@@ -972,11 +972,25 @@ describe('LeaveService', () => {
 
       expect(uow.callCount).toBe(1);
       expect(repository.findReversesCalls).toHaveLength(1);
+      expect(repository.findReversesCalls[0].reversesRequestId).toBe('lr-1');
       expect(repository.findReversesCalls[0].client).toBe(uow.stubClient);
+      expect(repository.createCalls[0].input.reversesRequestId).toBe('lr-1');
       expect(repository.createCalls[0].client).toBe(uow.stubClient);
+      // The balance is read FOR UPDATE before it is written, inside the same tx.
+      expect(balanceRepository.findByKeyCalls.some((c) => c.forUpdate)).toBe(true);
+      expect(balanceRepository.findByKeyCalls.every((c) => c.client === uow.stubClient)).toBe(
+        true
+      );
       expect(balanceRepository.updateCalls[0].client).toBe(uow.stubClient);
       expect(auditService.recordClients[0]).toBe(uow.stubClient);
       expect(notificationService.createClients[0]).toBe(uow.stubClient);
+    });
+
+    it('never hands the immutable original to update, not even by id', async () => {
+      const original = repository.rows[0];
+      await service.cancel(manager, 'lr-1');
+
+      expect(repository.updateCalls.some((c) => c.id === original.id)).toBe(false);
     });
 
     it('blocks a second cancellation of an already-reversed original with ConflictError and no writes', async () => {
