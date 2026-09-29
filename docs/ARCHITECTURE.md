@@ -1178,7 +1178,7 @@ Every public service method is declared on an interface before its implementatio
 1. **CANCEL audit `entityId` target** — reconciliation adopted the data design's choice (`entityId` = original APPROVED request id, `beforeState` = original, `afterState` = reversal); the domain business rule proposed the reversal row id. Confirm before the code agent writes the audit call.
 2. **Reversal-row approval provenance** — reconciliation adopted null `approverId`/`approvalComment`/`submittedAt`/`decidedAt` on the reversal row (provenance reached via `reversesRequestId`). Confirm, since a reader filtering on `approverId`/`decidedAt` will not see the reversal.
 3. **GET /leaves list shape** — reconciliation adopted returning both rows unchanged, paired by `reversesRequestId`. Every existing consumer (LeaveListPage, ApprovalsPage, DashboardPage) will render two rows unless it learns to filter.
-4. **Aggregation double-counting** — the reversal row copies `requestedDays`/dates from the original; any future aggregation summing `requestedDays` over CANCELLED rows must filter on `reverses_request_id IS NULL` or it double-counts.
+4. **[RESOLVED — BINDING RULE] Aggregation double-counting** — the reversal row copies `requestedDays`/dates from the original (never re-derived, never zeroed). Any aggregation that sums `requestedDays` MUST filter on `reverses_request_id IS NULL`, or the original APPROVED row and its reversal row are double-counted. This rule is binding feature-wide, not a comment on one call site.
 5. **Double-cancel guard** — resolved by the service `findByReversesRequestId` check plus the UNIQUE index backstop; confirm the `ConflictError` response is the desired UX.
 
 ### Stack compliance

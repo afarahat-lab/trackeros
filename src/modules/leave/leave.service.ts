@@ -92,6 +92,7 @@ export class LeaveService implements ILeaveService {
       decidedAt: null,
       cancelledBy: null,
       cancelledAt: null,
+      reversesRequestId: null,
     };
 
     // The request and its audit record are ONE unit of work. Written separately, a

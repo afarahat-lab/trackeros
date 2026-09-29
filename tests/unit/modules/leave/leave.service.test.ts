@@ -71,6 +71,13 @@ class FakeLeaveRepository implements ILeaveRepository {
     return this.rows.find((r) => r.id === id) ?? null;
   }
 
+  async findByReversesRequestId(
+    reversesRequestId: string,
+    _client?: PoolClient
+  ): Promise<LeaveRequest | null> {
+    return this.rows.find((r) => r.reversesRequestId === reversesRequestId) ?? null;
+  }
+
   async update(
     id: string,
     changes: UpdateLeaveRequestDto,
@@ -364,6 +371,7 @@ function makeRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
     decidedAt: null,
     cancelledBy: null,
     cancelledAt: null,
+    reversesRequestId: null,
     ...overrides,
   };
 }
@@ -888,6 +896,7 @@ describe('LeaveService concurrency and atomicity guarantees', () => {
       decidedAt: null,
       cancelledBy: null,
       cancelledAt: null,
+      reversesRequestId: null,
     });
   }
 
