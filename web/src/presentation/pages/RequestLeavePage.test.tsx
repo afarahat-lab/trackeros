@@ -22,6 +22,7 @@ const createdView = {
   decidedAt: null,
   cancelledBy: null,
   cancelledAt: null,
+  reversesRequestId: null,
 } satisfies LeaveRequestView;
 
 function buildLeaveService(create = vi.fn()): ILeaveService {

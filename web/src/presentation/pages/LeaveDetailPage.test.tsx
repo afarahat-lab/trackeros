@@ -75,6 +75,7 @@ function buildView(
     decidedAt: null,
     cancelledBy: null,
     cancelledAt: null,
+    reversesRequestId: null,
     ...overrides,
   };
 }

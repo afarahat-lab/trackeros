@@ -29,6 +29,7 @@ const leave: LeaveRequestView = {
   decidedAt: null,
   cancelledBy: null,
   cancelledAt: null,
+  reversesRequestId: null,
 };
 
 const input: CreateLeaveRequestInput = {

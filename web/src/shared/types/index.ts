@@ -73,6 +73,7 @@ export interface LeaveRequestView {
   decidedAt: Date | null;
   cancelledBy: string | null;
   cancelledAt: Date | null;
+  reversesRequestId: string | null;
 }
 
 export interface LoginResponse {
