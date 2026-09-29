@@ -1,0 +1,6 @@
+{
+  "templateId": "corporate-ops-web-mobile",
+  "templateVersion": "0.62.0",
+  "templateBaseCommit": "",
+  "_comment": "What the template said when this project was seeded \u2014 the BASE of the three-way merge `gestalt template upgrade` performs. Read-only to every agent, and kept by the merge purge. Do not edit by hand: editing it makes a template change look like your customization, or the reverse."
+}

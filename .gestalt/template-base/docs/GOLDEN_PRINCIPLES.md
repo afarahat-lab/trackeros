@@ -1,13 +1,15 @@
-# Golden Principles — trackeros
+# Golden Principles — {{projectName}}
 
 These invariants are non-negotiable. Violations produce
-`GOLDEN_PRINCIPLE_BREACH` signals and pause the cycle for human review —
-they are never auto-resolved by the platform.
+`GOLDEN_PRINCIPLE_BREACH` signals and pause the cycle for human review.
+The breach RECORD is closed only by a human; a breach whose findings name a
+file may first get one bounded, audited corrective pass that must re-gate
+(platform GP-003 / ADR-075).
 
 Stylistic rules and architectural conventions (no-any, no-direct-db,
 no-hardcoded-secrets, etc.) live in `HARNESS.json` under
 `constraints.rules` and produce `CONSTRAINT_VIOLATION` signals that the
-platform can auto-retry. The six principles below are the ones that
+platform can auto-retry. The eight principles below are the ones that
 get a human in the loop.
 
 ## GP-001 — Repository pattern
