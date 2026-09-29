@@ -357,6 +357,31 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
         }
         const originalApproverId = approvedBody.approverId;
         const originalDecidedAt = approvedBody.decidedAt;
+        const originalRequestedDays = approvedBody.requestedDays;
+        if (typeof originalRequestedDays !== 'number' || originalRequestedDays <= 0) {
+          throw new Error(
+            `the approved request must carry a positive requestedDays, got ` +
+            `${JSON.stringify(originalRequestedDays)}`
+          );
+        }
+
+        // Capture the balance AFTER approval and BEFORE cancellation: approval moved the
+        // original's requestedDays into usedDays, so cancellation must take EXACTLY that
+        // many back out. Comparing the before/after rows proves "released exactly once"
+        // against the original's own requestedDays rather than a bare literal 0.
+        const knexBefore = require('knex')(require('../knexfile').smoke_pg);
+        let usedDaysAfterApprove;
+        try {
+          const beforeRow = await knexBefore('leave_balances').where({ id: 'bal-1' }).first();
+          if (!beforeRow) throw new Error('seeded balance row bal-1 is missing after approval');
+          usedDaysAfterApprove = beforeRow.used_days;
+        } finally { await knexBefore.destroy(); }
+        if (usedDaysAfterApprove !== originalRequestedDays) {
+          throw new Error(
+            `approving must move the original's requestedDays into usedDays: got ` +
+            `${usedDaysAfterApprove}, expected ${originalRequestedDays}`
+          );
+        }
 
         const cancelled = await app.inject({
           method: 'POST', url: `/leaves/${seededRequestId}/cancel`,
@@ -422,18 +447,55 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
           throw new Error(`the reversal row must read CANCELLED, got ${reversalRow.status}`);
         }
 
-        // The release happened exactly once: the original's requestedDays is back out of
-        // usedDays, and pendingDays was never touched. Read it straight from the row the
-        // request resolved to (the 2030 period balance) before stage 8 re-keys it.
+        // The reversal row is independently readable by id, and reads CANCELLED with its
+        // reversesRequestId still pointing at the original. This exercises GET /leaves/:id
+        // on the NEW row (stage 7 covered the original), so the reversal is a full entry.
+        const reversalById = await app.inject({
+          method: 'GET', url: `/leaves/${reversal.id}`,
+          headers: { authorization: `Bearer ${loginToken}` },
+        });
+        if (reversalById.statusCode !== 200) {
+          throw new Error(`GET /leaves/${reversal.id} (reversal) returned ${reversalById.statusCode}`);
+        }
+        const reversalByIdBody = JSON.parse(reversalById.payload);
+        if (
+          reversalByIdBody.id !== reversal.id ||
+          reversalByIdBody.status !== LeaveStatus.CANCELLED ||
+          reversalByIdBody.reversesRequestId !== seededRequestId
+        ) {
+          throw new Error(
+            `GET /leaves/:id did not return the CANCELLED reversal row: ${String(reversalById.payload)}`
+          );
+        }
+
+        // A second cancel is rejected with 409 — the request has already been reversed,
+        // and the balance must not be released a second time.
+        const secondCancel = await app.inject({
+          method: 'POST', url: `/leaves/${seededRequestId}/cancel`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        if (secondCancel.statusCode !== 409) {
+          throw new Error(
+            `a second cancel of an already-reversed request must return 409, got ` +
+            `${secondCancel.statusCode}: ${String(secondCancel.payload || '').slice(0, 400)}`
+          );
+        }
+
+        // The release happened exactly once: the original's requestedDays (captured above)
+        // is back out of usedDays — usedDays returns to its pre-approval value — and
+        // pendingDays was never touched. Read it straight from the row the request resolved
+        // to (the 2030 period balance) before stage 8 re-keys it.
         const knexCheck = require('knex')(require('../knexfile').smoke_pg);
         try {
           const balanceRow = await knexCheck('leave_balances').where({ id: 'bal-1' }).first();
           if (!balanceRow) {
             throw new Error('seeded balance row bal-1 is missing');
           }
-          if (balanceRow.used_days !== 0) {
+          if (balanceRow.used_days !== usedDaysAfterApprove - originalRequestedDays) {
             throw new Error(
-              `expected usedDays released back to 0 after cancellation, got ${balanceRow.used_days}`
+              `expected usedDays released exactly once by the original's requestedDays ` +
+              `(${usedDaysAfterApprove} - ${originalRequestedDays} = ${usedDaysAfterApprove - originalRequestedDays}), ` +
+              `got ${balanceRow.used_days}`
             );
           }
           if (balanceRow.pending_days !== 0) {
