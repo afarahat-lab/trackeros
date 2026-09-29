@@ -98,7 +98,7 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
   // router. (`printRoutes()` confirmed both modes register /leaves identically.)
   try {
     const { signToken } = require('../src/shared/auth');
-    const { EmployeeRole, EmploymentStatus, LeaveTypeCode } = require('../src/shared/types');
+    const { EmployeeRole, EmploymentStatus, LeaveTypeCode, LeaveStatus } = require('../src/shared/types');
 
     if (!app.hasRoute({ method: 'POST', url: '/leaves' })) {
       throw new Error('POST /leaves is not registered — leaveRoutes is not mounted in app.ts');
@@ -148,13 +148,25 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
       try {
         const passwordHash = bcrypt.hashSync(SMOKE_PASSWORD, 10);
 
-        await knex('employees').insert({
-          id: EMP, employee_number: 'E-0001', first_name: 'Smoke', last_name: 'Test',
-          email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
-          manager_id: null, department: 'Engineering',
-          hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
-          password_hash: passwordHash,
-        });
+        await knex('employees').insert([
+          {
+            id: EMP, employee_number: 'E-0001', first_name: 'Smoke', last_name: 'Test',
+            email: 'smoke@example.com', role: EmployeeRole.EMPLOYEE,
+            manager_id: null, department: 'Engineering',
+            hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
+            password_hash: passwordHash,
+          },
+          // An ADMIN row for the GP-008 reversal stage below: approving/cancelling an
+          // APPROVED request writes actor.id into approver_id, which is FK-constrained to
+          // employees, so the actor must exist. One ADMIN may both approve and cancel.
+          {
+            id: 'smoke-admin', employee_number: 'E-0002', first_name: 'Smoke', last_name: 'Admin',
+            email: 'smoke-admin@example.com', role: EmployeeRole.ADMIN,
+            manager_id: null, department: 'Engineering',
+            hire_date: '2020-01-01', employment_status: EmploymentStatus.ACTIVE,
+            password_hash: passwordHash,
+          },
+        ]);
         await knex('leave_types').insert([
           { code: LeaveTypeCode.ANNUAL, name: 'Annual', requires_approval: true, is_paid: true },
           { code: LeaveTypeCode.SICK, name: 'Sick', requires_approval: true, is_paid: true },
@@ -305,6 +317,134 @@ console.log(`\n  smoke mode: ${MODE}${PG ? '' : '  (persistence NOT covered — 
         throw new Error(`GET /leaves/:id did not return the seeded request: ${String(one.payload)}`);
       }
       ok('stage 7 getById — GET /leaves/:id returns the seeded request');
+
+      // ── Stage 7b — GP-008: cancelling an APPROVED request inserts a reversal ──
+      //
+      // The approved row is IMMUTABLE: cancelling it must not touch its status,
+      // approverId or decidedAt. Instead a NEW terminal CANCELLED row is inserted whose
+      // reversesRequestId points at the original, and the original's requestedDays is
+      // released from usedDays exactly once. This runs BEFORE stage 8 re-keys the balance
+      // to the current period — the request's startDate (2030) resolves to the 2030
+      // balance row that still exists here.
+      {
+        // ADMIN is the one role that may cancel an APPROVED request it did not approve
+        // and is not the direct manager of; the existing signToken helper mints it, and
+        // the role check needs no employees row for ADMIN.
+        const adminToken = signToken({ id: 'smoke-admin', role: EmployeeRole.ADMIN });
+
+        const submitted = await app.inject({
+          method: 'POST', url: `/leaves/${seededRequestId}/submit`,
+          headers: { authorization: `Bearer ${loginToken}` },
+        });
+        if (submitted.statusCode !== 200) {
+          throw new Error(
+            `POST /leaves/:id/submit returned ${submitted.statusCode}: ${String(submitted.payload || '').slice(0, 400)}`
+          );
+        }
+
+        const approved = await app.inject({
+          method: 'POST', url: `/leaves/${seededRequestId}/approve`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        if (approved.statusCode !== 200) {
+          throw new Error(
+            `POST /leaves/:id/approve returned ${approved.statusCode}: ${String(approved.payload || '').slice(0, 400)}`
+          );
+        }
+        const approvedBody = JSON.parse(approved.payload);
+        if (approvedBody.status !== LeaveStatus.APPROVED) {
+          throw new Error(`approve did not move the request to APPROVED: ${String(approved.payload)}`);
+        }
+        const originalApproverId = approvedBody.approverId;
+        const originalDecidedAt = approvedBody.decidedAt;
+
+        const cancelled = await app.inject({
+          method: 'POST', url: `/leaves/${seededRequestId}/cancel`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        if (cancelled.statusCode !== 200) {
+          throw new Error(
+            `POST /leaves/:id/cancel returned ${cancelled.statusCode}: ${String(cancelled.payload || '').slice(0, 400)}`
+          );
+        }
+        const reversal = JSON.parse(cancelled.payload);
+        if (reversal.status !== LeaveStatus.CANCELLED) {
+          throw new Error(`cancel did not return a CANCELLED reversal: ${String(cancelled.payload)}`);
+        }
+        if (reversal.reversesRequestId !== seededRequestId) {
+          throw new Error(
+            `reversal must reference the original via reversesRequestId: got ` +
+            `${JSON.stringify(reversal.reversesRequestId)}, expected ${seededRequestId}`
+          );
+        }
+        if (reversal.id === seededRequestId) {
+          throw new Error('cancel must insert a NEW reversal row, not reuse the original id');
+        }
+
+        // The original is still readable and byte-identical: APPROVED with its approval
+        // provenance intact. Nothing was written back to it.
+        const originalAfter = await app.inject({
+          method: 'GET', url: `/leaves/${seededRequestId}`,
+          headers: { authorization: `Bearer ${loginToken}` },
+        });
+        if (originalAfter.statusCode !== 200) {
+          throw new Error(`GET /leaves/${seededRequestId} after cancel returned ${originalAfter.statusCode}`);
+        }
+        const originalBody = JSON.parse(originalAfter.payload);
+        if (originalBody.status !== LeaveStatus.APPROVED) {
+          throw new Error(
+            `the original APPROVED row must remain APPROVED after cancellation, got ${originalBody.status}`
+          );
+        }
+        if (originalBody.approverId !== originalApproverId || originalBody.decidedAt !== originalDecidedAt) {
+          throw new Error(
+            `the immutable approved row's approverId/decidedAt changed: ` +
+            `${JSON.stringify({ before: { approverId: originalApproverId, decidedAt: originalDecidedAt }, after: { approverId: originalBody.approverId, decidedAt: originalBody.decidedAt } })}`
+          );
+        }
+
+        // A second row exists in the owner's list whose reversesRequestId is the original.
+        const listAfter = await app.inject({
+          method: 'GET', url: '/leaves',
+          headers: { authorization: `Bearer ${loginToken}` },
+        });
+        if (listAfter.statusCode !== 200) {
+          throw new Error(`GET /leaves after cancel returned ${listAfter.statusCode}`);
+        }
+        const listAfterBody = JSON.parse(listAfter.payload);
+        const reversalRow = listAfterBody.find((l) => l.reversesRequestId === seededRequestId);
+        if (!reversalRow) {
+          throw new Error(
+            `GET /leaves did not include a reversal row referencing ${seededRequestId}`
+          );
+        }
+        if (reversalRow.status !== LeaveStatus.CANCELLED) {
+          throw new Error(`the reversal row must read CANCELLED, got ${reversalRow.status}`);
+        }
+
+        // The release happened exactly once: the original's requestedDays is back out of
+        // usedDays, and pendingDays was never touched. Read it straight from the row the
+        // request resolved to (the 2030 period balance) before stage 8 re-keys it.
+        const knexCheck = require('knex')(require('../knexfile').smoke_pg);
+        try {
+          const balanceRow = await knexCheck('leave_balances').where({ id: 'bal-1' }).first();
+          if (!balanceRow) {
+            throw new Error('seeded balance row bal-1 is missing');
+          }
+          if (balanceRow.used_days !== 0) {
+            throw new Error(
+              `expected usedDays released back to 0 after cancellation, got ${balanceRow.used_days}`
+            );
+          }
+          if (balanceRow.pending_days !== 0) {
+            throw new Error(
+              `cancelling an APPROVED request must not touch pendingDays, got ${balanceRow.pending_days}`
+            );
+          }
+        } finally { await knexCheck.destroy(); }
+
+        ok('stage 7b reversal — original stays APPROVED, new CANCELLED row references it, balance released once');
+      }
 
       // ── Stage 8 — current-period balances omit effective policies with no row ──
       // ONLY the ANNUAL balance exists (the SICK leave type has an effective ACTIVE policy
