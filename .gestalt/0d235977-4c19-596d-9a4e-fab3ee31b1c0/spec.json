@@ -1,0 +1,176 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "balance",
+      "audit",
+      "notification"
+    ],
+    "affectedLayers": [
+      "test",
+      "e2e-smoke"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The leave service unit suite contains a reversal test proving that after cancelling an APPROVED request the ORIGINAL row is never written: the original object is never passed to the repository's update, and the original still reads status APPROVED with its approverId, approvalComment and decidedAt byte-identical to the pre-cancel values.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts a NEW row is created with status CANCELLED and reversesRequestId equal to the original's id, and that this reversal row copies employeeId, leaveTypeCode, startDate, endDate, requestedDays and reason verbatim from the original while setting approverId, approvalComment, submittedAt and decidedAt to null and cancelledBy to the actor's id with cancelledAt set.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts the balance release happens exactly once, on the ORIGINAL's requestedDays (usedDays decremented by that amount), with pendingDays untouched, and that the balance row was read with the row lock (forUpdate) inside the transaction.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts exactly one AuditAction.CANCEL entry with entityId equal to the ORIGINAL request id, beforeState equal to the original and afterState equal to the reversal, and exactly one cancellation notification to the requester.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts the double-cancel guard: when the repository reports an existing reversal for the original id, cancel throws ConflictError and performs no insert, no balance write, no audit record and no notification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts DRAFT and SUBMITTED cancellation is unchanged in place: no reversal row is created, the created row's reversesRequestId stays null, and the existing in-place assertions (DRAFT touches no balance; SUBMITTED releases pendingDays) still hold.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The unit suite asserts transaction containment: every participating call (findByReversesRequestId, balance read/write, reversal create, audit record, notification create) receives the single stub PoolClient from the one withTransaction callback, and the unit of work is entered exactly once.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The smoke script, in Postgres mode, drives create \u2192 submit \u2192 approve \u2192 cancel of a request and then reads the original back: it still reports APPROVED with its approverId and decidedAt intact, while a second row exists whose reversesRequestId equals the original's id and whose status is CANCELLED.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The smoke script asserts the balance release happened exactly once: the original's requestedDays is returned to usedDays (usedDays back to its pre-approval value) and pendingDays is unchanged.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "`npm run build` (tsc) is clean for both application roots, the full Jest suite passes, and `npm run smoke` passes against real Postgres with the new reversal stage executed (not skipped).",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "No production source changes: the Phase 1\u20133 deliverables (leave.model.ts, leave.repository.ts, leave.service.ts, web/src/shared/types/index.ts) are fixed contracts and must not be edited. Only the leave service unit test and scripts/smoke.js may change.",
+    "Assertions must be derived from the actual code, not assumed names: read LeaveRequest.reversesRequestId, ILeaveRepository.findByReversesRequestId, the cancel reversal branch, and LeaveRequestView.reversesRequestId before writing any assertion.",
+    "The unit test must reuse the existing eight in-memory fakes and the existing fixtures (makeRequest, makeActor, makeBalance, makeEmployee, makePolicy) rather than introducing new doubles; the FakeLeaveRepository must keep satisfying ILeaveRepository (findByReversesRequestId returning null by default and the previously-created reversal when one exists).",
+    "The smoke script's existing stages and the sqlite-mode skip caveat (stage 3d skipped, sawDbGap=true) must remain untouched; the reversal assertion is added only to the Postgres-mode path.",
+    "The smoke reversal stage must run before the existing stage 8 re-keys bal-1 to the current accrual period (or seed a dedicated 2030 balance), because after the re-key no balance exists for the 2030 period and the release would fail with NotFoundError.",
+    "The smoke script must not hardcode credentials (no-hardcoded-secrets): reuse the existing SMOKE_PASSWORD env pattern and the existing signToken helper for the approving/cancelling actor.",
+    "The smoke actor that approves and cancels must be an ADMIN (the seeded employee has manager_id null, so no direct manager exists); the requester must remain the seeded employee so resolveBalance can resolve the balance.",
+    "Strict TypeScript: no `any`; the test file must type-check under the existing tsconfig and the fakes must remain structurally assignable to their interfaces."
+  ],
+  "outOfScope": [
+    "Any production source edit \u2014 leave.model.ts, leave.repository.ts, leave.service.ts, leave.routes.ts, web/src/shared/types/index.ts, migrations, or the unit of work.",
+    "New endpoints, new HTTP methods/paths, or changes to the cancel route's authorization, status codes or response shape.",
+    "Web test changes (Vitest suites under web/src) and any client-side reversal logic.",
+    "Fixing the still-open \"GET /leaves list shape\" question (consumers rendering both rows) \u2014 the read path returns both rows unchanged and this phase does not filter or collapse them."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (APPROVED state)",
+      "mustExistOrExtend": true,
+      "invariant": "Once APPROVED, the row is terminal and immutable: status, approverId, approvalComment and decidedAt are never written again. Cancelling an APPROVED request must not pass the original row to any update operation; the original remains byte-identical and still readable as APPROVED."
+    },
+    {
+      "entity": "LeaveRequestReversal (row with reversesRequestId non-null)",
+      "mustExistOrExtend": true,
+      "invariant": "Born CANCELLED and terminal: it copies employeeId, leaveTypeCode, startDate, endDate, requestedDays and reason verbatim from the original, carries null approverId/approvalComment/submittedAt/decidedAt, sets cancelledBy to the cancelling actor and cancelledAt, and never transitions again (no submit/approve/reject/cancel, never itself reversed)."
+    },
+    {
+      "entity": "LeaveBalance",
+      "mustExistOrExtend": true,
+      "invariant": "Cancelling an APPROVED request releases the ORIGINAL's requestedDays from usedDays exactly once (usedDays -= requestedDays, no pro-rating) and leaves pendingDays untouched; the release is skipped and never applied twice."
+    },
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one CANCEL record per approved cancellation, with entityId = the ORIGINAL APPROVED request id, beforeState = the original and afterState = the reversal row, written in the same unit of work as the reversal insert and the balance release."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one cancellation notification to the requester per approved cancellation, pointing at the ORIGINAL request id, written in the same unit of work."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 APPROVED branch (reversal)",
+      "authRule": "Unchanged: only the direct manager or an ADMIN may cancel an APPROVED request; the owner may not; cancellation is blocked once startDate <= today (UTC day) with ConflictError.",
+      "idempotent": false,
+      "errorSemantics": "A second cancel of an already-reversed original throws ConflictError (409) before any write; unknown request -> NotFoundError (404); unauthorized -> ForbiddenError (403)."
+    },
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId, client?)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Returns null when no reversal exists; never throws for absence. The service decides error semantics (ConflictError on a found reversal)."
+    },
+    {
+      "operation": "IUnitOfWork.withTransaction(fn)",
+      "authRule": "",
+      "idempotent": false,
+      "errorSemantics": "The reversal insert, balance release, audit write and notification all join ONE callback; the same client is forwarded to every participating call; a throw rolls the whole unit back."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The unit test's FakeLeaveRepository must remain structurally assignable to ILeaveRepository, including findByReversesRequestId(reversesRequestId, client?) returning null by default and the previously-created reversal when one exists.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "Assertions on the reversal row's shape and the original's immutability must match the actual cancel reversal branch (field names, nulls, audit entityId/beforeState/afterState, notification title) rather than the plan's prose.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The smoke assertion must read the reversal linkage off the same field name the read model exposes (reversesRequestId) and must not infer the pairing from dates or employeeId.",
+      "referencePath": "web/src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The smoke reversal stage must reuse the existing seed (employee, leave type, policy, balance), the existing signToken helper and the existing SMOKE_PASSWORD pattern, and must not duplicate or re-seed them.",
+      "referencePath": "scripts/smoke.js"
+    },
+    {
+      "requirement": "The reversal assertions must encode the binding GP-008 rules (immutability, new-instance reversal, exactly-once release, single CANCEL audit against the original id, terminal reversal row) as stated in the feature's architecture section.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts",
+      "why": "The existing suite already has the eight fakes, fixtures and a cancel describe block; the reversal block extends it and must keep the existing tests passing."
+    },
+    {
+      "target": "scripts/smoke.js",
+      "why": "The Postgres-mode stages already seed the employee/type/policy/balance and exercise create/list/getById; the reversal stage slots into that flow and must respect stage 8's balance re-key ordering."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts (cancel reversal branch)",
+      "why": "The behaviour under test; the tests must assert against its actual contract, not a re-specified one."
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts (ILeaveRepository.findByReversesRequestId, create, COLUMNS/mapRow)",
+      "why": "The fake and the smoke assertions depend on this interface's exact shape and on reverses_request_id being carried end-to-end."
+    },
+    {
+      "target": "src/shared/db (IUnitOfWork / PgUnitOfWork)",
+      "why": "The containment assertions rely on the single withTransaction callback and the client threaded to every participating call."
+    }
+  ]
+}
