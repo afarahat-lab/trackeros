@@ -1168,8 +1168,8 @@ Every public service method is declared on an interface before its implementatio
 
 1. **Phase 1 — `reverses_request_id` column, model field, repository plumbing** (3 files). New knex migration (PostgreSQL) adds nullable `reverses_request_id` with a self-referencing FK and a UNIQUE index. `LeaveRequest` gains `reversesRequestId: string | null`; `PgLeaveRequestRepository` carries it end-to-end and gains `findByReversesRequestId`. **Delivered.**
 2. **Phase 2 — `LeaveService.cancel` reversal branch (GP-008)** (1 file). DRAFT/SUBMITTED keep the in-place `update` path; APPROVED inserts a NEW CANCELLED row via `create` and never writes the original. Balance release, CANCEL audit and notification stay exactly-once inside one `withTransaction`. A pre-insert `findByReversesRequestId` check throws `ConflictError` on a repeat cancel. **Delivered — see below.**
-3. **Phase 3 — expose `reversesRequestId` on the read model (wire + web)** (2 files). Backend read path needs no change; `web/src/shared/types/index.ts` `LeaveRequestView` gains `reversesRequestId: string | null` and the API client passes it through.
-4. **Phase 4 — tests: reversal unit test + smoke assertion** (2 files). Unit test proves the original stays APPROVED, exactly one CANCELLED reversal row references it, `usedDays` released exactly once, one CANCEL audit entry and one notification, all in a single `withTransaction`. Smoke stage approves then cancels against real Postgres and asserts two rows with the original still APPROVED.
+3. **Phase 3 — expose `reversesRequestId` on the read model (wire + web)** (2 files). Backend read path needs no change; `web/src/shared/types/index.ts` `LeaveRequestView` gains `reversesRequestId: string | null` and the API client passes it through. **Delivered — see below.**
+4. **Phase 4 — tests: reversal unit test + smoke assertion** (2 files). Unit test proves the original stays APPROVED, exactly one CANCELLED reversal row references it, `usedDays` released exactly once, one CANCEL audit entry and one notification, all in a single `withTransaction`. Smoke stage approves then cancels against real Postgres and asserts two rows with the original still APPROVED. **Delivered — see below.**
 
 ### Phase 2 delivered (LeaveService.cancel reversal branch)
 This phase implements the GP-008 reversal branch in `src/modules/leave/leave.service.ts` — the sole file changed. The Phase 1 persistence foundation (`reverses_request_id` column, `LeaveRequest.reversesRequestId`, `ILeaveRepository.findByReversesRequestId`) was already in place and is consumed as a fixed contract.
@@ -1191,7 +1191,7 @@ This phase implements the GP-008 reversal branch in `src/modules/leave/leave.ser
 
 **Divergences from the plan worth noting:**
 - The plan described the DRAFT/SUBMITTED path as "byte-identical"; the implementation restructured the branch (APPROVED handled first, then a single `if (request.status === SUBMITTED)` block) rather than keeping the original `if (status !== DRAFT) { ... if SUBMITTED ... else ... }` nesting. Observable behaviour is identical — DRAFT still touches no balance, SUBMITTED still releases `pendingDays` — but the code shape differs from the pre-existing structure.
-- The plan's Phase 2 was scoped to production code only ("no test file changes this phase"); the committed diff for this phase likewise touches no test file, so the reversal unit test and smoke assertion remain Phase 4 work.
+- The plan's Phase 2 was scoped to production code only ("no test file changes this phase"); the committed diff for this phase likewise touches no test file. The reversal unit test and smoke assertion were delivered in Phase 4 (see below).
 
 ### Phase 3 delivered (expose `reversesRequestId` on the web read model)
 This phase delivers recommended Phase 3 — surfacing the reversal linkage on the web read model. The backend read path needed no change: `src/modules/leave/leave.routes.ts` is untouched (the repository's `mapRow` already supplies `reversesRequestId` and the routes pass the service's `LeaveRequest` objects through unchanged), resolving the phase's open ambiguity in favour of "leave the route untouched" rather than adding a route-level mapping.
@@ -1201,6 +1201,27 @@ This phase delivers recommended Phase 3 — surfacing the reversal linkage on th
 **Divergence from the plan worth noting:** the phase spec asserted "no test file changes this phase", but the committed diff also updates five existing test files — `web/src/modules/approvals/approvals.service.test.ts`, `web/src/modules/leave/leave.service.test.ts`, and `web/src/presentation/pages/{ApprovalsPage,LeaveDetailPage,LeaveListPage,RequestLeavePage}.test.tsx` — each adding `reversesRequestId: null` to its `LeaveRequestView` fixture builder. These are mechanical fixture completions forced by the new required field (the fixtures are typed as `LeaveRequestView`), not new test cases: no test file is added or deleted and no assertion changes. Without them `tsc` would fail on the web root.
 
 **Read-path behaviour (unchanged, now consumable):** `GET /leaves` and `GET /leaves/:id` continue to return both the original APPROVED row (`reversesRequestId` = null) and its CANCELLED reversal row (`reversesRequestId` = the original's id) as two independent entries, with role scoping and error semantics unchanged. The client pairs them via `reversesRequestId`; neither row is suppressed, collapsed, or filtered. No query parameter or route-level mapping was added. The "GET /leaves list shape" open question remains open: every existing consumer (LeaveListPage, ApprovalsPage, DashboardPage) still renders two rows unless it learns to filter on `reversesRequestId`.
+
+### Phase 4 delivered (reversal unit test + smoke assertion)
+This phase delivers recommended Phase 4 — the GP-008 reversal test coverage. Two files changed, both test-only; no production source was touched (the Phase 1–3 deliverables are fixed contracts).
+
+**Unit test — `tests/unit/modules/leave/leave.service.test.ts`.** A new `describe('cancel (APPROVED reversal)')` block extends the existing suite, reusing the eight in-memory fakes and fixtures. `FakeLeaveRepository.findByReversesRequestId` now records its calls (`findReversesCalls`) and forwards the optional `client`, so the reversal lookup is assertable. The block's own `beforeEach` seeds an APPROVED request with `usedDays = REQUESTED_DAYS` (the existing cancel `beforeEach` seeds `usedDays: 0`, which would not exercise the release path) and clears the recorded-call arrays before each case. Cases:
+- **Original immutability** — `repository.updateCalls` is empty; the stored original is the same object and still reads APPROVED with `approverId`/`approvalComment`/`decidedAt` byte-identical; no update call targets the original id.
+- **Reversal shape** — exactly one `repository.create` call; the new row is CANCELLED with `reversesRequestId === original.id`, copies `employeeId`/`leaveTypeCode`/`startDate`/`endDate`/`requestedDays`/`reason` verbatim, nulls `approverId`/`approvalComment`/`submittedAt`/`decidedAt`, and sets `cancelledBy = actor.id` with `cancelledAt` a `Date`.
+- **Exactly-once release** — exactly one balance update, `usedDays` back to 0, `pendingDays` `undefined` in the change set.
+- **Audit** — exactly one `AuditAction.CANCEL` record with `entityId = original.id`, `beforeState = original`, `afterState = reversal`.
+- **Notification** — exactly one cancellation notification (`type 'leave_request'`, title `'Leave request cancelled'`, recipient the requester, `relatedEntityId = 'lr-1'`).
+- **Transaction containment** — `uow.callCount === 1`; `findByReversesRequestId`, `create`, the balance read (`forUpdate` true) and write, the audit record and the notification create all receive the single stub `PoolClient`.
+- **Double-cancel guard** — with a pre-existing reversal row, `cancel` throws `ConflictError` (asserted `statusCode: 409`) and performs no insert, no balance write, no audit and no notification.
+- **DRAFT/SUBMITTED unchanged** — both cancel in place (`repository.update` on the same id), create no reversal row, and leave `reversesRequestId` null.
+
+**Smoke — `scripts/smoke.js` (Postgres mode).** A new **stage 7b** drives the full reversal flow against real Postgres: it mints an ADMIN token via the existing `signToken` helper, submits then approves the seeded request, then cancels it. It asserts the cancel response is a NEW CANCELLED row whose `reversesRequestId` equals the original id (and whose id differs from the original), that `GET /leaves/:id` still returns the original as APPROVED with its `approverId`/`decidedAt` unchanged, that `GET /leaves` includes a CANCELLED row referencing the original, and — reading `leave_balances` directly — that `used_days` is back to 0 with `pending_days` untouched. The stage runs **before** stage 8 re-keys `bal-1` to the current period, because after the re-key no balance exists for the request's 2030 period and the release would fail with `NotFoundError`. The seed block now inserts a second `employees` row (`smoke-admin`, `EmployeeRole.ADMIN`) alongside the seeded employee, because approving/cancelling writes `actor.id` into `approver_id`, which is FK-constrained to `employees`; one ADMIN may both approve and cancel. The existing stages and the sqlite-mode skip caveat are untouched.
+
+**Divergences from the plan worth noting:**
+- The plan scoped Phase 4 to "2 files"; the committed diff matches (the unit test and `scripts/smoke.js`).
+- The plan's unit-test constraint required the reversal tests to seed `usedDays = REQUESTED_DAYS`; the implementation does so in the block's own `beforeEach` while leaving the existing cancel `beforeEach` (`usedDays: 0`) intact.
+- The plan required the smoke actor to be an ADMIN; the implementation seeds a dedicated ADMIN employee row rather than reusing the seeded employee (whose `manager_id` is null, so no direct manager exists), and reuses the existing `SMOKE_PASSWORD`/`signToken` pattern with no hardcoded credential.
+
 ### Open questions
 
 1. **CANCEL audit `entityId` target** — **resolved by the implementation**: `entityId` = the ORIGINAL APPROVED request id, `beforeState` = the original, `afterState` = the reversal row.
@@ -1212,6 +1233,3 @@ This phase delivers recommended Phase 3 — surfacing the reversal linkage on th
 ### Stack compliance
 
 TypeScript on Node 20, npm, Jest, Fastify, React (Vite SPA), PostgreSQL, modular monolith. The migration targets PostgreSQL (the declared database); the smoke check runs against real Postgres. No framework outside the declared stack is used.
-<!-- gestalt:architecture feature=79f682f0-f52a-4751-b803-2b0059522cdd END -->
-
-<!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a START -->
