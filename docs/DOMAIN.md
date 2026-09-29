@@ -39,10 +39,12 @@ Represents a leave record managed by the `leave` module, including leave request
 | approvedAt | Date \| null | false |
 | createdAt | Date | true |
 | updatedAt | Date | true |
+| reversesRequestId | string \| null | true |
 
 **Relationships**
 - `Employee` — many-to-one
 
+**Reversal provenance (GP-008)** — `reversesRequestId` is `null` for every ordinary request and non-null only on a reversal row, where it equals the id of the original APPROVED request it reverses. It is set at INSERT time only and is never updated. A reversal row is born CANCELLED and is terminal/inert; at most one reversal row may exist per original request (UNIQUE index on `reverses_request_id`). Because a reversal row copies the original's `requestedDays` verbatim, any aggregation summing `requestedDays` MUST filter on `reverses_request_id IS NULL` or it double-counts.
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
