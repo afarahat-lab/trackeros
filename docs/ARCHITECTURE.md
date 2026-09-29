@@ -811,8 +811,7 @@ New top-level `web/` directory, separate from the `src/` Fastify backend. React 
 - **AuthSession** — token, profile, status. Lifecycle: `LOGGED_OUT` → `LOGGED_IN` → `EXPIRED` → `LOGGED_OUT`. Created on login, cleared on logout or any 401.
 - **EmployeeProfile** — read-only signed-in employee; never carries `passwordHash` or `terminationDate`.
 - **LeaveBalanceView** — read-only balance; `available = entitledDays - usedDays - pendingDays` (display only, never persisted). Lifecycle: `OPEN`, `CLOSED`.
-- **LeaveRequestView** — read-only leave request. Lifecycle displayed only: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`.
-
+- **LeaveRequestView** — read-only leave request. Lifecycle displayed only: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`. Carries `reversesRequestId: string | null` (the GP-008 reversal linkage): `null` on an original row, the original's id on a CANCELLED reversal row. Read-only projection — no lifecycle transitions and no client-side reversal behaviour.
 ### Module boundaries
 - `shared-types` — `web/src/shared/types/` — `EmployeeProfile`, `LeaveBalanceView`, `LeaveRequestView`, `LoginResponse`, enums (`EmployeeRole`, `LeaveTypeCode`, `LeaveStatus`, `EmploymentStatus`, `AuthSessionStatus`).
 - `shared-date` — `web/src/shared/date/` — `formatUtcDate`, `parseUtcDate`.
@@ -1173,7 +1172,6 @@ Every public service method is declared on an interface before its implementatio
 4. **Phase 4 — tests: reversal unit test + smoke assertion** (2 files). Unit test proves the original stays APPROVED, exactly one CANCELLED reversal row references it, `usedDays` released exactly once, one CANCEL audit entry and one notification, all in a single `withTransaction`. Smoke stage approves then cancels against real Postgres and asserts two rows with the original still APPROVED.
 
 ### Phase 2 delivered (LeaveService.cancel reversal branch)
-
 This phase implements the GP-008 reversal branch in `src/modules/leave/leave.service.ts` — the sole file changed. The Phase 1 persistence foundation (`reverses_request_id` column, `LeaveRequest.reversesRequestId`, `ILeaveRepository.findByReversesRequestId`) was already in place and is consumed as a fixed contract.
 
 **`LeaveService.cancel(actor, requestId)`** now branches on the request's current status inside the single `uow.withTransaction` callback:
@@ -1195,6 +1193,14 @@ This phase implements the GP-008 reversal branch in `src/modules/leave/leave.ser
 - The plan described the DRAFT/SUBMITTED path as "byte-identical"; the implementation restructured the branch (APPROVED handled first, then a single `if (request.status === SUBMITTED)` block) rather than keeping the original `if (status !== DRAFT) { ... if SUBMITTED ... else ... }` nesting. Observable behaviour is identical — DRAFT still touches no balance, SUBMITTED still releases `pendingDays` — but the code shape differs from the pre-existing structure.
 - The plan's Phase 2 was scoped to production code only ("no test file changes this phase"); the committed diff for this phase likewise touches no test file, so the reversal unit test and smoke assertion remain Phase 4 work.
 
+### Phase 3 delivered (expose `reversesRequestId` on the web read model)
+This phase delivers recommended Phase 3 — surfacing the reversal linkage on the web read model. The backend read path needed no change: `src/modules/leave/leave.routes.ts` is untouched (the repository's `mapRow` already supplies `reversesRequestId` and the routes pass the service's `LeaveRequest` objects through unchanged), resolving the phase's open ambiguity in favour of "leave the route untouched" rather than adding a route-level mapping.
+
+**`web/src/shared/types/index.ts`** — `LeaveRequestView` gains `reversesRequestId: string | null` as its LAST field, positioned after `cancelledAt`. No other field of the interface is added, renamed, split, reordered, or retyped; `EmployeeProfile`, `LeaveBalanceView`, `LoginResponse`, `CreateLeaveRequestInput` and the enums are untouched. The field name, type and nullability mirror the backend `LeaveRequest.reversesRequestId` exactly, so the read model stays a faithful projection of the service's returned object. No client-side reversal logic is introduced: `leave.service.ts` (`ILeaveService`/`LeaveService`), `leave.actions.ts` and `leave.validation.ts` keep their existing method set and behaviour — the field only flows through the type, and the API client passes it through unchanged.
+
+**Divergence from the plan worth noting:** the phase spec asserted "no test file changes this phase", but the committed diff also updates five existing test files — `web/src/modules/approvals/approvals.service.test.ts`, `web/src/modules/leave/leave.service.test.ts`, and `web/src/presentation/pages/{ApprovalsPage,LeaveDetailPage,LeaveListPage,RequestLeavePage}.test.tsx` — each adding `reversesRequestId: null` to its `LeaveRequestView` fixture builder. These are mechanical fixture completions forced by the new required field (the fixtures are typed as `LeaveRequestView`), not new test cases: no test file is added or deleted and no assertion changes. Without them `tsc` would fail on the web root.
+
+**Read-path behaviour (unchanged, now consumable):** `GET /leaves` and `GET /leaves/:id` continue to return both the original APPROVED row (`reversesRequestId` = null) and its CANCELLED reversal row (`reversesRequestId` = the original's id) as two independent entries, with role scoping and error semantics unchanged. The client pairs them via `reversesRequestId`; neither row is suppressed, collapsed, or filtered. No query parameter or route-level mapping was added. The "GET /leaves list shape" open question remains open: every existing consumer (LeaveListPage, ApprovalsPage, DashboardPage) still renders two rows unless it learns to filter on `reversesRequestId`.
 ### Open questions
 
 1. **CANCEL audit `entityId` target** — **resolved by the implementation**: `entityId` = the ORIGINAL APPROVED request id, `beforeState` = the original, `afterState` = the reversal row.
