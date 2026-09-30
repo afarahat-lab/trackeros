@@ -120,17 +120,23 @@ jobs:
       - name: Lint
         id: lint
         continue-on-error: true
-        # TR_056-unblock — eslint@10.x (npx default) requires flat
-        # config (eslint.config.js). Projects on legacy .eslintrc.*
-        # break with "ESLint couldn't find an eslint.config file".
-        # Pin to eslint@8 (last release that honours legacy config)
-        # and skip the step entirely when no eslint config is
-        # present anywhere in the tree — matches the project's own
-        # `npm run lint` no-op contract.
+        # Prefer the PROJECT'S OWN `npm run lint`, so CI lints exactly what the
+        # project says it lints. The previous form hardcoded `eslint@8 src`, which
+        # covered 66 of 143 files: every file under `web/src` was unlinted, and a
+        # planted `any` there passed CI while the identical line in `src` failed.
+        # That is the #152 frontend blindness again, in CI rather than the gate.
+        # The `npx eslint@8 .` fallback stays for a project with a config but no
+        # lint script; it is pinned to 8 because npx's default major requires flat
+        # config and a project on legacy .eslintrc.* breaks with
+        # "ESLint couldn't find an eslint.config file".
         run: |
           if [ -f package.json ] || [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
             if ls eslint.config.js eslint.config.mjs eslint.config.cjs .eslintrc.js .eslintrc.cjs .eslintrc.json .eslintrc.yml .eslintrc.yaml 2>/dev/null | grep -q .; then
-              npx eslint@8 src --max-warnings 0
+              if [ -f package.json ] && node -p "!!(require('./package.json').scripts||{}).lint" 2>/dev/null | grep -q true; then
+                npm run lint
+              else
+                npx eslint@8 . --max-warnings 0
+              fi
             else
               echo "No eslint config in tree — skipping lint"
             fi

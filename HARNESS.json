@@ -77,26 +77,23 @@
     ]
   },
   "constraints": {
+    "_comment": "Project-wide rules. Every rule MUST name its enforcer \u2014 a rule that names none is policy nobody applies, which is the state all four of these were in until 2026-09-30. `ci` rules name a job in this project's own workflows; the gate CONFIRMS that job ran rather than re-checking.",
     "rules": [
       {
         "id": "no-any",
         "description": "Use unknown with type guards instead of any",
-        "severity": "high"
-      },
-      {
-        "id": "no-direct-db-outside-repository",
-        "description": "Database calls must go through repository pattern",
-        "severity": "critical"
+        "severity": "high",
+        "enforcer": "ci",
+        "ciJob": "quality",
+        "ciStep": "Lint"
       },
       {
         "id": "no-hardcoded-secrets",
         "description": "No hardcoded passwords, API keys, or tokens",
-        "severity": "critical"
-      },
-      {
-        "id": "no-gestalt-internal-deps",
-        "description": "Do not add @gestalt/* packages as project dependencies \u2014 these are Gestalt platform internals not available on npm",
-        "severity": "critical"
+        "severity": "critical",
+        "enforcer": "ci",
+        "ciJob": "quality",
+        "ciStep": "Security scan"
       }
     ]
   },
