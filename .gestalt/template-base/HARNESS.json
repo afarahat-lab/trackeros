@@ -1,0 +1,126 @@
+{
+  "name": "{{projectSlug}}",
+  "version": "0.1.0",
+  "tier": "tier1",
+  "description": "{{projectDescription}}",
+  "stack": {
+    "language": "{{language}}",
+    "nodeVersion": "{{nodeVersion}}",
+    "packageManager": "{{packageManager}}",
+    "testFramework": "{{testFramework}}",
+    "framework": "{{framework}}",
+    "frontend": "{{frontend}}",
+    "database": "{{database}}",
+    "architectureStyle": "modular-monolith"
+  },
+  "_comment_gate": "qualityGate: what the gate enforces. `applicationRoots` declares each BUILD in this repository so the dependency map in docs/ARCHITECTURE.md can describe more than one; `ownedDecisions` names symbols whose rule belongs to a single module. Both are read by the constraint agent's deterministic checks. See docs/guides/pipeline-yaml.md.",
+  "qualityGate": {
+    "required": [
+      "constraint-check",
+      "design-review"
+    ],
+    "blockingSignals": [
+      "GOLDEN_PRINCIPLE_BREACH",
+      "CONSTRAINT_VIOLATION"
+    ],
+    "autoResolvableSignals": [
+      "LINT_FAILURE",
+      "TEST_FAILURE"
+    ],
+    "maxRetries": 3,
+    "_comment_applicationRoots": "Each BUILD whose module boundaries the dependency map describes. `prefix` keeps two builds' identically-named modules apart in one flat map; `containers` are the directories under the root that hold modules. Module names DERIVE from the path: <prefix><name> under `modules`, <prefix><container>-<name> elsewhere. Declare nothing and only the repository-root src/ is checked. The web/src root is declared because this template targets a web front end; a root that matches no directory yet is inert until the project creates one.",
+    "applicationRoots": [
+      {
+        "path": "src",
+        "prefix": "",
+        "containers": [
+          "modules",
+          "shared"
+        ]
+      },
+      {
+        "path": "web/src",
+        "prefix": "web-",
+        "containers": [
+          "modules",
+          "shared",
+          "presentation",
+          "infrastructure"
+        ]
+      }
+    ],
+    "_comment_ownedDecisions": "Symbols whose meaning is a POLICY, and the modules allowed to branch on them. A rule expressed in two places eventually gets expressed inconsistently. Flags COMPARISONS only \u2014 a type annotation or an import is a reference, not a decision \u2014 and only on lines the phase wrote. Declare nothing and the check does nothing. Empty here because the symbols are a PROJECT's own: add a row per policy type, e.g. {\"symbol\": \"<Role enum>\", \"owners\": [\"<module that owns the rule>\"], \"why\": \"...\"}.",
+    "ownedDecisions": []
+  },
+  "constraints": {
+    "_comment": "Project-wide rules. Every rule MUST name its enforcer — a rule that names none is policy nobody applies, which is the state all four of these were in until 2026-09-30. `ci` rules name a job in this project's own workflows; the gate CONFIRMS that job ran rather than re-checking, because re-implementing semgrep or eslint beside them would be strictly worse and would double every finding.",
+    "rules": [
+      {
+        "id": "no-any",
+        "description": "Use unknown with type guards instead of any",
+        "severity": "high",
+        "enforcer": "ci",
+        "ciJob": "quality",
+        "ciStep": "Lint"
+      },
+      {
+        "id": "no-hardcoded-secrets",
+        "description": "No hardcoded passwords, API keys, or tokens",
+        "severity": "critical",
+        "enforcer": "ci",
+        "ciJob": "quality",
+        "ciStep": "Security scan"
+      }
+    ]
+  },
+  "pipeline": {
+    "adapter": "noop",
+    "autoMerge": false,
+    "mergeMethod": "squash"
+  },
+  "planner": {
+    "enabled": true,
+    "maxPhasesPerFeature": 10,
+    "maxFilesPerPhase": 5,
+    "maxModulesPerPhase": 2,
+    "architectureReviewPerPhase": true,
+    "maxPhaseRetries": 2,
+    "engine": "langgraph"
+  },
+  "tokenManagement": {
+    "promptCompressionThreshold": 6000,
+    "maxRetryBudgetMultiplier": 2.0,
+    "enableDynamicBudget": true,
+    "enableScopeReduction": true
+  },
+  "_comment_verification": "verification.command: the project's REAL install+compile+test invocation, run in the work dir after the code agent declares done and BEFORE the commit, so a compile error cannot reach CI. Ideally the same command CI runs. Absent or empty means verification is skipped.",
+  "verification": {
+    "command": "{{verificationCmd}}",
+    "timeoutSeconds": 900
+  },
+  "maintenance": {
+    "driftCheck": {
+      "enabled": true,
+      "scheduleUtc": "0 2 * * *"
+    },
+    "alignmentCheck": {
+      "enabled": true,
+      "scheduleUtc": "0 3 * * *"
+    },
+    "gcCheck": {
+      "enabled": true,
+      "scheduleUtc": "0 4 * * 5"
+    },
+    "monitoring": {
+      "adapter": "noop",
+      "enabled": true,
+      "connectionConfig": {},
+      "thresholds": {
+        "errorRatePercent": 5.0,
+        "latencyP99Ms": 2000,
+        "alertCountWindow": "1h",
+        "alertCountThreshold": 10
+      }
+    }
+  }
+}
