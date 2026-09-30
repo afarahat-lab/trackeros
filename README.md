@@ -55,3 +55,4 @@ The seed creates two accounts that share a single demo password:
 | Employee | `employee@example.com` | `demo-password` |
 
 The shared password is the literal hardcoded by the seed for demo purposes only.
+
