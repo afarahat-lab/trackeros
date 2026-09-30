@@ -8,7 +8,7 @@
     "dev": "node scripts/dev.js",
     "build": "./node_modules/.bin/tsc --noEmit",
     "test": "jest --passWithNoTests --forceExit",
-    "lint": "echo \"No lint configured\"",
+    "lint": "eslint . --max-warnings 0",
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:make": "knex migrate:make",
@@ -40,6 +40,8 @@
     "sqlite3": "^6.0.1",
     "ts-jest": "^29.0.0",
     "ts-node": "^10.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "eslint": "^9.11.0",
+    "typescript-eslint": "^8.7.0"
   }
 }
