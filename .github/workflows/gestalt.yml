@@ -47,6 +47,24 @@ on:
       - 'PLAN.md'
       - 'docs/**'
       - 'AGENTS.md'
+  # EVERY pull request gets CI, whatever the branch is called.
+  #
+  # The `push` trigger above matches only the five prefixes the PLATFORM creates. A human PR
+  # from `chore/**` or `feat/**` therefore reported ZERO checks — and on 2026-09-30 three of
+  # them (#644, #650, #651) were merged that way, because a merge loop read "no checks" as
+  # "nothing failed". `pull_request` has no branch-name condition, so it cannot develop the
+  # same gap: a prefix nobody thought of is still covered.
+  #
+  # `branches:` is deliberately absent. For `pull_request` it filters the BASE branch, not the
+  # head, so it could not express "skip platform branches" even if that belonged here — that
+  # exclusion is the job-level `if:` below, which is the only level GitHub lets it live at.
+  pull_request:
+    paths-ignore:
+      - '.gestalt/**'
+      - 'PLAN.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+
   workflow_dispatch:
     inputs:
       environment:
@@ -66,6 +84,21 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    # A platform-managed branch already gets a `push` run, and the platform reads ONLY push
+    # runs — `_find_push_run` queries `event=push` and now also filters on it client-side. A
+    # `pull_request` run on the same commit would be a second run that nothing reads, on every
+    # phase of every feature. So it is skipped rather than duplicated.
+    #
+    # This is a COST decision, not a correctness one: the two runs were never ambiguous to
+    # `poll_ci`. Human PRs — any branch name outside these five prefixes — are unaffected and
+    # are the reason the trigger exists.
+    if: >-
+      github.event_name != 'pull_request'
+      || !(startsWith(github.head_ref, 'gestalt/')
+           || startsWith(github.head_ref, 'feature/')
+           || startsWith(github.head_ref, 'phase/')
+           || startsWith(github.head_ref, 'retry/')
+           || startsWith(github.head_ref, 'fix/'))
     steps:
       - name: Checkout
         uses: actions/checkout@v4
