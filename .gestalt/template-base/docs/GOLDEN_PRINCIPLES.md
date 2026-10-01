@@ -1,4 +1,4 @@
-# Golden Principles — {{projectName}}
+# Golden Principles — trackeros
 
 These invariants are non-negotiable. Violations produce
 `GOLDEN_PRINCIPLE_BREACH` signals and pause the cycle for human review.
