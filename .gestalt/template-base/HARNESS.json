@@ -1,16 +1,16 @@
 {
-  "name": "{{projectSlug}}",
+  "name": "trackeros",
   "version": "0.1.0",
   "tier": "tier1",
-  "description": "{{projectDescription}}",
+  "description": "Trackeros \u2014 a corporate operations web and mobile platform for\n  mid-sized companies. Provides employee self-service (leave\n  requests, balances, expense claims), manager workflows\n  (approvals, team views, time-off calendars), and HR admin\n  surfaces (leave policy configuration, balance accruals,\n  audit reports).\n  \n  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via\n  Knex migrations + a thin repository layer, BullMQ for\n  background jobs (accrual schedulers, notification fanout).\n  Module structure: src/modules/<name>/<name>.{model,\n  repository,service,controller,routes}.ts. Domain modules\n  include leave, balance, employee, policy, notification.\n  Shared utilities under src/shared/ (db connection, base\n  repository, error types).\n  \n  Frontend: React + Vite SPA for the web client, React Native\n  for the mobile client (shared @trackeros/contracts package\n  for the typed REST surface). Auth via JWT against the\n  backend's /auth endpoints; identity comes from corporate\n  OIDC in production and from local users in development.\n  \n  Tests: Jest for unit + integration. CI on GitHub Actions\n  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +\n  a Semgrep security pass on every PR. Conventional Commits +\n  squash-merge. Strict TypeScript (no implicit any, strict\n  null checks).",
   "stack": {
-    "language": "{{language}}",
-    "nodeVersion": "{{nodeVersion}}",
-    "packageManager": "{{packageManager}}",
-    "testFramework": "{{testFramework}}",
-    "framework": "{{framework}}",
-    "frontend": "{{frontend}}",
-    "database": "{{database}}",
+    "language": "TypeScript",
+    "nodeVersion": "20",
+    "packageManager": "npm",
+    "testFramework": "Jest",
+    "framework": "Fastify",
+    "frontend": "React (Vite SPA)",
+    "database": "PostgreSQL",
     "architectureStyle": "modular-monolith"
   },
   "_comment_gate": "qualityGate: what the gate enforces. `applicationRoots` declares each BUILD in this repository so the dependency map in docs/ARCHITECTURE.md can describe more than one; `ownedDecisions` names symbols whose rule belongs to a single module. Both are read by the constraint agent's deterministic checks. See docs/guides/pipeline-yaml.md.",
@@ -95,7 +95,7 @@
   },
   "_comment_verification": "verification.command: the project's REAL install+compile+test invocation, run in the work dir after the code agent declares done and BEFORE the commit, so a compile error cannot reach CI. Ideally the same command CI runs. Absent or empty means verification is skipped.",
   "verification": {
-    "command": "{{verificationCmd}}",
+    "command": "npm install --include=dev --no-audit --no-fund && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests --forceExit && npm run smoke; else echo 'no source files to verify'; fi",
     "timeoutSeconds": 900
   },
   "maintenance": {

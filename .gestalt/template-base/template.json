@@ -2,5 +2,18 @@
   "templateId": "corporate-ops-web-mobile",
   "templateVersion": "0.62.0",
   "templateBaseCommit": "",
+  "seedVariables": {
+    "database": "PostgreSQL",
+    "framework": "Fastify",
+    "frontend": "React (Vite SPA)",
+    "language": "TypeScript",
+    "nodeVersion": "20",
+    "packageManager": "npm",
+    "projectDescription": "Trackeros \u2014 a corporate operations web and mobile platform for\n  mid-sized companies. Provides employee self-service (leave\n  requests, balances, expense claims), manager workflows\n  (approvals, team views, time-off calendars), and HR admin\n  surfaces (leave policy configuration, balance accruals,\n  audit reports).\n  \n  Backend: TypeScript on Node 20 (Fastify), PostgreSQL via\n  Knex migrations + a thin repository layer, BullMQ for\n  background jobs (accrual schedulers, notification fanout).\n  Module structure: src/modules/<name>/<name>.{model,\n  repository,service,controller,routes}.ts. Domain modules\n  include leave, balance, employee, policy, notification.\n  Shared utilities under src/shared/ (db connection, base\n  repository, error types).\n  \n  Frontend: React + Vite SPA for the web client, React Native\n  for the mobile client (shared @trackeros/contracts package\n  for the typed REST surface). Auth via JWT against the\n  backend's /auth endpoints; identity comes from corporate\n  OIDC in production and from local users in development.\n  \n  Tests: Jest for unit + integration. CI on GitHub Actions\n  runs lint (ESLint) + typecheck (tsc --noEmit) + unit tests +\n  a Semgrep security pass on every PR. Conventional Commits +\n  squash-merge. Strict TypeScript (no implicit any, strict\n  null checks).",
+    "projectName": "trackeros",
+    "projectSlug": "trackeros",
+    "testFramework": "Jest",
+    "verificationCmd": "npm install --include=dev --no-audit --no-fund && if find src -name '*.ts' -not -name '*.spec.ts' -not -name '*.test.ts' -not -name '*.d.ts' -type f | grep -q .; then npm run build && npx jest --passWithNoTests --forceExit && npm run smoke; else echo 'no source files to verify'; fi"
+  },
   "_comment": "What the template said when this project was seeded \u2014 the BASE of the three-way merge `gestalt template upgrade` performs. Read-only to every agent, and kept by the merge purge. Do not edit by hand: editing it makes a template change look like your customization, or the reverse."
 }
