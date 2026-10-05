@@ -1,15 +1,20 @@
 import app from './app';
+import { PortResolver } from './shared/config';
 
-const PORT = 3000;
+const portResolver = new PortResolver();
 
-const start = async () => {
+const start = async (): Promise<void> => {
+  const { port } = portResolver.resolvePort(process.env.PORT);
+
   try {
-    await app.listen({ port: PORT, host: '0.0.0.0' });
-    console.log(`Server is running on http://localhost:${PORT}`);
+    await app.listen({ port, host: '0.0.0.0' });
+    console.log(`Server is running on http://localhost:${port}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
   }
 };
 
-start();
+if (require.main === module) {
+  start();
+}
