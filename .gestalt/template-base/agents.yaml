@@ -607,6 +607,7 @@ agents:
     # conventions below are conveyed to Aider in the decision message.
     prompt_extensions:
       - "Begin each phase with the architect edit format — it plans multi-file changes best. Only fall back to the diff edit format when you have EVIDENCE of assistant-mode drift in the feedback (the model acknowledged file additions conversationally without producing edits, and no files were written). Do not pre-emptively avoid architect."
+
     max_iterations: 30
     condenser_max_tokens: 50000
     condenser_max_size: 80

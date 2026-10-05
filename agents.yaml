@@ -413,6 +413,15 @@ agents:
 
   context-agent:
     role: "Technical writer"
+    write_paths:
+      # Brief 1 — what THIS agent may write. GOVERNANCE files (docs/GOLDEN_PRINCIPLES.md,
+      # HARNESS.json, agents.yaml, harness/pipeline.yaml) are refused regardless of what is
+      # listed here: a per-project config must not grant an agent authority over the rules the
+      # platform judges the project by. See gestalt_core/agents/write_policy.py.
+      - docs/ARCHITECTURE.md
+      - docs/DOMAIN.md
+      - docs/DECISIONS.md
+      - AGENTS.md
     goal: "Keep project context files accurate and up to date"
     llm:
       # TR_061-followup — was `model: ~` (platform default). The TR_061
