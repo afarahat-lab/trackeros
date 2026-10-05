@@ -19,12 +19,50 @@
 #   role  — short professional title (becomes "You are <role> working on
 #           the Gestalt platform.")
 #   goal  — one sentence stating what the agent is trying to accomplish
-#   llm.model         — '~' (YAML null) means "use the platform default
-#                       from .env LLM_MODEL". Set to a specific model
-#                       name (e.g. "gpt-4o", "gpt-4o-mini") to override.
-#                       The override reuses the platform's baseUrl +
-#                       apiKey — only the model name changes on the wire.
-#   llm.temperature, llm.max_tokens — override the platform defaults
+#   llm.model         — '~' (YAML null) means "use the platform default".
+#                       Otherwise set it to the COMPOSITE reference of an
+#                       LLM you registered in gestalt:
+#                       "<provider>/<llm>" (e.g. "fireworks/deepseek-v4-pro"
+#                       or "deepinfra/kimi-k2"). You register a provider
+#                       (endpoint = base URL + API key) ONCE, then add as
+#                       many LLMs under it as you like; the platform shows
+#                       you the "<provider>/<llm>" handle to paste here.
+#                       The platform resolves that handle to the provider's
+#                       base URL + key and the LLM's model string + API
+#                       shape on the wire. NOTE: only the composite form is
+#                       resolved — a bare LLM name or a raw provider model
+#                       string (e.g. "deepseek-ai/DeepSeek-V4-Pro") is NOT
+#                       matched and falls back to the platform-default
+#                       endpoint. List handles with `gestalt platform llms
+#                       list`.
+#   llm.temperature — override the platform default sampling temperature
+#   llm.max_tokens — every agent below now carries one, and this guidance is
+#                       under review because of it (2026-09-19). The advice was
+#                       written for OPERATORS adding a ceiling by hand; it was
+#                       never true that no ceiling was set. The platform baseline
+#                       set one on all 17 agents, invisibly, from a file this
+#                       template's author never opened. Those exact values moved
+#                       here unchanged, so behaviour is identical — but they are
+#                       visible for the first time, and they are a "static output
+#                       ceiling" by the definition below. Resolve it deliberately:
+#                       either the ceilings are correct and this note is stale, or
+#                       they re-introduce the mid-JSON cliff and should be dropped
+#                       — which is a behaviour change, not a relocation.
+#                       The original reasoning, unedited: the output budget is
+#                       driven by the LLM registry row's `max_output_tokens`;
+#                       list-producing agents commit one item at a time (append
+#                       tool) and single-output agents expand the budget
+#                       progressively on truncation, so a hardcoded ceiling only
+#                       re-introduces the mid-JSON cliff.
+#   llm.reasoning_effort — controls how much internal thinking the model
+#                       does before responding (GPT-5.5+ family only).
+#                       Values: xhigh | high | medium | low | non-reasoning
+#                       Use 'high' for high-stakes decisions (architecture,
+#                       self-healing); 'medium' for planning and evaluation;
+#                       'low' for deterministic gate checks (temperature 0.0).
+#                       Omit on agents whose model doesn't use the
+#                       'responses' API shape — the parameter is silently
+#                       dropped on classic chat-completions endpoints.
 #   prompt_extensions — list of standing project rules appended to every
 #                       prompt under a "Project-specific instructions"
 #                       heading
@@ -32,8 +70,17 @@
 agents:
 
   intent-agent:
+    # The cross-check rule below was in the PLATFORM baseline for intent / design /
+    # intent-design. This agent declares its own `rules`, and a declared list REPLACES
+    # the baseline's rather than extending it — so this agent never actually received
+    # it in production. Written here (2026-09-20), where it is visible and in effect.
     rules:
-    - "Before finalizing your output, cross-check it against the project's maintained architecture (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered reference context, NOT as an expansion of your task. If your output would contradict a decision already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent that owns it) so it is resolved deliberately. The maintained document is the source of truth for existing decisions."
+    - 'Before finalizing your output, cross-check it against the project''s maintained architecture
+      (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered
+      reference context, NOT as an expansion of your task. If your output would contradict a decision
+      already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent that
+      owns it) so it is resolved deliberately. The maintained document is the source of truth for existing
+      decisions.'
     - This intent describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, the items listed there are intentionally out of scope for this phase. Do not flag them as ambiguities or missing functionality.
     - Evaluate the intent against what this phase explicitly commits to delivering, not against the full feature description.
     - Interface method signatures in per-phase architecture specifications are CONTRACTS to be implemented by the code-agent during this phase. They are not stubs. An interface showing method signatures without bodies is correct and complete — do not flag missing method bodies as ambiguity or missing implementation.
@@ -41,14 +88,11 @@ agents:
     role: "Senior software architect"
     goal: "Extract a precise, unambiguous specification from a natural language intent"
     llm:
-      # TR_050 — DeepInfra-hosted DeepSeek-V3.2 (chat-completions
-      # apiShape); reasoning_effort intentionally omitted (not
-      # supported by DeepInfra OpenAI-compatible endpoint).
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~          # null = use platform default. Example: gpt-4o-mini
       temperature: 0.1
       max_tokens: 2000
     tools:
-      builtin: [readFile, searchFiles]   # §config-migration — explicit platform grant
+      builtin: [readFile, searchFiles]   # §2 — read code + reference docs while extracting the spec
     prompt_extensions: []
     profile: intent
     reference_paths:
@@ -58,7 +102,7 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/intent-spec.json
+    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/intent-spec.json
     schema:
       models:
         _SuccessCriterion:
@@ -134,14 +178,17 @@ agents:
     role: "Senior software architect"
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      temperature: 0.1
+      model: ~
+      temperature: 0.2
       max_tokens: 4000
     tools:
-      builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
+      builtin: [readFile, listDirectory, searchFiles]   # §2 — inspect existing modules/patterns
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+
+  # Merged intent+design agent (consolidation Brief 2). Its structured-output schema, profile,
+  # artifact path, and discovery budget (max_iterations) come from the platform baseline; this
+  # declares only the tunable basics. It replaces intent-agent + design-agent in the pipeline.
     profile: design
     rules:
     - 'Before finalizing your output, cross-check it against the project''s maintained architecture
@@ -157,7 +204,7 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/design-spec.json
+    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/design-spec.json
     schema:
       models:
         _Field:
@@ -255,23 +302,26 @@ agents:
         componentSpecs: _ComponentSpec
       finalize: {}
       required_non_empty: []
-
   intent-design-agent:
+    # The cross-check rule below was in the PLATFORM baseline for intent / design /
+    # intent-design. This agent declares its own `rules`, and a declared list REPLACES
+    # the baseline's rather than extending it — so this agent never actually received
+    # it in production. Written here (2026-09-20), where it is visible and in effect.
     rules:
-    - "Before finalizing your output, cross-check it against the project's maintained architecture (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered reference context, NOT as an expansion of your task. If your output would contradict a decision already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent that owns it) so it is resolved deliberately. The maintained document is the source of truth for existing decisions."
+    - 'Before finalizing your output, cross-check it against the project''s maintained architecture
+      (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered
+      reference context, NOT as an expansion of your task. If your output would contradict a decision
+      already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent that
+      owns it) so it is resolved deliberately. The maintained document is the source of truth for existing
+      decisions.'
     - This spec describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, the items there are intentionally out of scope for this phase — do not flag them as ambiguities or missing functionality.
     - Evaluate the intent against what this phase explicitly commits to delivering, not against the full feature description.
     - Specify WHAT the implementation must satisfy (success criteria, entity/interface invariants, consistency requirements), NOT how to build it. Do not prescribe HTTP methods/paths, component names, or field lists — the code agent chooses the implementation shape.
     - A consistency requirement MUST name the exact file/interface to match (referencePath), so the code agent can reuse the existing type/method/pattern instead of drifting.
-    - "Transaction boundaries: the SERVICE owns the unit of work (it decides what is inside the transaction) and the DATA-ACCESS layer opens it. Services take an injected IUnitOfWork with withTransaction(fn) and never import a pool, a client, or a module-level db helper. Do NOT put withTransaction on a repository. Participating repository and service methods take the client as an optional LAST parameter and fall back to the shared pool when it is omitted. See AGENTS.md 'Architecture rules' item 5."
     role: "Senior software architect"
     goal: "Specify the phase's success criteria, constraints, and the consistency + interface invariants the implementation must satisfy — leaving implementation shape to the code agent"
     llm:
-      # Pin to Deepseek-v4-pro like every other project agent. Was `model: ~` (null), which
-      # silently inherited the platform default LLM_MODEL (now glm-5p2) — a leftover from the
-      # intent+design consolidation (context-agent got pinned then; this one was missed), so this
-      # high-impact spec agent was running on a weaker/different model than the rest of the pipeline.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.15
       max_tokens: 5000
     tools:
@@ -286,7 +336,7 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/spec.json
+    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/spec.json
     max_iterations: 10
     token_budget: 600000
     schema:
@@ -413,14 +463,18 @@ agents:
 
   context-agent:
     role: "Technical writer"
+    write_paths:
+      # Brief 1 — what THIS agent may write. GOVERNANCE files (docs/GOLDEN_PRINCIPLES.md,
+      # HARNESS.json, agents.yaml, harness/pipeline.yaml) are refused regardless of what is
+      # listed here: a per-project config must not grant an agent authority over the rules the
+      # platform judges the project by. See gestalt_core/agents/write_policy.py.
+      - docs/ARCHITECTURE.md
+      - docs/DOMAIN.md
+      - docs/DECISIONS.md
+      - AGENTS.md
     goal: "Keep project context files accurate and up to date"
     llm:
-      # TR_061-followup — was `model: ~` (platform default). The TR_061
-      # second run hit a moonshotai/Kimi-K2.6 timeout in context-agent's
-      # tool-loop because the env LLM_MODEL fallback resolved to Kimi
-      # before the registry default could take over. Pin to V4-Pro
-      # explicitly to bypass the env-fallthrough.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 8000
     tools:
@@ -429,20 +483,30 @@ agents:
         - listDirectory     # explore the docs/ structure
         - searchFiles       # find where references need to change
         - getFileTree       # understand project layout
-        - gitDiff           # see this phase's diff before updating docs
+        - gitDiff           # §2 — see what this phase changed before updating docs
     prompt_extensions: []
     profile: context
+    # §3 — NARROWED to the files this agent MAINTAINS. Audited on run f890ed1a: all five previous
+    # references were read exactly 8 times each (once per invocation), which is the turn-1 bulk
+    # load, not evidence of need — the agent loads every reference it is given before it knows what
+    # the phase changed.
+    #   docs/ARCHITECTURE.md  KEPT   it writes this; 16 reads (8 whole + 8 paged remainders)
+    #   AGENTS.md             KEPT   it writes this
+    #   docs/DOMAIN.md        ADDED  it writes this and read it 15x by discovering it itself
+    #   docs/DECISIONS.md     ADDED  same, 6 reads
+    #   docs/GOLDEN_PRINCIPLES.md  DROPPED — since Brief 1 it CANNOT write this file (governance),
+    #                          and it does not need to READ it either: the gate judges the code
+    #                          against the principles; documenting what a phase built does not.
+    #   HARNESS.json          DROPPED — project identity and infrastructure; nothing a phase's
+    #                          documentation depends on.
+    #   PLAN.md               DROPPED — redundant with the phase spec, which the task already
+    #                          injects by path and which the instruction points at for drift checks.
     reference_paths:
-    # §3 — narrowed to the files this agent MAINTAINS. Audited on run f890ed1a: all five
-    # previous references were read exactly 8 times each (once per invocation) — the turn-1
-    # bulk load, not evidence of need. GOLDEN_PRINCIPLES.md dropped because Brief 1 means this
-    # agent cannot write it and documenting what a phase built does not need to read it;
-    # HARNESS.json and PLAN.md dropped as redundant with the injected phase spec.
     - docs/ARCHITECTURE.md
     - docs/DOMAIN.md
     - docs/DECISIONS.md
     - AGENTS.md
-    artifact_path: .gestalt/{correlation_id}/context-updates.json
+    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/context-updates.json
     token_budget: 800000
     schema:
       models:
@@ -466,7 +530,9 @@ agents:
             content:
               type: str
               optional: false
-              description: With `section`, the new body of that section alone. Without `section`, the FULL new contents of the file.
+              description: >-
+                With `section`, the new body of that section alone. Without `section`, the FULL
+                new contents of the file.
       fields: {}
       append:
         updates: _Update
@@ -474,6 +540,15 @@ agents:
       required_non_empty: []
 
   code-agent:
+    # ADR-060 reference docs the code agent reads (CONFIG, not hardcoded): the stack, the
+    # architecture, the plan, the coding conventions, and the cross-cutting golden principles the
+    # quality gate enforces. Override per project; omit to inherit the platform default.
+    reference_paths:
+    - HARNESS.json
+    - docs/ARCHITECTURE.md
+    - docs/GOLDEN_PRINCIPLES.md
+    - AGENTS.md
+    - PLAN.md
     rules:
     - Generated code must compile without errors. Verify with executeScript before returning.
     - All imports must resolve to files that exist in the project or are declared in package.json.
@@ -484,74 +559,13 @@ agents:
     - Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
     - Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
     - Your verification command is configured to fail when no source implementation files exist. You MUST write implementation files before verification can pass. Do not consider the task complete based on a passing verification that ran before any source files were written.
-    - 'Transaction boundaries: the SERVICE owns the unit of work (it decides what is inside the
-      transaction) and the DATA-ACCESS layer opens it. Services take an injected IUnitOfWork with
-      withTransaction(fn) and never import a pool, a client, or a module-level db helper. Do NOT put
-      withTransaction on a repository. Participating repository and service methods take the client as an
-      optional LAST parameter and fall back to the shared pool when it is omitted. See AGENTS.md
-      ''Architecture rules'' item 5.'
     - When code in one module needs data or behavior owned by another module, depend on that module's public SERVICE interface — never import another module's repository or other private files. A module's repository is private to that module; cross-module access goes through the owning module's service. A service may import its own module's repository interface (the standard repository pattern).
     - Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled.
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # TR_050 — initially switched off deepseek-ai/DeepSeek-V3.2
-      # onto moonshotai/Kimi-K2.6 for code-agent because DeepSeek
-      # V3.2 reasoned ABOUT Aider's SEARCH/REPLACE protocol but
-      # did not reliably EMIT the blocks — Aider's diff parser
-      # saw zero edits and exited with only metadata changes.
-      #
-      # 2026-06-15 (TR_056-aider-diag) — switched off Kimi-K2.6
-      # onto deepseek-ai/DeepSeek-V4-Pro because Kimi-K2.6 on
-      # DeepInfra now drops chunked-transfer streams mid-response
-      # (litellm.APIConnectionError: peer closed connection
-      # without sending complete message body). Symptom on
-      # platform: code-agent exits 124 after the 15-min
-      # subprocess timeout (executeScript's MAX_SCRIPT_TIMEOUT_MS)
-      # while litellm retries the broken connection.
-      #
-      # V4-Pro is the new bet: improved instruction-following
-      # vs V3.2 means it should emit SEARCH/REPLACE blocks
-      # reliably. If V4-Pro also fails Aider's diff parser
-      # (same failure mode as V3.2), revert to Kimi and find a
-      # different mitigation for the streaming flake.
-      #
-      # TR_077-qwen — swapped off deepseek-ai/DeepSeek-V4-Pro onto
-      # Qwen/Qwen3.6-27B to test whether a different code-agent model
-      # gets past the layering wall + Mode A on dependency-bearing
-      # service phases. Exact DeepInfra model string confirmed against
-      # https://api.deepinfra.com/v1/openai/models (Qwen/Qwen3.6-27B).
-      # Unregistered model string → resolves via the env DeepInfra
-      # default (LLM_BASE_URL/LLM_API_KEY) per llm/index.ts fallback.
-      #
-      # 2026-06-20 — switched code-agent to fireworks/qwen3p6-plus.
-      # deepseek-v4-pro entered a degenerate repetition loop on Aider
-      # (restating one observation until it blew the 16k output cap →
-      # 0/partial source). Qwen 3.6 converged cleanly on the same
-      # intent via `gestalt agent test code-agent` (build + 17/17 jest
-      # green, no loop, 3.2 min). The other agents stay on
-      # deepseek-v4-pro. (TR_079 driver finding.)
-      #
-      # 2026-06-29 (ADR-063) — switched to fireworks/kimi-k2p7-code for the
-      # OpenHands code-agent. qwen3p7-plus burned all of OpenHands'
-      # CodeActAgent iterations without emitting edits (too weak for the
-      # agentic tool loop); kimi-k2p7-code completed a trivial task cleanly
-      # (AgentState.FINISHED, file written) in the smoke test.
-      #
-      # 2026-06-30 — switched off kimi-k2p7-code onto
-      # FireworkAI-Deepseek-v4-pro for OpenHands. Root cause isolated:
-      # OpenHands 1.6.0's str_replace_editor hardcodes a REQUIRED
-      # `security_risk` param; kimi-k2p7-code never emits it on the
-      # non-native function-calling path → every edit rejected
-      # ("Missing required parameters: {'security_risk'}") → 0 files.
-      # DeepSeek-V4-Pro SUPPLIES security_risk → validated on the real
-      # platform path (clean main clone): 0 errors, 4 files written via
-      # str_replace_editor, persisted + discovered. So it's the right
-      # OpenHands code-agent model.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      temperature: 0.1
-      # No reasoning_effort — Aider drives its own reasoning loop;
-      # DeepInfra also does not support reasoning_effort.
+      model: ~          # Example: set to "gpt-4o" to use a specific model
+      temperature: 0.2
       max_tokens: 8000
     tools:
       builtin:
@@ -587,16 +601,12 @@ agents:
     # Stack-specific coding conventions generated by the
     # `generateStackConfig` LLM call at `gestalt init` time.
     # Add more project-specific extensions below as needed.
+    #
+    # TR_081 — the code-agent manages Aider via structured AiderDecisions.
+    # This first extension sets the edit-format preference; the stack
+    # conventions below are conveyed to Aider in the decision message.
     prompt_extensions:
-      - Begin each phase with the architect edit format — it plans multi-file changes best. Only fall back to the diff edit format when you have EVIDENCE of assistant-mode drift in the feedback (the model acknowledged file additions conversationally without producing edits, and no files were written). Do not pre-emptively avoid architect.
-      - Use ES module syntax with resolveJsonModule for JSON imports — never require()
-      - Use async/await throughout, never callbacks
-    reference_paths:
-    - HARNESS.json
-    - docs/ARCHITECTURE.md
-    - docs/GOLDEN_PRINCIPLES.md
-    - AGENTS.md
-    - PLAN.md
+      - "Begin each phase with the architect edit format — it plans multi-file changes best. Only fall back to the diff edit format when you have EVIDENCE of assistant-mode drift in the feedback (the model acknowledged file additions conversationally without producing edits, and no files were written). Do not pre-emptively avoid architect."
     max_iterations: 30
     condenser_max_tokens: 50000
     condenser_max_size: 80
@@ -607,24 +617,27 @@ agents:
     role: "Senior QA engineer"
     goal: "Generate comprehensive Jest tests mapped to success criteria"
     llm:
-      # TR_061-followup — pin off env-default fallthrough to Kimi-K2.6.
-      # test-agent is skipped under Aider backend (ADR-043) but the pin
-      # is harmless and consistent.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 6000
     prompt_extensions: []
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
   constraint-agent:
-    # Raised from the 400k platform default after run ecef04ad's gate came back
-    # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
-    # budget of 790k (the platform scales the default with diff size). The frontend
-    # phase adds a whole second build — package.json, tsconfig, vite config and a
-    # component tree — so the diff the gate must read is far larger than a backend
-    # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
-    # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1200000
+    role: "Architectural constraint evaluator"
+    goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
+    llm:
+      model: ~
+      temperature: 0.0
+      max_tokens: 4000
+    tools:
+      # §2 — gitDiff is a first-class tool now, not a shell command. It serves per-file HUNKS
+      # (bounded, refusing a file outside the phase diff) and is read_only, so an identical
+      # repeat collapses to a stub instead of re-appending its body. On run f890ed1a the
+      # agent made 38 shell `git diff <file>` calls for content this tool did not yet serve,
+      # 26 for a file list it had already been handed, and 17 `git rev-parse --show-toplevel`.
+      builtin: [executeScript, readFile, searchFiles, getFileTree, gitDiff]
+    prompt_extensions: []
     rules:
     - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
     - The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
@@ -635,42 +648,36 @@ agents:
     verificationGuidance:
     - Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.
     - A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.
-    - "Scope your evaluation to the files changed in this phase only; files outside that set were passing before this phase, so do not re-evaluate them. When the 'Phase scope' block LISTS the changed files, those are authoritative — evaluate exactly them and do NOT re-derive the list, because a second derivation can disagree with the one the platform already resolved. Only when the block gives a defaultBranch but no file list should you derive it yourself: run `git diff origin/<defaultBranch>..HEAD --name-only` (TWO dots — the clone is shallow, so three-dot/merge-base diffs do not resolve) via executeScript. If that fails or returns empty, fall through to evaluating the artifact files inlined above."
+    - 'Scope your evaluation to the files changed in this phase only; files outside that set were passing
+      before this phase, so do not re-evaluate them. When the ''Phase scope'' block LISTS the changed
+      files, those are authoritative — evaluate exactly them and do NOT re-derive the list, because a
+      second derivation can disagree with the one the platform already resolved. Only when the block gives
+      a defaultBranch but no file list should you derive it yourself: run `git diff
+      origin/<defaultBranch>..HEAD --name-only` (TWO dots — the clone is shallow, so three-dot/merge-base
+      diffs do not resolve) via executeScript. If that fails or returns empty, fall through to evaluating
+      the artifact files inlined above.'
     - 'The repository pattern is sanctioned data-access delegation. A business-logic-layer service that depends on a repository INTERFACE — via constructor injection or by importing the interface type — is correctly delegating data access to the data access layer; this is NOT a data-access-layer violation. Only flag a data-access violation when a non-data-access-layer file performs data access DIRECTLY: inline SQL, connection management, query execution, or direct datastore calls.'
     - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's git diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
     - Consult the dependency-direction graph in ARCHITECTURE.md. A cross-module dependency that follows a documented allowed direction is sanctioned — do not flag it as a circular or bidirectional-dependency risk unless you find an ACTUAL reverse import that creates a cycle. Speculative risk is not a violation.
     - The project's shared infrastructure directory (the common/shared module location defined in ARCHITECTURE.md) hosts cross-cutting infrastructure — shared connection pools or clients, utility modules, and shared type definitions. This directory is sanctioned shared infrastructure, NOT a layering violation. Data-access-layer code that imports a shared connection pool or client from the shared infrastructure directory is following the correct pattern. Do NOT flag such imports as data-access-layer violations, and do NOT flag the shared connection/utility module itself as data access outside the data access layer.
     - A service class calling a method on an injected repository interface is correct delegation to the data-access layer. Do NOT flag this as direct data access — the call goes through the interface, not to a data store directly.
     - Reading properties or fields on a domain model object that was returned by a repository call is business logic, not data access. Do NOT flag field access on fetched domain objects as a data-access-layer violation.
-    role: "Architectural constraint evaluator"
-    goal: "Verify generated code satisfies all project architectural rules using executeScript + read-only file tools"
-    llm:
-      # TR_067 §3 — DeepSeek-V4-Pro at reasoning_effort: low. The
-      # V3.2 default produced 21-tool-call 164k-token 203s runs on
-      # Phase 1 of leave-management. ADR-043 specifies low reasoning
-      # effort for deterministic gate checks; V4-Pro's higher
-      # per-turn throughput + the §1 cap raise + the §2 git-diff
-      # scoping should bring constraint-agent under 90s typical.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      reasoning_effort: low
-      temperature: 0.0
-      max_tokens: 4000
-    tools:
-      builtin: [executeScript, readFile, searchFiles, getFileTree, gitDiff]
-    prompt_extensions: []
     reference_paths:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    # §3 (2026-09-29) — back to 40, MONITORED. After-run 79f682f0 completed 5/5 with the largest
-    # constraint-agent attempt at 30 calls and per-phase gates at 5-11, against 7-32 before. The
-    # attempts that hit 40 did so on costs since removed: scope re-derivation (68 -> 11 calls), the
-    # toolchain hunt (the platform now installs every declared build from its lockfile) and
-    # whole-file reads. 40 leaves 33% headroom over the observed maximum; token_budget stays at the
-    # 1,200,000 this project declares, so iterations remain the binding bound.
-    # 🔴 REVISIT ON ANY CAP HIT — a gate cut at 40 again means a removed cost returned. Get the
-    # tool-call breakdown from the platform's scripts/classify_tool_calls.py (cite its version).
+    # §3 (2026-09-29) — 62 -> 40, MONITORED. Measured on run 79f682f0 (completed 5/5, one rebuild
+    # at 85c8b770f0ad): the largest constraint-agent attempt was 30 calls and per-phase gates ran
+    # 5-11, against 7-32 before. The three attempts that ever hit 40 did so on costs since removed —
+    # scope re-derivation (68 -> 11 calls), the toolchain hunt (now provisioned), and whole-file
+    # reads. 40 leaves 33% headroom over the observed maximum and is the value that predates the
+    # temporary raise. token_budget stays at 1,000,000: 40 x 15,584 (worst observed per-turn spend)
+    # = 623,360, so ITERATIONS remain the binding bound with room to spare.
+    # 🔴 REVISIT ON ANY CAP HIT. A gate cut at 40 again is evidence the removed costs came back or a
+    # new one appeared — investigate the tool-call breakdown (scripts/classify_tool_calls.py) before
+    # raising anything. Status tracked in STATE.md.
     max_iterations: 40
+    token_budget: 1000000
     schema:
       models:
         _Finding:
@@ -714,14 +721,6 @@ agents:
       required_non_empty: []
 
   review-agent:
-    # Raised from the 400k platform default after run ecef04ad's gate came back
-    # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
-    # budget of 790k (the platform scales the default with diff size). The frontend
-    # phase adds a whole second build — package.json, tsconfig, vite config and a
-    # component tree — so the diff the gate must read is far larger than a backend
-    # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
-    # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1200000
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
@@ -732,18 +731,20 @@ agents:
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness — verify findings with executeScript before flagging"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
-      # not supported by DeepInfra).
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
+      # 0.0 — a gate agent is deterministic, like constraint-agent beside it. This read 0.1
+      # until 2026-09-20, while the platform baseline it inherited the rest of its config
+      # from said 0.0; the template won, so 0.0 was never actually in effect and nobody
+      # could see the disagreement from either file alone. Corrected once both halves
+      # became visible in one place.
       temperature: 0.0
       max_tokens: 4000
     tools:
-      # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
-      # to verify import resolution before flagging "Import cannot be
-      # resolved" findings. searchFiles + readFile are the legacy
-      # spot-check toolset. Same hard blocklist as code-agent (no rm
-      # -rf / no git push / no sudo / no curl|bash / etc.) applies.
-      builtin: [gitDiff, executeScript, readFile, searchFiles]
+      # §2 — the LIVE review tool set: gitDiff discovers this phase's changed files (the
+      # review runtime's first step), then readFile/searchFiles spot-check them. (The prior
+      # executeScript grant was never active — the runtime hardcoded gitDiff — so preserving
+      # runtime behavior means gitDiff here.) Same hard blocklist as code-agent applies.
+      builtin: [gitDiff, readFile, searchFiles]
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
@@ -753,6 +754,7 @@ agents:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
     max_iterations: 40
+    token_budget: 800000
     schema:
       models:
         _Item:
@@ -806,8 +808,7 @@ agents:
     role: "Technical documentation specialist"
     goal: "Detect when project documentation has fallen behind the codebase"
     llm:
-      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -818,8 +819,7 @@ agents:
     role: "Technical documentation specialist"
     goal: "Ensure project context files are internally consistent"
     llm:
-      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 2000
     tools:
@@ -830,8 +830,7 @@ agents:
     role: "Technical writer"
     goal: "Apply additive context-file edits that resolve maintenance findings"
     llm:
-      # TR_061-followup — pin off env-default Kimi-K2.6 fallthrough.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.2
       max_tokens: 8192
     tools:
@@ -872,19 +871,9 @@ agents:
     role: "Senior software architect"
     goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
     llm:
-      # TR_050 — switched off moonshotai/Kimi-K2.6 to
-      # deepseek-ai/DeepSeek-V3.2. Kimi inference on DeepInfra
-      # was unreliable at 12k max_tokens (~50% timeout rate over
-      # 2 cycles even with LLM_TIMEOUT_MS=300000). DeepSeek-V3.2
-      # has run reliably for every other agent in this matrix
-      # including the heavy Aider call (133k tokens consumed
-      # without timeout). Kimi remains pinned to self-healing-
-      # agent where the prompt size is much smaller.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 3000
-    tools:
-      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
       - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
       - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
@@ -902,20 +891,28 @@ agents:
       - "Example of incorrect output: 'Use the shared/db module'"
 
   # ─── Architecture crew (TR_051 / ADR-056 Phase 1) ────────────────────
-  # LangGraph StateGraph: three specialists deliberate in parallel,
-  # then chief reconciles. Replaces the feature-level designFeature +
-  # reviewDesign pair on the architecture-agent above. The
-  # architecture-agent entry remains in use for the per-phase
-  # designPhase + reviewPhaseDesign (Phase 2 of the migration replaces
-  # those too).
+  # Replaces the single architecture-agent's feature-level designFeature
+  # + reviewDesign pass with a LangGraph StateGraph crew. Three specialists
+  # deliberate in parallel; the chief reconciles. The architecture-agent
+  # entry above remains in use for per-phase designPhase + reviewPhaseDesign
+  # (Phase 2 of the migration will replace those too).
   #
-  # TR_050 matrix: specialists on deepseek-ai/DeepSeek-V3.2 (steady,
-  # reliable under DeepInfra); chief on moonshotai/Kimi-K2.6 because
-  # the reconciliation task fits within Kimi's strength on direct
-  # structured output and the chief budget (12k) is the same as the
-  # working single-agent setting under TR_050.
+  # model: ~ keeps these agents on the platform default LLM. Operators
+  # who want to bind a specific model (e.g. a stronger reasoning model
+  # for chief-architect-agent) override here.
+    tools:
+      builtin:
+      - readFile
+      - listDirectory
+      - searchFiles
+      - getFileTree
 
   domain-architect-agent:
+    # The continuity rule below was in the PLATFORM baseline for all three architects.
+    # This agent declares its own `rules`, and a declared list REPLACES the baseline's
+    # rather than extending it — so no architect ever received it in production, and
+    # 'your design must EXTEND the existing architecture' was never said to the agents
+    # whose job that is. Written here (2026-09-20), where it is visible and in effect.
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
     - Define domain entities with exact field names, types, and lifecycle states
@@ -926,74 +923,84 @@ agents:
     role: "Domain architect"
     goal: "Define the domain model: entities, relationships, lifecycle states, and business rules for this feature"
     llm:
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 6000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      builtin: [readFile, searchFiles, getFileTree]   # §2 — inspect the repo; ARCHITECTURE.md continuity is readFile-scoped
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
-      - Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules
-      - Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)
-      - Every lifecycle state must be named explicitly so the chief can fold it into architectureMdUpdate
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+      - "Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules"
+      - "Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)"
+      - "Every lifecycle state must be named explicitly so the chief can fold it into architectureMdUpdate"
     profile: domain-architect
     reference_paths:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
 
   data-architect-agent:
+    # The continuity rule below was in the PLATFORM baseline for all three architects.
+    # This agent declares its own `rules`, and a declared list REPLACES the baseline's
+    # rather than extending it — so no architect ever received it in production, and
+    # 'your design must EXTEND the existing architecture' was never said to the agents
+    # whose job that is. Written here (2026-09-20), where it is visible and in effect.
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
     - Every domain entity that persists state requires a CONCEPTUAL table spec — table name, field names (no SQL types), primary key, foreign-key relationships, index rationale. Do NOT write SQL DDL or CREATE TABLE; the code agent generates migrations from this specification
     - Every repository interface must name its concrete backing implementation using the declared stack — do not leave the choice open
     - Use the declared database client — do not substitute alternatives
     - When the same table appears in multiple repositories, its schema must be defined exactly once and referenced by name elsewhere
-    - Foundational counting/rounding/range semantics are BINDING or OPEN — if how a quantity is computed, rounded, or bounded (e.g. an aggregated day count, a balance rounding direction) must hold across call sites but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options) rather than silently asserting one value for a single query and leaving the rest implicit (the BR-001 anti-pattern).
-    - "Cross-cutting TRANSACTION / UNIT-OF-WORK contract — decide and record `transactionContract` WHENEVER this feature has multi-step writes that must be atomic (e.g. a status change plus a balance update applied together). State concretely how a transaction propagates across a caller-controlled boundary: whether repository methods that must join a caller's transaction take an OPTIONAL client/executor parameter (defaulting to the shared pool/connection when omitted), and that the calling service owns the unit of work — acquire a client, BEGIN, pass it to each repository call, then COMMIT or ROLLBACK. This is a data-access-layer contract you own. Leave `transactionContract` EMPTY for a read-only or single-write feature — do NOT invent a transaction contract a feature does not need."
+    - 'Foundational counting/rounding/range semantics are BINDING or OPEN — if how a quantity is computed, rounded, or bounded (e.g. an aggregated day count, a balance rounding direction) must hold across call sites but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options) rather than silently asserting one value for a single query and leaving the rest implicit (the BR-001 anti-pattern).'
+    - 'Cross-cutting TRANSACTION / UNIT-OF-WORK contract — decide and record `transactionContract` WHENEVER this feature has multi-step writes that must be atomic (e.g. a status change plus a balance update applied together). State concretely how a transaction propagates across a caller-controlled boundary: whether repository methods that must join a caller''s transaction take an OPTIONAL client/executor parameter (defaulting to the shared pool/connection when omitted), and that the calling service owns the unit of work — acquire a client, BEGIN, pass it to each repository call, then COMMIT or ROLLBACK. This is a data-access-layer contract you own. Leave `transactionContract` EMPTY for a read-only or single-write feature — do NOT invent a transaction contract a feature does not need.'
     role: "Data architect"
     goal: "Define the persistence layer: conceptual table specifications (no DDL), repository interfaces, and concrete implementations for this feature"
     llm:
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 6000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      builtin: [readFile, searchFiles, getFileTree]   # §2
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
-      - 'Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale'
-      - Do NOT write SQL DDL — no CREATE TABLE statements; the code agent generates migrations from this specification
-      - Every repository interface must name its concrete backing implementation using the declared stack — PostgreSQL via pg Pool
-      - Index rationale must reflect the entity's lifecycle and access patterns
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+      - "Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale"
+      - "Do NOT write SQL DDL — no CREATE TABLE statements; the code agent generates migrations from this specification"
+      - "Every repository interface must name its concrete backing implementation using the declared stack"
+      - "Index rationale must reflect the entity's lifecycle and access patterns"
     profile: data-architect
     reference_paths:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
 
   app-architect-agent:
+    # The continuity rule below was in the PLATFORM baseline for all three architects.
+    # This agent declares its own `rules`, and a declared list REPLACES the baseline's
+    # rather than extending it — so no architect ever received it in production, and
+    # 'your design must EXTEND the existing architecture' was never said to the agents
+    # whose job that is. Written here (2026-09-20), where it is visible and in effect.
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
     - Define clear layer boundaries — presentation, application, domain, infrastructure
     - Dependencies flow inward only — outer layers depend on inner layers, never the reverse
     - Every public service method must be defined in an interface before the implementation
     - No circular dependencies between modules — verify your dependencyMap before returning
-    - Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location src/shared/types/ — declare ONE module whose path is src/shared/types/ that owns those types; do not scatter them. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at src/modules/<name>/. Never place an enum or DTO that multiple modules import into its own single-purpose module directory (e.g. never src/modules/LeaveType/ for a cross-module LeaveType enum — that belongs in src/shared/types/).
-    - Foundational computation semantics are BINDING or OPEN — when a service derives a count, range, or rounded value whose rule must hold across sibling methods but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options); never bake the rule silently into one service method and leave the methods that consume the same value unspecified (the BR-001 anti-pattern).
-    - 'Cross-cutting AUTH / IDENTITY contract — decide and record `authContract` WHENEVER this feature exposes API endpoints or role-gated access. State concretely: the authenticated-request/identity shape (e.g. request.user: { id, role }), the role model / enum values (e.g. employee | manager | hr_admin), and how identity and role are obtained and enforced (an auth middleware verifies the caller and populates the request; RBAC is enforced by a route-level guard, never inline — per AGENTS.md). Leave `authContract` EMPTY when the feature has no API surface and no access control — do NOT invent an auth contract a pure data-model feature does not need.'
+    - 'Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location src/shared/types/ — declare ONE module whose path is src/shared/types/ that owns those types; do not scatter them. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at src/modules/<name>/. Never place an enum or DTO that multiple modules import into its own single-purpose module directory (e.g. never src/modules/OrderStatus/ for a cross-module OrderStatus enum — that belongs in src/shared/types/).'
+    - 'Foundational computation semantics are BINDING or OPEN — when a service derives a count, range, or rounded value whose rule must hold across sibling methods but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options); never bake the rule silently into one service method and leave the methods that consume the same value unspecified (the BR-001 anti-pattern).'
+    - 'Cross-cutting AUTH / IDENTITY contract — decide and record `authContract` WHENEVER this feature exposes API endpoints or role-gated access. State concretely: the authenticated-request/identity shape (e.g. request.user: { id, role }), the role model / enum values (e.g. member | approver | admin), and how identity and role are obtained and enforced (an auth middleware verifies the caller and populates the request; RBAC is enforced by a route-level guard, never inline — per AGENTS.md). Leave `authContract` EMPTY when the feature has no API surface and no access control — do NOT invent an auth contract a pure data-model feature does not need.'
     - 'Cross-cutting ERROR / RESPONSE contract — decide and record `errorResponseContract` WHENEVER this feature exposes API endpoints. State the standard error/response shape and the responses for the common failures: validation failure (HTTP 400), authentication failure (401), authorization failure (403), and not-found (404). Leave `errorResponseContract` EMPTY when the feature exposes no endpoints.'
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 6000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      builtin: [readFile, searchFiles, getFileTree]   # §2
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
-      - Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. deductBalance(employeeId, leaveType, days, fiscalYear); no TypeScript types or return types (the design agent adds types)
-      - Dependencies flow inward only — outer layers toward inner layers; never the reverse
-      - No circular dependencies between modules — verify dependencyMap before returning
-      - Recommended phases should each fit within Aider's effective context window
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+      - "Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. reserveStock(accountId, itemType, quantity, period); no TypeScript types or return types (the design agent adds types)"
+      - "Dependencies flow inward only — outer layers toward inner layers; never the reverse"
+      - "No circular dependencies between modules — verify dependencyMap before returning"
+      - "Recommended phases should each fit within Aider's effective context window"
     profile: app-architect
     reference_paths:
     - docs/ARCHITECTURE.md
@@ -1005,31 +1012,37 @@ agents:
     - Resolve symbol name conflicts by choosing one canonical name and applying it everywhere — across entities, repositories, services, and the markdown summary
     - Verify stack compliance across all three specialist designs before producing final output — if any specialist used a framework not in the declared stack, correct it
     - 'The final architecture must include: domain entities, conceptual table specifications (no SQL DDL), repository interfaces with concrete implementations, module boundaries, dependency map, and phase recommendations'
+    # The dependency map is READ BY A DETERMINISTIC CHECK, not only by humans, so its module
+    # names have to be the ones that check derives from a file path. They are derived, not
+    # invented: for each root in HARNESS.json `qualityGate.applicationRoots`, a file at
+    # <root>/<container>/<name>/... is module `<prefix><name>` when the container is `modules`,
+    # and `<prefix><container>-<name>` otherwise. So src/modules/balance -> `balance`,
+    # src/shared/date -> `shared-date`, web/src/modules/approvals -> `web-approvals`,
+    # web/src/presentation/pages -> `web-presentation-pages`.
+    #
+    # A name that does not derive this way is not wrong-looking, it is INVISIBLE: the checker
+    # resolves the file to a module, finds no entry, and stays silent. That is not theoretical
+    # — the map on trackeros carried `api-client` and `presentation-pages` for months while the
+    # frontend was checked by nothing at all.
     - 'Name every module in the dependency map exactly as it derives from its path under a declared application root: `<prefix><name>` for a module under the `modules` container, `<prefix><container>-<name>` for any other container (so src/shared/date is `shared-date` and web/src/presentation/pages is `web-presentation-pages`). A map entry whose name does not derive this way is silently ignored by the dependency check — it does not fail, it simply never matches.'
-    - Write ONE LINE PER EDGE in the dependency map, as `- <module> -> <comma-separated modules it may import>`. A module may appear on several lines; the reader unions them. Emit an entry for EVERY module in every declared application root, including the frontend ones — a module absent from the map is a module the dependency check cannot constrain.
+    - 'Write ONE LINE PER EDGE in the dependency map, as `- <module> -> <comma-separated modules it may import>`. A module may appear on several lines; the reader unions them. Emit an entry for EVERY module in every declared application root, including the frontend ones — a module absent from the map is a module the dependency check cannot constrain.'
     - If a specialist slice is missing (errors block in the prompt), reconcile around it — supply the minimum content needed to keep the feature buildable, not a fresh design
     - Every lifecycle state introduced by the domain architect must be reflected in architectureMdUpdate
-    - Surface, do not swallow, open questions — if any specialist recorded an openQuestion, or you find a foundational semantics (counting, boundary, rounding, range, or unit) asserted narrowly in one place but relied on elsewhere, carry it into the reconciled openQuestions rather than silently picking a value (the BR-001 anti-pattern).
-    - Reconcile the cross-cutting infrastructure contracts — carry the application architect's `authContract` and `errorResponseContract` and the data architect's `transactionContract` into the reconciled output, harmonising names/shapes across the slices (reconcile, do not regenerate). Whenever the feature has API endpoints, role-gated access, or multi-step atomic writes, the corresponding contract MUST be present and concrete in the final architecture, so a later phase relying on it finds the decision already made instead of absent. Leave each contract EMPTY when the feature has no corresponding surface; do NOT invent a contract no specialist decided and the feature does not need.
+    - 'Surface, do not swallow, open questions — if any specialist recorded an openQuestion, or you find a foundational semantics (counting, boundary, rounding, range, or unit) asserted narrowly in one place but relied on elsewhere, carry it into the reconciled openQuestions rather than silently picking a value (the BR-001 anti-pattern).'
+    - 'Reconcile the cross-cutting infrastructure contracts — carry the application architect''s `authContract` and `errorResponseContract` and the data architect''s `transactionContract` into the reconciled output, harmonising names/shapes across the slices (reconcile, do not regenerate). Whenever the feature has API endpoints, role-gated access, or multi-step atomic writes, the corresponding contract MUST be present and concrete in the final architecture, so a later phase relying on it finds the decision already made instead of absent. Leave each contract EMPTY when the feature has no corresponding surface; do NOT invent a contract no specialist decided and the feature does not need.'
     role: "Chief architect and design reviewer"
     goal: "Reconcile the domain, data, and application designs into a single coherent architecture. Resolve conflicts, enforce stack compliance, ensure completeness."
     llm:
-      # TR_053 amendment verification — Kimi-K2.6 was flaking on 12k
-      # chief calls (~50% timeout rate observed). Switch chief to
-      # DeepSeek-V3.2 to keep verification cycles flowing. Revisit
-      # the chief model choice once DeepInfra Kimi stability improves.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 12000
-    tools:
-      builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
-      - You receive three specialist designs. Your job is to reconcile them, not regenerate them.
-      - Resolve naming conflicts by choosing the most semantically correct name and applying it consistently
-      - If any specialist missed a stack compliance requirement, correct it
-      - If a specialist slice is missing, supply the smallest reconciliation that keeps the feature buildable
-      - Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+      - "You receive three specialist designs. Your job is to reconcile them, not regenerate them."
+      - "Resolve naming conflicts by choosing the most semantically correct name and applying it consistently"
+      - "If any specialist missed a stack compliance requirement, correct it"
+      - "If a specialist slice is missing, supply the smallest reconciliation that keeps the feature buildable"
+      - "Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL"
     profile: chief-architect
 
   planner-agent:
@@ -1056,19 +1069,18 @@ agents:
     role: "Technical project planner"
     goal: "Decompose a feature into a sequence of small, independently deployable phases that each fit within Aider's effective context window"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
       max_tokens: 3000
     tools:
-      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §2 — inspect the repo while planning phases
     prompt_extensions:
-      - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
-      - Each phase must touch at most 5 files — prefer 2-3 files per phase
-      - Each phase must have a single clear concern (model, repository, service, routes — not combined)
-      - Phases must be ordered by dependency — a phase can only use files from prior phases or existing files
-      - 'The scope field must be directly actionable by the code agent: specific, self-contained, referencing existing files by exact path'
-      - Maximum 10 phases per feature — if more are needed, the feature is too large and should be split
+      - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
+      - "Each phase must touch at most 5 files — prefer 2-3 files per phase"
+      - "Each phase must have a single clear concern (model, repository, service, routes — not combined)"
+      - "Phases must be ordered by dependency — a phase can only use files from prior phases or existing files"
+      - "The scope field must be directly actionable by the code agent: specific, self-contained, referencing existing files by exact path"
+      - "Maximum 10 phases per feature — if more are needed, the feature is too large and should be split"
     profile: planner
     reference_paths:
     - HARNESS.json
@@ -1095,8 +1107,7 @@ agents:
     role: "Technical delivery reviewer"
     goal: "Evaluate what was actually built in a completed phase, assess whether it matches the plan, and recommend adjustments to subsequent phases based on real results"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~
       temperature: 0.1
     tools:
       # TR_026 — executeScript is mandatory: the agent runs `git diff`
@@ -1130,143 +1141,17 @@ agents:
     role: "Autonomous failure analyst and recovery coordinator"
     goal: "Analyse failures and decide the correct recovery action: retry with fixes, submit a fix intent for systemic gaps, or escalate to human"
     llm:
-      # TR_050 — DeepInfra-hosted moonshotai/Kimi-K2.6 for the
-      # routing-quality bar (retry vs fix-intent vs escalate).
-      # reasoning_effort intentionally omitted.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: ~        # set to "chat-latest" (registered in platform LLMs with apiShape: 'responses') for best reasoning
       temperature: 0.0
     prompt_extensions:
       - "Always ground your diagnosis in the actual error output — do not infer failures not evidenced in the provided context"
       - "A fix-intent is only appropriate when retrying the same intent would produce the same failure"
 
-
-# ─── Custom agents (ADR-037) ─────────────────────────────────────────────────
-# Project-specific LLM agents that run after the framework generate agents
-# (intent / design / context / lint-config / code / test) and BEFORE
-# dispatch to the quality gate. They receive the generated artifacts and
-# return structured findings. The orchestrator routes findings to typed
-# signals:
-#   high severity   → CONSTRAINT_VIOLATION
-#   medium / low    → LINT_FAILURE
-#   error (LLM/parse) → CONTEXT_GAP
-# All of which the gate orchestrator evaluates alongside framework signals.
-# Custom agents NEVER emit GOLDEN_PRINCIPLE_BREACH.
-#
-# Prompt template placeholders:
-#   {{role}}, {{goal}}           — fields on the agent definition
-#   {{artifacts}}                — generated code files (code type only),
-#                                  truncated to 2000 chars each, formatted
-#                                  as ### path / ```typescript ... ```
-#   {{goldenPrinciples}}         — bullet list of GP-NNN titles + descriptions
-#   {{intentText}}               — the operator's original intent string
-#   trackeros              — HARNESS.json `name` field
-#   {{evidenceRequirement}}      — TR_013. Drops in the shared "every
-#                                  finding must include quotedLine"
-#                                  prompt section. Strongly recommended
-#                                  for ANY custom agent that emits
-#                                  findings — the platform parser drops
-#                                  unevidenced findings, so omitting this
-#                                  from the prompt leaves the LLM
-#                                  blind to the requirement and EVERY
-#                                  finding it emits will be discarded.
-#   {{quotedLineSchema}}         — TR_013. Drops in the `"quotedLine":
-#                                  "..."` JSON schema field. Include
-#                                  inside the `findings[]` object in the
-#                                  Expected JSON response schema below.
-#
-# Custom agent findings must include "quotedLine" — the exact line from
-# the artifact that constitutes the violation, quoted verbatim. Findings
-# without quotedLine are automatically dropped by the platform before
-# reaching the gate. This prevents hallucinated findings from blocking
-# cycles. Include {{evidenceRequirement}} in your prompt body and
-# {{quotedLineSchema}} inside the findings[] object to surface this
-# contract to the LLM.
-#
-# Expected JSON response from the LLM:
-#   {
-#     "passed": true | false,
-#     "findings": [
-#       {
-#         "severity": "high|medium|low",
-#         "file": "path",
-#         "quotedLine": "the exact violating line copied verbatim",
-#         "description": "..."
-#       }
-#     ],
-#     "summary": "one-line overall verdict"
-#   }
-#
-# Example — uncomment and edit to enable:
-#
-# runs_after — ordering hint (ADR-037 / runs_after enforcement,
-#   2026-06-02). Names the framework agent OR another custom agent
-#   that must complete before this custom agent runs. Omit (or set to
-#   null) to default to `test-agent` — the last framework generate
-#   agent — which matches the pre-enforcement "run at the end"
-#   behaviour. Valid framework targets: intent-agent, design-agent,
-#   context-agent, lint-config-agent, code-agent, test-agent.
-#   Unknown targets and cycles in the custom-agent graph are caught
-#   by `gestalt agents validate` and fail intent submission with a
-#   CONTEXT_GAP signal.
-#
-# custom_agents:
-#   - name: security-review-agent
-#     role: "Application security reviewer"
-#     goal: "Identify OWASP Top 10 vulnerabilities in generated code"
-#     runs_after: code-agent      # run right after code-agent finishes
-#                                 # — before test-agent generates tests
-#     llm:
-#       model: ~           # null = platform default; override with e.g. "gpt-4o"
-#       temperature: 0.1
-#       max_tokens: 4000
-#     prompt: |
-#       You are {{role}}. Goal: {{goal}}.
-#
-#       {{evidenceRequirement}}
-#
-#       Review the following generated code for OWASP Top 10 issues
-#       (SQL injection, XSS, IDOR, missing auth checks, sensitive data
-#       exposure):
-#
-#       {{artifacts}}
-#
-#       Project golden principles to respect:
-#       {{goldenPrinciples}}
-#
-#       Return JSON only — no markdown fences, no preamble:
-#       {
-#         "passed": true|false,
-#         "findings": [
-#           {
-#             "severity": "high|medium|low",
-#             "file": "path",
-#             {{quotedLineSchema}},
-#             "description": "..."
-#           }
-#         ],
-#         "summary": "one line"
-#       }
-#
-#   - name: performance-agent
-#     role: "Performance reviewer"
-#     goal: "Spot N+1 queries, sync I/O on hot paths"
-#     runs_after: security-review-agent   # depend on another custom
-#     llm: { temperature: 0.1 }
-#     prompt: |
-#       ...
-#
-#   - name: docs-check-agent
-#     role: "Documentation reviewer"
-#     goal: "Ensure exported functions have JSDoc"
-#     runs_after: test-agent              # run after tests are generated
-#     llm: { temperature: 0.1 }
-#     prompt: |
-#       Check JSDoc on these files: {{artifacts}}
-#       Return JSON: { "passed": true, "findings": [], "summary": "ok" }
-
-  # The BACKGROUND whole-codebase gate. Not on the phase pipeline, so the validator
-  # never demanded it while a platform baseline supplied it; the baseline is gone (a
-  # template owns its agents), so it is declared here.
+  # The BACKGROUND whole-codebase gate. Not on the phase pipeline — GlobalGateWorkflow
+  # resolves it by name — so the pipeline validator never demanded it and it was the one
+  # agent this template inherited WHOLE from the platform. Declared here now: it runs the
+  # same constraint machinery as constraint-agent (same tools, same schema) over the entire
+  # tree instead of one diff, which is why its budgets are the larger of the two tiers.
   global-gate-agent:
     role: Whole-codebase architectural auditor
     goal: 'Audit the ENTIRE codebase for cross-cutting architectural drift the per-phase diff-scoped
@@ -1287,8 +1172,14 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    # 🔴 TEMPORARY (2026-09-28) — 60 -> 120, purely to keep this whole-tree tier above the
-    # per-phase one raised to 85 above. Not evidence about this agent: it has never capped.
+    # 🔴 TEMPORARY (2026-09-28) — raised 60 -> 120 to KEEP this tier above the per-phase one.
+    # Not evidence about this agent: the whole-tree sweep has never been observed capping.
+    # `test_gate_budget_config` pins global > per-phase so a recalibration cannot silently
+    # invert them, and raising the per-phase cap to 85 would have done exactly that. The
+    # invariant's PURPOSE is that a whole-tree audit may explore more than a 7-file diff
+    # review, so following it means moving this one too. 120 x 8,981/turn = 1,077,720,
+    # inside the existing 1.2M budget, so the budget stays untouched. Reverts with the
+    # per-phase raise above.
     max_iterations: 120
     token_budget: 1200000
     schema:
