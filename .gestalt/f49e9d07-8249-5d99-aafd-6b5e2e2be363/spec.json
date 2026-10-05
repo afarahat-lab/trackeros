@@ -1,0 +1,159 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "bootstrap / process entry point",
+      "shared-config (consumed, not modified)"
+    ],
+    "affectedLayers": [
+      "composition root / bootstrap",
+      "shared foundation (read-only dependency)"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run build` (tsc --noEmit) exits 0 with strict TypeScript and no implicit `any` after the change to `src/index.ts`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`src/index.ts` contains no hardcoded port literal (no `3000`, no other numeric port constant) and no inline validity logic (no regex, `parseInt`, `Number(...)`, `trim`, or range comparison on the PORT value).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The value passed to `app.listen` and the value interpolated into the startup log line are the same `ResolvedHttpPort.port` produced by a single `resolvePort` call; no raw string and no second read of `process.env.PORT` reaches either.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Importing `src/index.ts` in a Jest/Node process performs no socket bind and no `app.listen` call (the `start()` invocation is guarded by `require.main === module`), so the module is importable without side effects.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Running the entry point as the process main module (`npm start` / `ts-node src/index.ts`) still starts the server and prints exactly `Server is running on http://localhost:<resolvedPort>` via `console.log`, with the resolved port actually bound.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "With `PORT` unset or invalid, the process still starts and binds `DEFAULT_PORT` (3000) with no warning, log, or `console.warn` emitted on the fallback path.",
+      "testable": true,
+      "layer": "e2e"
+    },
+    {
+      "description": "The startup failure path is unchanged: a rejected `app.listen` is caught, `app.log.error(err)` is called, and the process exits with code 1.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "`src/index.ts` must import the resolver ONLY from the public entry point `./shared/config`; importing `./shared/config/port-resolver` or `./shared/config/port-resolver.interface` directly is forbidden.",
+    "The raw `process.env.PORT` value must be passed to `resolvePort` exactly as observed (`undefined` when absent) \u2014 no pre-parse, pre-trim, pre-validate, or defaulting in `src/index.ts`.",
+    "The validity predicate must not be re-implemented, duplicated, or inlined in `src/index.ts`; `src/shared/config/port-resolver.ts` remains the only definition of validity in the codebase.",
+    "`ResolvedHttpPort.rawValue` must never be logged, echoed in an error message, or otherwise emitted (GP-004); only the resolved numeric port may appear in output.",
+    "The startup log sink stays `console.log` in this feature (not `app.log.info`), and the message text stays exactly `Server is running on http://localhost:${port}` with the literal host `localhost` \u2014 only the interpolated value changes.",
+    "The fallback path is silent: no log, warning, `console.warn`, or `app.log` call may be added when PORT is absent or invalid.",
+    "`import app from './app';`, the `host: '0.0.0.0'` listen argument, and the failure path (`app.log.error(err)` then `process.exit(1)`) must remain exactly as they are; `src/app.ts` is unchanged by this phase.",
+    "`src/index.ts` must not export `start` and must not be imported by any test or script in this phase; the `require.main === module` guard is the only mechanism preventing import-time side effects.",
+    "No new dependency edge may be introduced: `bootstrap` may depend only on `shared-config` and `app`; `src/index.ts` must not import `shared/db`, `shared/auth`, `shared/errors`, or any domain module.",
+    "`src/index.ts` must not read any environment variable other than `PORT`, and must not read `process.env.PORT` more than once per process.",
+    "The change is confined to `src/index.ts` (one MODIFIED file); no other production source file may be created or modified in this phase."
+  ],
+  "outOfScope": [
+    "Any test file, including `tests/unit/shared/port-resolver.test.ts` and any test that imports `src/index.ts` \u2014 Phase 3.",
+    "`src/shared/config/*` (`index.ts`, `port-resolver.ts`, `port-resolver.interface.ts`) \u2014 Phase 1, already delivered; treat as a fixed contract and do not modify.",
+    "`src/app.ts` \u2014 unchanged by this feature.",
+    "`src/shared/db/connection.ts` (`DATABASE_URL`) and `src/shared/auth/index.ts` (`JWT_SECRET`) \u2014 they stay where they are; `shared-config` owns PORT resolution only in this feature (OQ-4).",
+    "`scripts/smoke.js` and `scripts/dev.js` \u2014 smoke requires `../src/app` directly and binds its own ephemeral port; dev spawns `npm run start`, which the `require.main === module` guard preserves. Neither is modified.",
+    "Moving the startup log sink to `app.log.info`, adding structured logging, or adding any observability on the fallback path (OQ-2/OQ-3 resolved against these).",
+    "Honouring port 0 (OS-assigned ephemeral) via `PORT`, and any change to the `1..65535` validity predicate or `DEFAULT_PORT` value."
+  ],
+  "ambiguities": [],
+  "entityInvariants": [
+    {
+      "entity": "ResolvedHttpPort",
+      "mustExistOrExtend": true,
+      "invariant": "Produced exactly once per process by a single `resolvePort` call at bootstrap; `port` is always a positive integer in 1..65535 by construction (never 0, negative, fractional, or out of range). It is the ONLY value permitted to reach the listen call and the startup log line, so the two can never disagree. `rawValue` is diagnostics-only and must never be logged verbatim."
+    },
+    {
+      "entity": "PortEnvironmentInput",
+      "mustExistOrExtend": true,
+      "invariant": "The snapshot is taken once at bootstrap and never mutated; `rawValue` is the exact observed `process.env.PORT` value (`undefined` when absent) and is passed unchanged as the `rawPort` argument. ABSENT and PRESENT are terminal observations, not a progression."
+    },
+    {
+      "entity": "ResolvedHttpPort lifecycle",
+      "mustExistOrExtend": true,
+      "invariant": "RESOLVED -> BOUND (exactly once per process, when the listener accepts the bind) or RESOLVED -> LISTEN_FAILED (terminal: log the error, exit non-zero). There is no transition from BOUND back to RESOLVED \u2014 the port is resolved once and never re-read."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IPortResolver.resolvePort(rawPort: string | undefined): ResolvedHttpPort \u2014 consumed by `src/index.ts` at bootstrap",
+      "authRule": "No authentication or role check applies (GP-005 not engaged); port resolution is a bootstrap concern only.",
+      "idempotent": true,
+      "errorSemantics": "Pure and total: never throws for any input, performs no I/O, and reads no global state beyond its argument. Absent or invalid input returns `{ port: DEFAULT_PORT, source: 'DEFAULT' }` silently \u2014 no log, warning, or abort. Valid input returns `{ port: n, source: 'ENV' }` with `rawValue` retained for diagnostics."
+    },
+    {
+      "operation": "Bootstrap startup sequence in `src/index.ts` (resolve -> listen -> log)",
+      "authRule": "None \u2014 no endpoint, identity, or role is involved.",
+      "idempotent": false,
+      "errorSemantics": "A rejected `app.listen` is caught and handled by `app.log.error(err)` followed by `process.exit(1)` \u2014 unchanged. No unhandled promise rejection may escape (GP-006)."
+    },
+    {
+      "operation": "Module import of `src/index.ts` (side-effect contract)",
+      "authRule": "None.",
+      "idempotent": true,
+      "errorSemantics": "Importing the module must not bind a socket, call `app.listen`, or exit the process; the `start()` invocation is guarded by `require.main === module`."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Import `PortResolver` (and `IPortResolver`/`ResolvedHttpPort` as types if used) from the public entry point `./shared/config` only \u2014 never from `port-resolver.ts` or `port-resolver.interface.ts` directly. `PortSource` and `ResolvedHttpPort` are type-only exports and cannot be imported as runtime values.",
+      "referencePath": "src/shared/config/index.ts"
+    },
+    {
+      "requirement": "Call the existing `resolvePort(rawPort: string | undefined): ResolvedHttpPort` method with the exact observed `process.env.PORT` value; do not add a second resolution path, a wrapper, or a local validity check.",
+      "referencePath": "src/shared/config/port-resolver.interface.ts"
+    },
+    {
+      "requirement": "Do not redefine or shadow `DEFAULT_PORT` (3000) or the validity predicate; `src/shared/config/port-resolver.ts` is the single definition of both, and no second literal `3000` may exist in the codebase.",
+      "referencePath": "src/shared/config/port-resolver.ts"
+    },
+    {
+      "requirement": "Match the existing `src/shared/<concern>/index.ts` public-entry-point convention (single re-export line) when consuming shared foundations \u2014 the same pattern `src/shared/date/index.ts` uses.",
+      "referencePath": "src/shared/date/index.ts"
+    },
+    {
+      "requirement": "Keep the startup log line's exact wording `Server is running on http://localhost:${port}` with the literal `localhost` host, per binding rule 7 \u2014 the host stays `localhost` even though the listener binds `0.0.0.0`.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "Preserve the `bootstrap -> shared-config` and `bootstrap -> app` edges only; `shared-config` remains a leaf with no dependency on Fastify, the app instance, or `process.env`.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/shared/config/index.ts (public entry point re-exporting PortResolver, DEFAULT_PORT, IPortResolver, PortSource, ResolvedHttpPort)",
+      "why": "The only sanctioned import surface for the resolver; importing internals would break the module boundary and the shared-foundation convention."
+    },
+    {
+      "target": "src/app.ts (default-exported Fastify instance)",
+      "why": "`app.listen({ port, host: '0.0.0.0' })` and `app.log.error(err)` are the two app surfaces the bootstrap uses; the file itself is unchanged."
+    },
+    {
+      "target": "package.json `start` script (`ts-node src/index.ts`) and scripts/dev.js",
+      "why": "The `require.main === module` guard must keep the module the process entry point under `npm start`, which dev.js spawns; otherwise the server never starts."
+    },
+    {
+      "target": "scripts/smoke.js (requires ../src/app directly, binds port 0 on 127.0.0.1)",
+      "why": "Confirms the smoke path does not traverse `src/index.ts` and is unaffected by the guard or the resolver wiring."
+    },
+    {
+      "target": "tsconfig.json (strict, module: commonjs, include: [\"src\"])",
+      "why": "`require.main === module` is valid under commonjs, and strict mode is what makes the no-implicit-any build criterion meaningful."
+    }
+  ]
+}
