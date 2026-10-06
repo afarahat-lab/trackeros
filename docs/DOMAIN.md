@@ -311,7 +311,6 @@ A discriminated union of exactly two shapes: `{ ok: true }` and `{ ok: false; er
 It is the internal, per-call outcome of a single readiness evaluation: produced only by `UptimeService.checkReadiness()`, never thrown, never logged by the service, and never serialized. The route reads only the `ok` discriminator and hands `error` to `request.log.error`; the wire body remains `ReadinessStatus`. Ownership split is binding — the service owns the failure, the route owns the logging.
 
 ### ReadinessProbe
-
 | Field | Type | Required |
 |-------|------|----------|
 | id | string | true |
@@ -322,4 +321,4 @@ It is the internal, per-call outcome of a single readiness evaluation: produced 
 
 Transient and per-request: created, settles, and is discarded within a single evaluation. Never persisted, never cached, never shared between requests, and never serialized into an HTTP body. Its lifecycle states `PENDING → SUCCEEDED` / `PENDING → FAILED` are derived from field nullness (`completedAt`/`outcome` null while PENDING), NOT from additional `ReadinessState` members; both terminal states are final and a probe is never re-entered, retried, or reused. `failureReason` is domain-internal and never crosses the HTTP boundary.
 
-**Delivery note (Phases 1–2):** the type is declared in `uptime.model.ts` but is not materialised by the delivered code — `UptimeService.checkReadiness()` maps probe resolution/rejection directly to the `ReadinessResult` discriminator without constructing a `ReadinessProbe`. The lifecycle states above describe the type's shape, not an instantiated object.
+**Delivery note (Phases 1–3):** the type is declared in `uptime.model.ts` but is not materialised by the delivered code — `UptimeService.checkReadiness()` maps probe resolution/rejection directly to the `ReadinessResult` discriminator without constructing a `ReadinessProbe`. The lifecycle states above describe the type's shape, not an instantiated object. Phase 3's unit tests (`tests/unit/modules/uptime/uptime.service.test.ts`) pin the surrounding contract from the outside: `ReadinessState.READY === 'ready'` / `NOT_READY === 'not-ready'`, the `ReadinessStatus` body as exactly `{ status }` with no error detail, and `ReadinessResult` as exactly `{ ok: true }` or `{ ok: false, error }` carrying the same rejection object. No production file was changed by that phase.
