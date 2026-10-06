@@ -285,8 +285,7 @@ Represents system-level status information, including health-check and version d
 | version | string | true |
 
 ## uptime
-
-Represents readiness-probe data managed by the `uptime` module. The probe is a pure observation of database connectivity: it persists nothing, writes no audit record, and opens no transaction. All three types are module-local to `src/modules/uptime/uptime.model.ts` and are deliberately NOT promoted to `src/shared/types/` (single-module use).
+Represents readiness-probe data managed by the `uptime` module. The probe is a pure observation of database connectivity: it persists nothing, writes no audit record, and opens no transaction. All four types are module-local to `src/modules/uptime/uptime.model.ts` and are deliberately NOT promoted to `src/shared/types/` (single-module use).
 
 ### ReadinessState
 
@@ -305,6 +304,12 @@ Exactly two members, both terminal, both lowercase hyphenated string literals wh
 
 A value object with `status` as its sole field — no identity, no timestamp, no diagnostic detail, no error information. It is the complete and only payload of the readiness response and is never persisted or enriched.
 
+### ReadinessResult
+
+A discriminated union of exactly two shapes: `{ ok: true }` and `{ ok: false; error: unknown }`. The success shape carries no error; the failure shape carries the caught rejection (or the timeout `Error` when the 2000ms bound fired). `error` is typed `unknown` — never `any` — matching `ReadinessProbe.failureReason`.
+
+It is the internal, per-call outcome of a single readiness evaluation: produced only by `UptimeService.checkReadiness()`, never thrown, never logged by the service, and never serialized. The route reads only the `ok` discriminator and hands `error` to `request.log.error`; the wire body remains `ReadinessStatus`. Ownership split is binding — the service owns the failure, the route owns the logging.
+
 ### ReadinessProbe
 
 | Field | Type | Required |
@@ -317,4 +322,4 @@ A value object with `status` as its sole field — no identity, no timestamp, no
 
 Transient and per-request: created, settles, and is discarded within a single evaluation. Never persisted, never cached, never shared between requests, and never serialized into an HTTP body. Its lifecycle states `PENDING → SUCCEEDED` / `PENDING → FAILED` are derived from field nullness (`completedAt`/`outcome` null while PENDING), NOT from additional `ReadinessState` members; both terminal states are final and a probe is never re-entered, retried, or reused. `failureReason` is domain-internal and never crosses the HTTP boundary.
 
-**Delivery note (Phase 1):** the type is declared in `uptime.model.ts` but is not materialised by the delivered code — `UptimeService.checkReadiness()` maps probe resolution/rejection directly to `ReadinessStatus` without constructing a `ReadinessProbe`. The lifecycle states above describe the type's shape, not an instantiated object.
+**Delivery note (Phases 1–2):** the type is declared in `uptime.model.ts` but is not materialised by the delivered code — `UptimeService.checkReadiness()` maps probe resolution/rejection directly to the `ReadinessResult` discriminator without constructing a `ReadinessProbe`. The lifecycle states above describe the type's shape, not an instantiated object.
