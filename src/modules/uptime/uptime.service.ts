@@ -1,7 +1,7 @@
 import { IUptimeService } from './uptime.service.interface';
 import { IReadinessRepository } from './uptime.repository.interface';
 import { PgReadinessRepository } from './uptime.repository';
-import { ReadinessState, ReadinessStatus, UptimeStatus } from './uptime.model';
+import { ReadinessResult, UptimeStatus } from './uptime.model';
 
 export class UptimeService implements IUptimeService {
   constructor(
@@ -12,12 +12,12 @@ export class UptimeService implements IUptimeService {
     return { uptimeSeconds: Math.floor(process.uptime()) };
   }
 
-  async checkReadiness(): Promise<ReadinessStatus> {
+  async checkReadiness(): Promise<ReadinessResult> {
     try {
       await this.readinessRepository.check();
-      return { status: ReadinessState.READY };
-    } catch {
-      return { status: ReadinessState.NOT_READY };
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error };
     }
   }
 }

@@ -19,8 +19,13 @@ export interface AuthUser {
 
 export type AuthedRequest = FastifyRequest & { user?: AuthUser };
 
-/** Routes that must serve an UNAUTHENTICATED caller (liveness, and auth itself). */
-const PUBLIC_PATHS = new Set<string>(['/uptime', '/health', '/auth/login']);
+/**
+ * Routes that must serve an UNAUTHENTICATED caller (liveness, readiness, and auth itself).
+ *
+ * '/ready' is exempt because a readiness probe is called by infrastructure that holds no
+ * credentials; a 401 would be indistinguishable from not-ready to every caller that matters.
+ */
+const PUBLIC_PATHS = new Set<string>(['/uptime', '/ready', '/health', '/auth/login']);
 
 /**
  * Verify a bearer token and decorate the request.

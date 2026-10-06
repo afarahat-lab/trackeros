@@ -18,6 +18,15 @@ export interface ReadinessStatus {
 }
 
 /**
+ * Internal outcome of a single readiness evaluation. Discriminated on `ok`: the success
+ * shape carries no error, the failure shape carries the caught rejection (or the timeout
+ * Error when the bound fired). Produced only by the service's readiness method, never
+ * thrown, never logged by the service, and never serialized — the route reads only the
+ * discriminator and hands `error` to the request logger.
+ */
+export type ReadinessResult = { ok: true } | { ok: false; error: unknown };
+
+/**
  * Transient, per-request record of a single connectivity evaluation. Never
  * persisted, cached, or shared. PENDING is derived from `completedAt`/`outcome`
  * being null rather than from an extra ReadinessState member. `failureReason` is
