@@ -1425,15 +1425,19 @@ Declared in `src/modules/uptime/uptime.repository.interface.ts`, implemented in 
 5. **`src/modules/status/` dead code** — remove, leave, or reconcile (reconciling would create the shared health abstraction the feature forbids). RESOLVED: left untouched, out of scope for this feature; unreconciled by decision, not by omission.
 
 ### 11. Delivery record
-
-**Phase 1 — Readiness probe + `UptimeService.checkReadiness` (DELIVERED).** Six files, all under `src/modules/uptime/`; no new module, no shared health abstraction, `src/modules/status/` untouched.
+**Phase 1 — Readiness probe + `UptimeService.checkReadiness` (DELIVERED).** Six files, all under `src/modules/uptime/`; no new module, no shared health abstraction, `src/modules/status/` untouched. No test file added or modified; `uptime.routes.ts` and `src/shared/auth/index.ts` untouched.
 
 - `uptime.model.ts` — `ReadinessState` (`READY='ready'`, `NOT_READY='not-ready'`, exactly two members), `ReadinessStatus` (`{ status }`), `ReadinessProbe` (`id`, `startedAt`, `completedAt`, `outcome`, `failureReason`) added alongside the unchanged `UptimeStatus`.
 - `uptime.repository.interface.ts` — NEW. `IReadinessRepository` with the single method `check(): Promise<void>`; no optional trailing `PoolClient`.
-- `uptime.repository.ts` — NEW. `PgReadinessRepository implements IReadinessRepository`, constructor-injected `dbPool: Pool = defaultPool` consumed through the shared `src/shared/db` entry point. The only place `SELECT 1` is written. The 2000ms bound is the module-level named constant `READINESS_QUERY_TIMEOUT_MS`; the query is raced against that timer so the bound is owned by the check rather than inherited from the pool. A successful round trip is required; on timeout the rejection is identical to a rejected query. No caching, no memoization.
+- `uptime.repository.ts` — NEW. `PgReadinessRepository implements IReadinessRepository`, constructor-injected `dbPool: Pool = defaultPool` consumed through the shared `src/shared/db` entry point (`import { pool as defaultPool } from '../../shared/db'`). The only place `SELECT 1` is written. The 2000ms bound is the module-level named constant `READINESS_QUERY_TIMEOUT_MS`; the query is raced against that timer so the bound is owned by the check rather than inherited from the pool. A successful round trip is required; on timeout the rejection is identical to a rejected query. No caching, no memoization.
 - `uptime.service.interface.ts` — `checkReadiness(): Promise<ReadinessStatus>` added to `IUptimeService`; `getUptime()` unchanged.
 - `uptime.service.ts` — `checkReadiness()` awaits `probe.check()`, maps resolution to `{ status: 'ready' }` and any rejection to `{ status: 'not-ready' }`; it never throws and never puts the raw error in the returned value. Constructor takes the injected `IReadinessRepository` defaulting to `new PgReadinessRepository()`, so the service never imports the pool. `getUptime()` unchanged.
 - `index.ts` — re-exports the model additions, `IReadinessRepository`, `PgReadinessRepository`, and the pre-existing `UptimeStatus` / `IUptimeService` / `UptimeService` / `uptimeRoutes`.
 
+**Divergences and resolutions recorded against the plan (code as built):**
+
+- **Timeout enforcement mechanism** — the plan left the mechanism open (driver `query_timeout` vs a race in the repository). The implementation chose a `Promise.race` against a `setTimeout` in `PgReadinessRepository.check()`, with the timer cleared in a `finally`. The observable requirement (a hung query rejects indistinguishably from a failed query, constant module-level and named) is met.
+- **`ReadinessProbe` is declared but never materialised** — `checkReadiness()` maps probe resolution/rejection straight to `ReadinessStatus`; no `ReadinessProbe` object is constructed, and `failureReason` is therefore never populated in this phase. The type exists with the exact prescribed shape and never reaches the HTTP body. Its `PENDING`/`SUCCEEDED`/`FAILED` states remain derived from `completedAt`/`outcome` nullness, not from extra `ReadinessState` members.
+- **`check()` takes no optional trailing `PoolClient`** — a deliberate, flagged divergence from every other repository in the codebase, documented in the repository interface's own doc comment and in section 4 above.
+
 `GET /ready`, the `PUBLIC_PATHS` exemption, and the unit tests are Phases 2 and 3 and are not part of this delivery.
-<!-- gestalt:architecture feature=dfc85052-311e-4b5d-b9d5-a4e1ec28165e END -->
