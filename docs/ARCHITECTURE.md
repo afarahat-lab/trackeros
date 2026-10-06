@@ -1356,6 +1356,8 @@ Transitions, all named: `PENDING → SUCCEEDED` (probe resolves), `PENDING → F
 1. The readiness predicate is exactly one thing: a trivial connectivity query against the configured PostgreSQL pool succeeds. Nothing else is checked — not disk, not memory, not downstream services, not migrations, not schema version. DECIDED, not open.
 2. The probe is binary and total: resolves → `READY`; rejects → `NOT_READY`. No third outcome, no partial readiness, no degraded state. Any rejection (connection refused, auth failure, timeout, pool exhaustion) maps to `NOT_READY` without discrimination.
 3. The probe is stateless and per-request: it opens no new pool, adds no dependency, caches no result, and holds no state between requests. It uses the existing shared pool from `src/shared/db/connection.ts`.
+3a. The probe is **bounded in time**: the connectivity query carries an explicit 2000ms timeout owned by the readiness check itself, declared as the module-level named constant `READINESS_QUERY_TIMEOUT_MS` in `uptime.repository.ts`. It does not rely on the pool's `connectionTimeoutMillis` or the caller's deadline — a hung pool must not hang the probe. On timeout the rejection is identical to a rejected query and maps to `NOT_READY`.
+3b. A successful **round trip** is required: acquiring a client from the pool is not sufficient, the query must return. A pool that hands out a client to an unreachable database is exactly the state readiness exists to detect.
 4. The response body is fixed and carries no diagnostic detail: `READY` → HTTP 200 with exactly `{status:'ready'}`; `NOT_READY` → HTTP 503 with exactly `{status:'not-ready'}`. No other fields, no error message, no code, no stack, no raw error. The failure reason never crosses the HTTP boundary.
 5. On a failed probe the error is logged through the existing Fastify request logger (`request.log.error`), exactly as the existing `/uptime` route does. No new logging mechanism. The raw error is logged, never returned in the body.
 6. Readiness is a pure observation and is NOT a state-changing operation: it writes no audit record (GP-002 does not apply), mutates no entity, and opens no transaction. It must not be routed through `IUnitOfWork`.
@@ -1420,5 +1422,18 @@ Declared in `src/modules/uptime/uptime.repository.interface.ts`, implemented in 
 2. **Round trip vs client acquisition** — the literal reading requires the query to resolve; the acquire-only reading disagrees exactly in the degraded cases the endpoint exists to detect.
 3. **Caching / memoization** — the binding rule says no caching; a future TTL would introduce a staleness bound and a third probe concern.
 4. **`/ready` auth exemption** — inferred, not stated by the spec; it edits a shared, security-relevant file and makes database availability publicly observable.
-5. **`src/modules/status/` dead code** — remove, leave, or reconcile (reconciling would create the shared health abstraction the feature forbids).
+5. **`src/modules/status/` dead code** — remove, leave, or reconcile (reconciling would create the shared health abstraction the feature forbids). RESOLVED: left untouched, out of scope for this feature; unreconciled by decision, not by omission.
+
+### 11. Delivery record
+
+**Phase 1 — Readiness probe + `UptimeService.checkReadiness` (DELIVERED).** Six files, all under `src/modules/uptime/`; no new module, no shared health abstraction, `src/modules/status/` untouched.
+
+- `uptime.model.ts` — `ReadinessState` (`READY='ready'`, `NOT_READY='not-ready'`, exactly two members), `ReadinessStatus` (`{ status }`), `ReadinessProbe` (`id`, `startedAt`, `completedAt`, `outcome`, `failureReason`) added alongside the unchanged `UptimeStatus`.
+- `uptime.repository.interface.ts` — NEW. `IReadinessRepository` with the single method `check(): Promise<void>`; no optional trailing `PoolClient`.
+- `uptime.repository.ts` — NEW. `PgReadinessRepository implements IReadinessRepository`, constructor-injected `dbPool: Pool = defaultPool` consumed through the shared `src/shared/db` entry point. The only place `SELECT 1` is written. The 2000ms bound is the module-level named constant `READINESS_QUERY_TIMEOUT_MS`; the query is raced against that timer so the bound is owned by the check rather than inherited from the pool. A successful round trip is required; on timeout the rejection is identical to a rejected query. No caching, no memoization.
+- `uptime.service.interface.ts` — `checkReadiness(): Promise<ReadinessStatus>` added to `IUptimeService`; `getUptime()` unchanged.
+- `uptime.service.ts` — `checkReadiness()` awaits `probe.check()`, maps resolution to `{ status: 'ready' }` and any rejection to `{ status: 'not-ready' }`; it never throws and never puts the raw error in the returned value. Constructor takes the injected `IReadinessRepository` defaulting to `new PgReadinessRepository()`, so the service never imports the pool. `getUptime()` unchanged.
+- `index.ts` — re-exports the model additions, `IReadinessRepository`, `PgReadinessRepository`, and the pre-existing `UptimeStatus` / `IUptimeService` / `UptimeService` / `uptimeRoutes`.
+
+`GET /ready`, the `PUBLIC_PATHS` exemption, and the unit tests are Phases 2 and 3 and are not part of this delivery.
 <!-- gestalt:architecture feature=dfc85052-311e-4b5d-b9d5-a4e1ec28165e END -->

@@ -1,5 +1,6 @@
-import { UptimeStatus } from './uptime.model';
+import { ReadinessStatus, UptimeStatus } from './uptime.model';
 
 export interface IUptimeService {
   getUptime(): UptimeStatus;
+  checkReadiness(): Promise<ReadinessStatus>;
 }
