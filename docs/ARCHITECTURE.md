@@ -1325,3 +1325,100 @@ All edges point inward toward shared foundations; nothing depends on `bootstrap`
 
 These four are new and distinct from the pre-existing open questions in this document (day-count calendar vs business days, accrual model, carry-forward cap, migration mechanism, controller layer, BullMQ). Do not merge them into that list without labelling them as this feature's.
 <!-- gestalt:architecture feature=ed7419c9-c171-4d5d-9d12-62ba16e78d54 END -->
+
+<!-- gestalt:architecture feature=dfc85052-311e-4b5d-b9d5-a4e1ec28165e START -->
+## Readiness endpoint with a database connectivity check (`GET /ready`)
+
+**Status:** reconciled across the domain, data, and application slices.
+**Module:** `src/modules/uptime/` (extended — no new module, no shared health abstraction).
+**Stack compliance:** TypeScript / Node 20 / npm / Jest / Fastify / PostgreSQL / modular monolith. No new dependency, no ORM, no second pool, no new framework. Compliant.
+
+### 1. Domain entities
+
+| Entity | Kind | Attributes | Lifecycle states |
+|---|---|---|---|
+| `ReadinessStatus` | value object | `status: ReadinessState` — the sole field; the wire body is exactly `{status:'ready'}` or `{status:'not-ready'}` | carries `ReadinessState` |
+| `ReadinessState` | enum | `READY = 'ready'`, `NOT_READY = 'not-ready'` | `READY`, `NOT_READY` |
+| `ReadinessProbe` | transient, per-request | `id`, `startedAt`, `completedAt`, `outcome`, `failureReason` | `PENDING`, `SUCCEEDED`, `FAILED` |
+
+**Lifecycle states introduced by this feature (all reflected here):**
+
+- `ReadinessState.READY` — the connectivity probe resolved. Terminal for the probe; maps to HTTP 200 `{status:'ready'}`.
+- `ReadinessState.NOT_READY` — the connectivity probe rejected. Terminal for the probe; maps to HTTP 503 `{status:'not-ready'}`.
+- `ReadinessProbe.PENDING` — the probe has been created and the connectivity query is in flight; `completedAt` and `outcome` are null.
+- `ReadinessProbe.SUCCEEDED` — the query resolved; `outcome = READY`, `completedAt` stamped.
+- `ReadinessProbe.FAILED` — the query rejected; `outcome = NOT_READY`, `completedAt` stamped, `failureReason` populated (domain-internal only).
+
+Transitions, all named: `PENDING → SUCCEEDED` (probe resolves), `PENDING → FAILED` (probe rejects). Both are terminal; a probe is never re-entered, retried, cached, or reused. `SUCCEEDED`/`FAILED` are the only states that produce a `ReadinessStatus`.
+
+### 2. Business rules (binding)
+
+1. The readiness predicate is exactly one thing: a trivial connectivity query against the configured PostgreSQL pool succeeds. Nothing else is checked — not disk, not memory, not downstream services, not migrations, not schema version. DECIDED, not open.
+2. The probe is binary and total: resolves → `READY`; rejects → `NOT_READY`. No third outcome, no partial readiness, no degraded state. Any rejection (connection refused, auth failure, timeout, pool exhaustion) maps to `NOT_READY` without discrimination.
+3. The probe is stateless and per-request: it opens no new pool, adds no dependency, caches no result, and holds no state between requests. It uses the existing shared pool from `src/shared/db/connection.ts`.
+4. The response body is fixed and carries no diagnostic detail: `READY` → HTTP 200 with exactly `{status:'ready'}`; `NOT_READY` → HTTP 503 with exactly `{status:'not-ready'}`. No other fields, no error message, no code, no stack, no raw error. The failure reason never crosses the HTTP boundary.
+5. On a failed probe the error is logged through the existing Fastify request logger (`request.log.error`), exactly as the existing `/uptime` route does. No new logging mechanism. The raw error is logged, never returned in the body.
+6. Readiness is a pure observation and is NOT a state-changing operation: it writes no audit record (GP-002 does not apply), mutates no entity, and opens no transaction. It must not be routed through `IUnitOfWork`.
+7. The readiness endpoint is unauthenticated: it is a probe consumed by orchestrators that hold no bearer token. It is added to the `PUBLIC_PATHS` set in `src/shared/auth/index.ts` alongside `/uptime` and `/health`. GP-005 (RBAC) does not apply — there is no actor and no protected resource.
+8. Liveness and readiness are distinct and must not be conflated: `/uptime` reports process uptime and never touches the database; `/ready` reports database connectivity and never reports uptime. The existing `/uptime` endpoint is not migrated, changed, or made to depend on the pool.
+9. The probe's connectivity query is trivial and read-only: it must not read or write any domain table, must not depend on any table existing, and must not be a domain repository call. It is a bare pool-level round trip (`SELECT 1`).
+
+### 3. Persistence
+
+**No tables.** This feature persists no state. `sqlSchemas` is intentionally empty and the code agent has no migration to generate. No `readiness_checks` / probe-history / audit table is introduced — GP-002 binds state-changing operations, and a probe changes no state (an audit row per probe would also make readiness depend on a writable DB and turn a health path into a write path). No existing table is altered or redefined here; `employees`, `leave_requests`, `leave_balances`, `leave_policies`, `leave_types`, `audit_logs`, `notifications` remain defined once, in the earlier features' specs.
+
+### 4. Repository
+
+| Interface | Concrete | Method | Backing |
+|---|---|---|---|
+| `IReadinessRepository` | `PgReadinessRepository` | `check(): Promise<void>` — issues the trivial connectivity query (`SELECT 1`) against the shared pool; resolves when the round trip succeeds, rejects with the underlying pg error otherwise. No retry, no error swallowing, no logging (the route owns `request.log.error`). | PostgreSQL via the existing shared `pg` Pool exported from `src/shared/db/connection.ts` (constructor-injected `dbPool: Pool = defaultPool`), exactly as `PgLeaveRequestRepository` / `PgLeaveBalanceRepository` do. No new pool, no new dependency, no ORM. |
+
+Declared in `src/modules/uptime/uptime.repository.interface.ts`, implemented in `src/modules/uptime/uptime.repository.ts`, both re-exported from `src/modules/uptime/index.ts`.
+
+**Deliberate divergence (flagged, not silently taken):** `check()` takes NO optional trailing `PoolClient`, unlike every other repository in this codebase. The optional-client convention exists so a write can join a caller's transaction; a connectivity probe that joined a caller's transaction would test that transaction rather than the pool, and could report ready while the pool is exhausted. The probe must always acquire from the shared pool.
+
+### 5. Module boundaries
+
+- **Presentation** — `uptime.routes.ts`. `GET /ready` handler only: calls the service, maps the result to 200/503, logs via `request.log.error` on the failed check. No SQL, no business logic.
+- **Application** — `UptimeService.checkReadiness()`. Owns the readiness predicate: probe succeeds → `{status:'ready'}`; probe rejects → `{status:'not-ready'}`. Catches the rejection so the route never interprets an error.
+- **Domain** — `ReadinessStatus` / `ReadinessState` in `uptime.model.ts`. Pure value types consumed by exactly one module, so per the placement rule they stay module-local and are NOT promoted to `src/shared/types/`.
+- **Infrastructure** — `IReadinessRepository` / `PgReadinessRepository`. The only place the connectivity query is written; holds the shared pool from `src/shared/db`. Dependencies flow inward: routes → service → repository interface → shared-db.
+
+`UptimeService` gains a **constructor-injected `IReadinessRepository` defaulting to `PgReadinessRepository`**, so the existing `new UptimeService()` call site in `uptime.routes.ts` keeps compiling and `/uptime` is untouched. This is also the seam the unit tests use.
+
+### 6. Dependency map
+
+- `uptime` -> `shared-db`
+- `app` -> `uptime`
+- `app` -> `shared-auth`
+- `shared-auth` -> `shared-errors`
+
+### 7. Cross-cutting contracts
+
+**Auth / identity.** `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`, populated by the existing `registerAuth` preHandler in `src/shared/auth/index.ts` (JWT bearer verified via `jwt.verify`, `payload.sub` → id, `payload.role` → role). RBAC is enforced by route-level guards, never inline. **This feature's endpoint is the documented exception:** `GET /ready` is an unauthenticated infrastructure probe, so it is added to the `PUBLIC_PATHS` set alongside the existing `/uptime`, `/health`, and `/auth/login`, and carries no `resolveActor` call and no role guard. GP-005 is therefore not applied to `/ready` — the same exemption the existing `/uptime` liveness endpoint already relies on. No new role, no new token claim, no change to the identity shape.
+
+**Error / response.** `GET /ready` uses a **fixed body with no error envelope**. Success: HTTP 200 `{ status: 'ready' }`. Not ready: HTTP 503 `{ status: 'not-ready' }` — 503 is the readiness signal, not an error response, and it carries no error detail, no message, and no code field. The raw probe error is never placed in the body; it is logged via `request.log.error(error)` exactly as `/uptime` does. An unexpected throw outside the probe path falls through to the app-level handler as HTTP 500 `{ error: 'Internal Server Error' }`, matching the existing `/uptime` behaviour. The standard `{ error, code }` envelope and the 400/401/403/404 cases do not apply: the endpoint takes no input (no validation failure), is unauthenticated (no 401/403), and addresses no resource (no 404).
+
+**Transaction / unit of work.** None. Readiness is a single trivial read-only query with no writes, so no transaction is opened and `IUnitOfWork` is not involved. The repository's `check()` deliberately takes no optional `PoolClient` so the probe can never join a caller's transaction.
+
+### 8. Recommended phases
+
+1. **Phase 1 — Readiness probe + `UptimeService.checkReadiness`** (6 files). Adds `ReadinessStatus`/`ReadinessState` to `uptime.model.ts`; adds `checkReadiness()` to `IUptimeService`; adds `IReadinessRepository` (`check(): Promise<void>`) and `PgReadinessRepository`; `UptimeService` gains the constructor-injected repository defaulting to `PgReadinessRepository`; `index.ts` re-exports the new symbols. No HTTP surface, so it is unit-testable in isolation.
+2. **Phase 2 — `GET /ready` route + public-path exemption** (2 files). `uptime.routes.ts` gains the handler (200/503, `request.log.error` on failure, no error detail, `/uptime` byte-identical) and `src/shared/auth/index.ts` adds `'/ready'` to `PUBLIC_PATHS`. These must land together or the endpoint 401s. Depends on Phase 1 only.
+3. **Phase 3 — `UptimeService.checkReadiness` unit tests** (1 file). `tests/unit/modules/uptime/uptime.service.test.ts`, in-memory fake implementing `IReadinessRepository`, no `jest.mock` of the pg driver. Two cases: probe resolves → `{ status: 'ready' }`; probe rejects → `{ status: 'not-ready' }` and does not throw. A third assertion pins that the probe was called exactly once. Depends on Phase 1; independent of Phase 2.
+
+### 9. Reconciliation decisions
+
+- **Canonical data-access name:** `IReadinessRepository` / `PgReadinessRepository` with `check(): Promise<void>` (the data slice's naming) supersedes the application slice's `IDatabaseProbe` / `PgDatabaseProbe` with `ping()`. Rationale: it keeps the connectivity query behind a repository interface per GP-001 and inside the established `uptime.repository.interface.ts` / `uptime.repository.ts` convention, which resolves the application slice's own GP-001 open question rather than carrying it forward. The deliberate divergence (no optional trailing `PoolClient`) is retained.
+- **Canonical service method:** `checkReadiness()` on `IUptimeService` / `UptimeService` (application slice). No competing name existed.
+- **`src/modules/status/`** is NOT used, extended, or reconciled. It is a second, unused health-shaped concept (`SystemStatus`, `StatusService.getStatus()`), unregistered in `src/app.ts`. Flagged as a dead-code decision, not a boundary to reconcile.
+- **`docs/DOMAIN.md`** is stale relative to this document (it still records `LeaveRequest.leaveTypeId`, `approvedBy`/`approvedAt`, and `EmploymentStatus.INACTIVE`). The readiness entities above should be added under a `system`/`uptime` section rather than appended to the stale `system` block.
+
+### 10. Open questions
+
+1. **Probe time bound** — the predicate is decided but the wait is not; an exhausted pool or black-holed DB can hang the request instead of producing the specified 503.
+2. **Round trip vs client acquisition** — the literal reading requires the query to resolve; the acquire-only reading disagrees exactly in the degraded cases the endpoint exists to detect.
+3. **Caching / memoization** — the binding rule says no caching; a future TTL would introduce a staleness bound and a third probe concern.
+4. **`/ready` auth exemption** — inferred, not stated by the spec; it edits a shared, security-relevant file and makes database availability publicly observable.
+5. **`src/modules/status/` dead code** — remove, leave, or reconcile (reconciling would create the shared health abstraction the feature forbids).
+<!-- gestalt:architecture feature=dfc85052-311e-4b5d-b9d5-a4e1ec28165e END -->
