@@ -1,0 +1,234 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "uptime",
+      "shared-auth",
+      "app-bootstrap"
+    ],
+    "affectedLayers": [
+      "presentation",
+      "application",
+      "domain",
+      "infrastructure",
+      "shared"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "`npm run build` (tsc --noEmit over src) exits 0 with the new readiness handler, the changed service return type, and the auth-set addition all in place.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A readiness request sent with NO Authorization header reaches the handler (no 401) and, when the connectivity probe resolves, responds HTTP 200 with a body whose only key is `status` and whose value is the ready member of ReadinessState.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "A readiness request sent with NO Authorization header, when the connectivity probe rejects (including the 2000ms timeout rejection), responds HTTP 503 with a body whose only key is `status` and whose value is the not-ready member of ReadinessState.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Neither outcome's response body contains any error, message, code, stack, or diagnostic field \u2014 the body is exactly the single `status` key in both the 200 and the 503 case.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "On a failed check the caught error is emitted through the Fastify request logger (request.log.error) \u2014 observable in the logger output \u2014 and the same error value is absent from the HTTP response body.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "The service's readiness method never throws: a rejecting probe yields the not-ready result rather than a rejected promise, and the result carries the caught error for the caller to log.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The existing liveness endpoint is unchanged: it still responds 200 with its pre-existing uptime payload, still requires no bearer token, and its handler source is byte-for-byte identical to before this phase.",
+      "testable": true,
+      "layer": "integration"
+    },
+    {
+      "description": "Default-deny auth is intact: a request to any path that is not in the public set and carries no bearer token still fails with the existing unauthorized error, and the public set contains exactly one new entry.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The readiness HTTP surface must be added to the EXISTING uptime module and its existing route-registration function. No new module, no shared health/status abstraction, and src/modules/status/ must not be touched, imported, or reconciled.",
+    "The existing liveness handler must remain byte-for-byte unchanged \u2014 not migrated, renamed, reordered, or made to depend on the database pool. Liveness and readiness stay distinct: readiness never reports uptime, liveness never touches the database.",
+    "The readiness response body is fixed and total: exactly one key, `status`, whose value is the ready or not-ready member of ReadinessState. No other field, no error message, no code, no stack, no raw error \u2014 in either the success or the failure response.",
+    "The raw probe error must never be serialized into the HTTP response. It is logged through the existing Fastify request logger (request.log.error) exactly as the existing liveness handler does \u2014 no new logging mechanism, no console, no new logger dependency.",
+    "The readiness path must be exempt from authentication by adding exactly one entry to the existing module-private public-path set in src/shared/auth/index.ts. No other path may be added, the set must not be widened by prefix/glob matching, and registerAuth's default-deny behaviour must not change.",
+    "The route must not perform data access: it must not call the connectivity probe, must not import or use the pg pool, and must not open a transaction or use IUnitOfWork. Readiness is a pure read-only observation \u2014 no audit record (GP-002 does not apply), no state mutation, no RBAC guard (GP-005 does not apply, there is no actor).",
+    "The service must not log and must not throw from the readiness method; the route must not interpret or inspect the error beyond handing it to the request logger. Ownership split is binding: the service owns the failure, the route owns the logging.",
+    "No caching or memoization anywhere on the readiness path \u2014 every request performs a fresh connectivity round trip. The 2000ms bound owned by the readiness check (READINESS_QUERY_TIMEOUT_MS) must not be relaxed, moved to the route, or replaced by the pool's connectionTimeoutMillis.",
+    "No new dependency, no ORM, no second pool, no new framework, and no new migration or table. The probe continues to use the existing shared pool from src/shared/db.",
+    "No tests may be added or modified in this phase (Phase 3 owns them). The mechanical gate is `npm run build` (tsc --noEmit over src) plus the existing Jest run with --passWithNoTests.",
+    "Strict TypeScript: no `any` (use `unknown` with type guards), no implicit any, strict null checks. The readiness result's error field must be typed without `any`."
+  ],
+  "outOfScope": [
+    "Unit tests for the readiness service and route \u2014 Phase 3 owns tests/unit/modules/uptime/uptime.service.test.ts; no test file is added or modified here.",
+    "Extending scripts/smoke.js to probe the readiness (or liveness) endpoint \u2014 the smoke script exercises neither today and this phase does not change it.",
+    "Restating the now-stale PLAN.md Phase 3 assertions (which expect a single `status` key from the service) and the docs/ARCHITECTURE.md \u00a711 / \u00a75 delivery record that still describes checkReadiness() as returning ReadinessStatus \u2014 documentation reconciliation, not code in this phase.",
+    "Materialising a ReadinessProbe object, populating failureReason, or persisting probe history \u2014 the probe type stays declared-but-uninstantiated as delivered in Phase 1.",
+    "Any change to src/modules/status/ (the pre-existing, unreconciled, unregistered health-shaped module) \u2014 left untouched by decision.",
+    "Adding a third readiness outcome (degraded/unknown), partial readiness, retries, or a TTL cache \u2014 the probe stays binary and total.",
+    "Any change to the connectivity predicate itself (the trivial read-only round trip), to IReadinessRepository.check()'s signature, or to the shared pool wiring \u2014 Phase 1's data-access deliverable is a fixed contract.",
+    "Promoting ReadinessStatus/ReadinessState/ReadinessResult to src/shared/types/ \u2014 they remain module-local to src/modules/uptime/."
+  ],
+  "ambiguities": [
+    {
+      "description": "The concrete TypeScript type of the failure shape's error field is not pinned by the clarification (it names the field but not its type).",
+      "options": [
+        "unknown (matches ReadinessProbe.failureReason and the no-any constraint)",
+        "Error",
+        "string (message only)"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The verification command runs `npm run smoke`, but scripts/smoke.js probes neither the liveness nor the readiness endpoint, so the phase's 'reachable without a bearer token' criterion is not mechanically exercised by the pipeline.",
+      "options": [
+        "Accept the build + existing Jest run as the mechanical gate and verify reachability by inspection/inject",
+        "Extend scripts/smoke.js to probe the readiness endpoint in this phase",
+        "Defer the smoke probe to a later phase"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "NEW operational aspect raised by synthesis: the app is constructed with Fastify's request logging enabled, so a probe polled on a short interval will emit a log line per poll. Nothing in the settled decisions or in docs/ARCHITECTURE.md \u00a77 states whether the readiness path should be exempted from routine request logging (or sampled) to avoid flooding the log, or whether the existing global logging behaviour is simply accepted.",
+      "options": [
+        "Accept the existing global request logging unchanged \u2014 no per-route logging configuration",
+        "Suppress routine request logging for the readiness path only",
+        "Leave it to a later operational phase"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "ReadinessResult (new, module-local to src/modules/uptime/)",
+      "mustExistOrExtend": true,
+      "invariant": "A discriminated result of exactly two shapes: a success shape carrying no error, and a failure shape carrying the caught rejection (or the timeout Error when the 2000ms bound fired). It is produced only by the service's readiness method, is never thrown, is never logged by the service, and never crosses the HTTP boundary \u2014 the route reads only its discriminator and hands its error to the request logger. It is declared alongside the other uptime model types and surfaced through the module barrel; it is NOT promoted to src/shared/types/."
+    },
+    {
+      "entity": "ReadinessStatus (src/modules/uptime/uptime.model.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Unchanged and remains the wire-body type: exactly one field, `status`, whose value is a ReadinessState member. It is the complete and only payload of the readiness response \u2014 no identity, no detail, no error \u2014 and it is the type the route serializes, not the service's result type."
+    },
+    {
+      "entity": "ReadinessState (src/modules/uptime/uptime.model.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly two members, READY = 'ready' and NOT_READY = 'not-ready'; the member value IS the wire value. No third member (no DEGRADED/UNKNOWN) may be added by this phase, and the route maps the service result's discriminator onto these two members only."
+    },
+    {
+      "entity": "ReadinessProbe (src/modules/uptime/uptime.model.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Remains declared-but-uninstantiated with its Phase 1 shape; its failureReason is domain-internal and must never be serialized into the readiness response. This phase does not materialise it, populate it, or persist it."
+    },
+    {
+      "entity": "UptimeStatus (src/modules/uptime/uptime.model.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Unchanged; the liveness payload keeps its existing shape and the liveness handler keeps returning it exactly as before."
+    },
+    {
+      "entity": "PUBLIC_PATHS (src/shared/auth/index.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "A module-private set of exact path strings, matched against the request URL with the query string stripped. It gains exactly one entry for the readiness path and nothing else; it is not exported, not widened to prefix/glob matching, and registerAuth stays default-deny for every path not in the set."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "UptimeService.checkReadiness() (declared on IUptimeService)",
+      "authRule": "No actor, no role, no token \u2014 the service method takes no caller identity and performs no authorization.",
+      "idempotent": true,
+      "errorSemantics": "Never throws and never rejects: a probe rejection (including the 2000ms timeout rejection) is caught and returned as the failure shape of the discriminated result, carrying the caught error for the caller to log. It does not log, does not cache, and performs a fresh probe on every call. Its return type changes from the wire-body type to the discriminated result type \u2014 this is the one Phase 1 signature change this phase requires."
+    },
+    {
+      "operation": "Readiness HTTP handler on the existing uptime route-registration function",
+      "authRule": "Unauthenticated by design: the path is exempted via the public-path set, so the handler must not read request.user, must not call resolveActor, and must carry no role guard. GP-005 does not apply \u2014 there is no actor and no protected resource.",
+      "idempotent": true,
+      "errorSemantics": "Success shape of the service result \u2192 200 with the fixed ready body. Failure shape \u2192 log the carried error via request.log.error and respond 503 with the fixed not-ready body; 503 is the readiness signal, not an error envelope, so no error/code field is added. An unexpected throw outside the probe path falls through to the existing app-level handler as 500 { error: 'Internal Server Error' }, matching the existing liveness handler's try/catch shape. The handler takes no input, so no validation failure, 401/403, or 404 case exists."
+    },
+    {
+      "operation": "IReadinessRepository.check() (Phase 1 contract, consumed unchanged)",
+      "authRule": "Not applicable \u2014 internal data-access seam, no caller identity.",
+      "idempotent": true,
+      "errorSemantics": "Resolves only on a successful round trip; rejects with the underlying pg error otherwise (timeout rejection indistinguishable from a failed query). It takes no optional trailing PoolClient \u2014 a deliberate divergence, because a probe joining a caller's transaction would test that transaction rather than the pool. This phase must not change this signature or call it from the route."
+    },
+    {
+      "operation": "registerAuth preHandler (src/shared/auth/index.ts)",
+      "authRule": "Default-deny is preserved: every path not in the public set still requires a valid bearer token and still throws the existing unauthorized error when it is missing or invalid. The only change is the single added public-path entry.",
+      "idempotent": true,
+      "errorSemantics": "Unchanged \u2014 missing/invalid token still surfaces as the existing UnauthorizedError, which the app-level error handler maps to its status code. No new error type, no new status code, no change to the JWT verification path."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new readiness handler must mirror the existing liveness handler's shape in the same file: service constructed inside the try, the caught error passed to request.log.error, and the 500 { error: 'Internal Server Error' } fallback \u2014 while the liveness handler itself stays byte-for-byte unchanged.",
+      "referencePath": "src/modules/uptime/uptime.routes.ts"
+    },
+    {
+      "requirement": "The public-path exemption must be added as an exact string entry to the existing module-private set, matched the way the preHandler already matches it (request.url with the query string stripped). Do not export the set, do not introduce a second exemption mechanism, and do not alter the default-deny branch.",
+      "referencePath": "src/shared/auth/index.ts"
+    },
+    {
+      "requirement": "The new discriminated result type must be declared in the uptime model file alongside ReadinessState/ReadinessStatus/ReadinessProbe and re-exported from the module barrel, following the existing module-local placement rule \u2014 not placed in src/shared/types/.",
+      "referencePath": "src/modules/uptime/uptime.model.ts"
+    },
+    {
+      "requirement": "The barrel must continue to re-export every existing uptime symbol (UptimeStatus, ReadinessState, ReadinessStatus, ReadinessProbe, IReadinessRepository, PgReadinessRepository, IUptimeService, UptimeService, uptimeRoutes) and additionally surface the new result type; no existing export may be dropped or renamed.",
+      "referencePath": "src/modules/uptime/index.ts"
+    },
+    {
+      "requirement": "The service must keep consuming the connectivity probe through the injected IReadinessRepository (defaulting to the pg implementation) and must never import the pool directly \u2014 the existing constructor-injection seam is the only data-access path.",
+      "referencePath": "src/modules/uptime/uptime.service.ts"
+    },
+    {
+      "requirement": "The route-registration function must keep its existing signature and remain registered with no prefix in the app bootstrap, so the readiness path resolves exactly as specified without a new registration call or a prefix change.",
+      "referencePath": "src/app.ts"
+    },
+    {
+      "requirement": "The wire body must keep using the existing ReadinessStatus/ReadinessState types (single `status` field, member value as wire value) rather than a new response type \u2014 the service result type is internal and must not leak into the serialized body.",
+      "referencePath": "src/modules/uptime/uptime.model.ts"
+    },
+    {
+      "requirement": "The 2000ms bound and the trivial read-only round trip must remain owned by the readiness repository (module-level named constant, no optional trailing PoolClient); the route and service must not re-implement, duplicate, or bypass it.",
+      "referencePath": "src/modules/uptime/uptime.repository.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/uptime/uptime.routes.ts \u2014 the existing uptimeRoutes(fastify) function",
+      "why": "The readiness handler is added here alongside the untouched liveness handler; this is the only presentation surface for the endpoint and the file whose existing try/catch + request.log.error shape the new handler must mirror."
+    },
+    {
+      "target": "src/shared/auth/index.ts \u2014 the module-private PUBLIC_PATHS set consumed by the registerAuth preHandler",
+      "why": "Without the single added entry the endpoint 401s before reaching the handler, making it indistinguishable from not-ready to every credential-less caller. The route and the exemption must land together."
+    },
+    {
+      "target": "src/modules/uptime/uptime.service.ts + uptime.service.interface.ts \u2014 UptimeService.checkReadiness() / IUptimeService",
+      "why": "The service's return type changes to the discriminated result so the route has something to log; the interface signature must change with it or the build breaks."
+    },
+    {
+      "target": "src/modules/uptime/uptime.model.ts + src/modules/uptime/index.ts \u2014 model types and module barrel",
+      "why": "The new discriminated result type is declared in the model and surfaced through the barrel, per the module-local placement rule; the route and service both reference it through the module's public entry point."
+    },
+    {
+      "target": "src/modules/uptime/uptime.repository.interface.ts / uptime.repository.ts \u2014 IReadinessRepository.check()",
+      "why": "The probe is the source of the rejection the service catches and the route logs; its signature and 2000ms bound are a fixed Phase 1 contract this phase consumes without change."
+    },
+    {
+      "target": "src/app.ts \u2014 app.register(uptimeRoutes) with no prefix, after registerAuth",
+      "why": "Registration order and the absence of a prefix are what make the readiness path resolve exactly and what make the auth preHandler apply to it; no change is expected here, but the endpoint is unreachable if either changes."
+    },
+    {
+      "target": "src/app.ts \u2014 the app-level setErrorHandler",
+      "why": "An unexpected throw outside the probe path must fall through to the existing 500 { error: 'Internal Server Error' } handler, matching the liveness handler's behaviour; the readiness handler must not introduce a competing error path."
+    }
+  ]
+}
