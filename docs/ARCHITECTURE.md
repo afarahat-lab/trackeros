@@ -1462,3 +1462,121 @@ Declared in `src/modules/uptime/uptime.repository.interface.ts`, implemented in 
 **Verification.** `npm test` — the new suite passes; the full API suite is green. No production file changed, so `npm run build` (`tsc --noEmit`) is unaffected by this phase.
 
 **All three phases of this feature are now delivered.** No phase of the readiness feature remains outstanding.
+
+<!-- gestalt:architecture feature=594d4d13-f841-45ca-9302-ff8e3c249e07 START -->
+## Audit trail for a single leave request
+
+**Endpoint:** `GET /leaves/:id/history` — returns one leave request's audit entries, oldest first.
+**Scope:** read-only. No new table, no new column, no new index, no migration. The feature opens an existing access path on an existing table.
+
+### Stack compliance
+All three slices comply with the declared stack: TypeScript on Node 20, npm, Jest, Fastify routes, PostgreSQL via the shared `pg` Pool, modular-monolith layout under `src/modules/*` + `src/shared/*`. No ORM, no second pool, no framework outside the declared stack. No frontend module is touched by this feature.
+
+### Domain entities
+
+**AuditLog** (existing, unchanged shape) — `id`, `actorId`, `action` (AuditAction: CREATE | UPDATE | DELETE | APPROVE | REJECT | CANCEL), `entityType`, `entityId`, `beforeState`, `afterState`, `occurredAt`.
+Lifecycle: **RECORDED** — terminal and immutable; reached exactly once at insert, inside the unit of work of the operation it describes. An entry is never updated, deleted, or re-recorded.
+
+**AuditTrail** (new read model / projection — no id, no table, no persistence) — `entityType`, `entityId`, `entries: AuditLog[]`, `entryCount`.
+Lifecycle: **EMPTY** — the entity exists and is visible to the caller but no AuditLog row matches `(entityType, entityId)`; a normal, successful outcome (200 with `[]`), never 404, never an error. **POPULATED** — one or more matching entries, ordered oldest first. There is no partial or error state: a failed read throws rather than producing a trail.
+
+**LeaveRequest** (existing, unchanged) — `id`, `employeeId`, `leaveTypeCode`, `startDate`, `endDate`, `requestedDays`, `reason`, `status`, `approverId`, `approvalComment`, `submittedAt`, `decidedAt`, `cancelledBy`, `cancelledAt`, `reversesRequestId`.
+Lifecycle: **DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED**. No state is added, removed, or changed by this feature. A GP-008 reversal row is born CANCELLED, is terminal and inert, and has no audit trail of its own.
+
+### Conceptual table specifications
+
+**`audit_logs`** — the only table this feature reads.
+Fields: `id`, `actor_id`, `action`, `entity_type`, `entity_id`, `before_state`, `after_state`, `occurred_at`. PK `id`. FK `actor_id -> employees.id`.
+Indexes: `id` (PK; serves the existing `findById` lookup by audit id — the only read path today, and the reason the trail is unreachable). `(entity_type, entity_id)` — the composite index that makes the new `findByEntity` query a bounded index scan instead of a full table scan; this is the access path the feature exists to open, and it is also what the GP-008 reversal relies on (the CANCEL entry for a cancelled-after-approval request is written against the ORIGINAL request id). `actor_id` — actor-history queries; not used by this feature. `(entity_type, entity_id, occurred_at)` is NOT present today; extending the index is an open question (see below). `before_state`/`after_state` are TEXT holding JSON strings (deliberate: the repository stringifies on write and parses on read, so a real json/jsonb column would break `mapRow`); the new query MUST reuse the existing `mapRow`/`parseState` helpers so history entries are structurally identical to what `findById` already returns.
+
+**`leave_requests`** — UNCHANGED and referenced by name only; defined once in the earlier leave/cancellation/GP-008 specs. This feature adds no column and no index.
+Fields: `id`, `employee_id`, `leave_type_code`, `start_date`, `end_date`, `requested_days`, `reason`, `status`, `approver_id`, `approval_comment`, `submitted_at`, `decided_at`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. PK `id`. FKs: `employee_id -> employees.id`, `leave_type_code -> leave_types.code`, `approver_id -> employees.id`, `cancelled_by -> employees.id`, `reverses_request_id -> leave_requests.id`.
+Indexes: `id` (PK; the lookup the history endpoint performs FIRST, via the existing `LeaveService.getById(actor, requestId)`, before any audit row is read — visibility is established here, not in the audit module). `employee_id` — the column the leave module's visibility rule reads; the audit module never reads it. `(employee_id, status)` — role-scoped list queries; not used by the history endpoint. `reverses_request_id` (UNIQUE, nullable) — the GP-008 linkage; a cancelled-after-approval request is TWO rows and the CANCEL audit entry is keyed to the ORIGINAL id, so the endpoint returns the trail of the row whose id was requested and does not merge the two.
+
+### Repository interfaces and concrete implementations
+
+**`IAuditRepository` -> `PgAuditLogRepository`** (PostgreSQL via the shared `pg` Pool from `src/shared/db/connection.ts`, constructor-injected `dbPool: Pool = defaultPool`). Declared in `src/modules/audit/audit.repository.interface.ts`, implemented in `src/modules/audit/audit.repository.ts`, both re-exported from `src/modules/audit/index.ts`.
+- `create(input, client?)` — EXISTING, unchanged. Generates `id` via `randomUUID()`, stamps `occurredAt`, JSON-stringifies `beforeState`/`afterState`.
+- `findById(id, client?)` — EXISTING, unchanged. Returns `null` when absent.
+- `findByEntity(entityType, entityId, client?)` — **NEW**. `SELECT` the existing COLUMNS list `FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY occurred_at ASC, id ASC`. Returns an array, possibly empty — never `null`, never throws on no rows. Ordering is owned by the repository's SQL, not by the caller; no caller may re-sort. Reuses `mapRow`/`parseState`.
+
+**`IAuditService` -> `AuditService`** (backed by `IAuditRepository`/`PgAuditLogRepository`; constructed as `new AuditService(new PgAuditLogRepository())`). Declared in `src/modules/audit/audit.service.interface.ts`, implemented in `src/modules/audit/audit.service.ts`, both re-exported from `src/modules/audit/index.ts`.
+- `record(input, client?)` — EXISTING, unchanged. Validates non-empty `actorId`/`entityType`/`entityId` and AuditAction membership (ValidationError), then delegates with the optional client forwarded so the insert joins the caller's transaction.
+- `getById(id)` — EXISTING, unchanged. `NotFoundError` (404) on unknown id.
+- `getByEntity(entityType, entityId)` — **NEW**. Validates that `entityType` and `entityId` are non-empty strings (ValidationError) and delegates to `repository.findByEntity`. Returns the array unchanged, including an EMPTY array — an entity with no audit rows is a valid 200-with-`[]` outcome, never a `NotFoundError`. Takes NO optional `PoolClient`: this is a read path, it opens no transaction and joins none. It performs NO authorization and NO role check — `EmployeeRole` is an owned decision of the leave and web-leave modules, and the audit module must not branch on it.
+
+**`ILeaveRepository` -> `PgLeaveRequestRepository`** (PostgreSQL via the shared `pg` Pool; declared inline in `src/modules/leave/leave.repository.ts`, re-exported from `src/modules/leave/index.ts`). UNCHANGED — no method added, no column added. Listed only to make the transitive read dependency explicit: `LeaveService.getHistory` calls the EXISTING `LeaveService.getById(actor, requestId)`, which calls `findById` and then applies the leave module's visibility rule. The audit module never calls this repository, and the history endpoint never queries `leave_requests` directly.
+
+**`ILeaveService` -> `LeaveService`** (`src/modules/leave/leave.service.ts`). Gains ONE method:
+- `getHistory(actor, requestId)` — **NEW**. Calls the EXISTING `this.getById(actor, requestId)` FIRST and lets it throw (so an invisible request yields the SAME 404 as a nonexistent one, never a 403), then calls `this.auditService.getByEntity(LEAVE_REQUEST_ENTITY_TYPE, requestId)` and returns the entries oldest-first. Read-only: no `uow.withTransaction`, no client forwarding, no writes. It does NOT re-derive visibility and does NOT branch on `EmployeeRole`.
+
+### Module boundaries
+
+- **Presentation** — `src/modules/leave/leave.routes.ts`. `GET /leaves/:id/history` handler only: `resolveActor`, `request.params.id`, call the service, `reply.status(200).send(entries)`, `try/catch -> request.log.error -> sendError`. No controller file. No SQL, no business logic, no role branch.
+- **Application** — `LeaveService.getHistory(actor, requestId)` (orchestration + visibility) and `AuditService.getByEntity(entityType, entityId)` (entity-scoped read). Both declared on their interfaces before implementation.
+- **Domain** — `AuditLog` (audit, lifecycle RECORDED), `AuditTrail` (audit, EMPTY | POPULATED), `LeaveRequest` (leave). No new domain type is introduced.
+- **Infrastructure** — `PgAuditLogRepository.findByEntity` (the only place the entity query is written), `PgLeaveRequestRepository` (unchanged), `src/shared/db` pool.
+
+Dependencies flow inward: routes -> service interfaces -> repository interfaces -> shared-db. No new edge is added by this feature; every edge in the dependency map already exists.
+
+### Ownership (the load-bearing constraint)
+
+The visibility rule (ADMIN sees all; MANAGER sees own plus direct reports, one level only; anyone else only own) is owned by `leave` and expressed in exactly one place: the existing `LeaveService.getById`. `getHistory` calls it first and lets it throw. The audit module gains a purely mechanical `entityType + entityId` query and **never** branches on `EmployeeRole` — HARNESS.json declares `EmployeeRole` an owned decision whose owners are `leave` and `web-leave`. The route adds no role guard either: authorization is the service's `getById` call, and the 404 it already produces is the response for both invisible and nonexistent ids (no 403, no existence leak).
+
+### Dependency map
+
+- leave -> audit, employee, balance, notification, validation, policy, shared-types, shared-errors, shared-db, shared-auth
+- audit -> shared-types, shared-errors, shared-db
+- employee -> shared-types, shared-errors, shared-db
+- balance -> shared-types, shared-errors, shared-db
+- notification -> shared-types, shared-errors, shared-db
+- validation -> shared-types, shared-errors
+- policy -> shared-types, shared-errors
+- shared-auth -> shared-types, shared-errors
+- shared-types ->
+- shared-errors ->
+- shared-db ->
+
+### Cross-cutting contracts
+
+**Auth.** `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity and role come from a JWT bearer token verified by the existing `registerAuth` preHandler (`src/shared/auth/index.ts`), which populates `request.user` from `payload.sub` (id) and `payload.role`; only `/auth/login` is in `PUBLIC_PATHS`, so `GET /leaves/:id/history` requires a valid token. The route-level `resolveActor` helper (reused unchanged from `leave.routes.ts`) extracts `request.user` and enforces id presence plus `EmployeeRole` membership at the API boundary, throwing `UnauthorizedError` on a missing/invalid actor. RBAC is NOT enforced inline in the route and no role guard is added: the endpoint's authorization is the service's existing `LeaveService.getById(actor, requestId)` call, which owns the visibility rule and throws `NotFoundError` for a request the caller may not see. No new role, no new claim, no change to the identity shape.
+
+**Error response.** Errors return `{ error: string; code: string }` via the existing `sendError` helper (`AppError` -> its `statusCode` + `code`; any other throw -> 500 `{ error: 'Internal Server Error' }`). For `GET /leaves/:id/history`: validation failure -> 400 (`ValidationError`, code `VALIDATION`) for a malformed `entityType`/`entityId` reaching the audit service; authentication failure -> 401 (`UnauthorizedError`, code `UNAUTHORIZED`) for a missing or invalid actor; authorization failure -> 403 (`ForbiddenError`, code `FORBIDDEN`) is NOT produced by this endpoint — a caller who may not see the request receives the SAME 404 as a nonexistent id, so existence is never leaked; not found -> 404 (`NotFoundError`, code `NOT_FOUND`) for both an invisible and a nonexistent request, byte-identical. Success: 200 with an array of `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }` ordered oldest first; an existing, visible request with no audit rows returns 200 with `[]` (never 404). No 409 is produced (read-only).
+
+**Transaction.** EMPTY — this feature is read-only. It writes no audit record, opens no transaction, and forwards no `PoolClient`. The existing `IUnitOfWork` contract is untouched; GP-002 is not engaged by a read.
+
+### Binding rules
+
+1. A trail is identified by the PAIR `(entityType, entityId)`, never by `entityId` alone. `entityType` is the exact, case-sensitive literal `'leave_request'` for a leave request.
+2. A trail is ordered by `occurredAt` ASCENDING (oldest first) — the canonical order for every trail read, everywhere. No consumer may reverse it for display. Ties are broken on `id` ASCENDING so repeated reads are deterministic.
+3. Who may see a leave request's history is EXACTLY who may see the leave request itself, established by calling the existing `getById(actor, requestId)` first and letting it throw. It must not be re-expressed anywhere, and the audit module must stay role-blind.
+4. A caller who may not see the request receives the SAME 404 (`NotFoundError`, code `NOT_FOUND`, byte-identical body) as a caller asking for a request that does not exist. Never 403, never 401, never an empty trail.
+5. An empty trail is a SUCCESS, not an error: 200 with an empty array, never 404.
+6. A GP-008 reversal row has NO audit entries of its own — its CANCEL entry carries the ORIGINAL request id — so `GET /leaves/:reversalId/history` legitimately returns an empty trail. Provenance is reached via `reversesRequestId`, not inferred from the trail.
+7. The trail is append-only and read-only. Reading a trail writes nothing; no entry is ever updated or deleted.
+8. Every state-changing leave operation writes exactly one AuditLog entry against the row it changed, except the GP-008 reversal (which targets the original).
+9. A trail read returns ALL matching entries — no limit, offset, date filter, or action filter.
+10. Each entry is projected as exactly `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }` — the entity, not a summary. No field added, renamed, or dropped.
+
+### Recommended phases
+
+1. **Phase 1 — audit entity query (`findByEntity` / `getByEntity`)** (4 files). Innermost dependency; unit-testable in isolation with an in-memory fake repository. No route, no leave change, no new module, no shared-types change.
+2. **Phase 2 — `LeaveService.getHistory`** (1 file). Depends on Phase 1. Visibility via the existing `getById`; read-only; no `EmployeeRole` branch.
+3. **Phase 3 — `GET /leaves/:id/history` route** (1 file). Depends on Phase 2. Reuses `resolveActor` and `sendError`; no role guard; invisible and nonexistent ids produce byte-identical 404s.
+4. **Phase 4 — tests** (2 files). Depends on Phases 1–3: entity-query ordering; the request's own employee; a MANAGER reading a direct report's history; a requester who may not see the request getting 404; the empty-history case.
+
+### Open questions
+
+1. **Ordering tie-break** for same-millisecond `occurred_at` — the domain slice asserts `ORDER BY occurred_at ASC, id ASC`; the data and application slices left it open. Must hold for every consumer of `findByEntity`, not just this endpoint.
+2. **GP-008 reversal trail** — should a reversal row have a non-empty trail of its own, or is the empty trail correct (the reversal is an event in the ORIGINAL's history)?
+3. **`beforeState`/`afterState` exposure** — the trail is visible to exactly the callers who may see the request, but it makes full snapshots bulk-readable and reveals the `actorId` of every actor who touched the request. Redaction must be decided now if wanted, because the projection rule is binding feature-wide.
+4. **Index extension** — should `(entity_type, entity_id)` be extended with `occurred_at` (and `id`) so the ordered scan is index-served? A migration decision that must be made once for the table.
+5. **`occurred_at` clock authority** — app-stamped `new Date()` vs the column's DB default `now()`; the DB default is currently dead code for every row the repository inserts.
+6. **`entity_type` literal ownership** — the leave module owns `LEAVE_REQUEST_ENTITY_TYPE` (defined once in `src/modules/leave/leave.model.ts` and imported by both the write path and the history read); a divergence would silently return an empty array, which this contract treats as a valid 200.
+7. **`getHistory` return type** — the audit-owned `AuditLog` entity as-is (leading option; it must not be promoted to `src/shared/types/` and must not be re-declared in leave) vs a leave-owned projection.
+8. **Unbounded response size** — pagination and filtering are out of scope, so the endpoint returns the full trail with no cap.
+
+### Documentation note
+
+`docs/ARCHITECTURE.md` previously recorded the audit module's repository/service interfaces as `create`/`findById` and `record`/`getById` only. This feature extends both interfaces (`findByEntity`, `getByEntity`), so the audit module's documented surface is updated in the same change — the doc is the contract the dependency check and later features read.
+<!-- gestalt:architecture feature=594d4d13-f841-45ca-9302-ff8e3c249e07 END -->
