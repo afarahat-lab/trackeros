@@ -16,7 +16,7 @@ import {
 } from '../../shared/errors';
 import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
 import { IBalanceRepository, LeaveBalance, PgLeaveBalanceRepository } from '../balance';
-import { IAuditService, AuditService, PgAuditLogRepository } from '../audit';
+import { IAuditService, AuditLog, AuditService, PgAuditLogRepository } from '../audit';
 import {
   INotificationService,
   NotificationService,
@@ -26,7 +26,11 @@ import { IValidationService, ValidationService } from '../validation';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
 import { IPolicyService, createPolicyService } from '../policy';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
-import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
+import {
+  CreateLeaveRequestInput,
+  LeaveRequest,
+  LEAVE_REQUEST_ENTITY_TYPE,
+} from './leave.model';
 import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';
 
 /**
@@ -46,6 +50,7 @@ export interface ILeaveService {
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
   getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
+  getHistory(actor: LeaveActor, requestId: string): Promise<AuditLog[]>;
 }
 
 /**
@@ -106,7 +111,7 @@ export class LeaveService implements ILeaveService {
         {
           actorId: actor.id,
           action: AuditAction.CREATE,
-          entityType: 'leave_request',
+          entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: created.id,
           beforeState: null,
           afterState: created,
@@ -154,7 +159,7 @@ export class LeaveService implements ILeaveService {
         {
           actorId: actor.id,
           action: AuditAction.UPDATE,
-          entityType: 'leave_request',
+          entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
           afterState: updated,
@@ -204,7 +209,7 @@ export class LeaveService implements ILeaveService {
         {
           actorId: actor.id,
           action: AuditAction.APPROVE,
-          entityType: 'leave_request',
+          entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
           afterState: updated,
@@ -263,7 +268,7 @@ export class LeaveService implements ILeaveService {
         {
           actorId: actor.id,
           action: AuditAction.REJECT,
-          entityType: 'leave_request',
+          entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
           afterState: updated,
@@ -358,7 +363,7 @@ export class LeaveService implements ILeaveService {
           {
             actorId: actor.id,
             action: AuditAction.CANCEL,
-            entityType: 'leave_request',
+            entityType: LEAVE_REQUEST_ENTITY_TYPE,
             entityId: request.id,
             beforeState: request,
             afterState: reversal,
@@ -414,7 +419,7 @@ export class LeaveService implements ILeaveService {
         {
           actorId: actor.id,
           action: AuditAction.CANCEL,
-          entityType: 'leave_request',
+          entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
           afterState: updated,
@@ -472,6 +477,14 @@ export class LeaveService implements ILeaveService {
       throw new NotFoundError('Leave request not found');
     }
     return request;
+  }
+
+  async getHistory(actor: LeaveActor, requestId: string): Promise<AuditLog[]> {
+    // getById is the single owner of the leave visibility rule: a caller who may
+    // not see the request gets its NotFoundError (indistinguishable from a
+    // nonexistent id). A visible request with no entries is a valid empty array.
+    await this.getById(actor, requestId);
+    return this.auditService.getByEntity(LEAVE_REQUEST_ENTITY_TYPE, requestId);
   }
 
   private async getRequest(requestId: string): Promise<LeaveRequest> {
