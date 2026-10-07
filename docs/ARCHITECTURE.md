@@ -120,10 +120,11 @@ Three reference-data modules, each under `src/modules/<name>/` with a public `in
 Jest unit tests under `tests/unit/modules/` cover each service with in-memory fake repositories (and a fake `ILeaveTypeService` for policy): create/retrieve happy paths plus ValidationError/ConflictError/NotFoundError semantics.
 
 ### Phase 3 delivered (audit and notification modules)
-
 Two modules, each under `src/modules/<name>/` with the same split-file layout as Phase 2 (model, repository interface, repository, service interface, service, `index.ts`).
 
 **audit** — `AuditLog` model (id, actorId, action: AuditAction, entityType, entityId, beforeState: `unknown | null`, afterState: `unknown | null`, occurredAt: Date). `CreateAuditLogInput = Omit<AuditLog, 'id' | 'occurredAt'>` — the repository generates `id` via `randomUUID()` and stamps `occurredAt`. `IAuditRepository` (create, findById) + `PgAuditLogRepository` (JSON-stringifies `beforeState`/`afterState` for the `before_state`/`after_state` columns on write; `mapRow` parses them back via a guarded `parseState` helper — null column → null, non-null → `JSON.parse` — so `findById` returns structurally equal values, preserving the `unknown | null` contract). `IAuditService` (record, getById) + `AuditService` validates non-empty `actorId`/`entityType`/`entityId` and `AuditAction` enum membership (ValidationError), throws NotFoundError(404) on unknown id.
+
+> Later extension: the "Audit trail for a single leave request" feature's Phase 1 added `findByEntity(entityType, entityId)` to `IAuditRepository`/`PgAuditLogRepository` and `getByEntity(entityType, entityId)` to `IAuditService`/`AuditService` (entity-scoped read, no `PoolClient`, empty array is a success). See that feature's section for the built signatures.
 
 **notification** — `Notification` model (id, recipientId, type, title, message, relatedEntityType: `string | null`, relatedEntityId: `string | null`, status: NotificationStatus, createdAt: Date, readAt: `Date | null`). `CreateNotificationInput = Omit<Notification, 'id' | 'status' | 'createdAt' | 'readAt'> & { status?: NotificationStatus }` — status defaults to PENDING when omitted. `INotificationRepository` (create, findById, updateStatus) + `PgNotificationRepository` (generates `id`/`createdAt`, defaults status to PENDING, `read_at` null on create). `INotificationService` (create, getById, markRead) + `NotificationService` validates required strings and status enum membership; `markRead` sets status READ and `readAt` to now, throwing NotFoundError(404) on unknown id.
 
@@ -134,7 +135,6 @@ Two modules, each under `src/modules/<name>/` with the same split-file layout as
 - No audit-log writes (GP-002) and no routes/controllers/RBAC for these modules — out of scope for this phase (routes deferred).
 
 Jest unit tests under `tests/unit/modules/` cover each service with in-memory fake repositories: create/retrieve happy paths, ValidationError on empty/invalid fields, NotFoundError on unknown id, and (notification) `markRead` semantics plus client-forwarding on `create`.
-
 ### Phase 4 delivered (balance module)
 
 The balance module under `src/modules/balance/` with the split-file layout (model, repository, service, `index.ts` — no separate interface files; the repository and service interfaces are declared in the same file as their implementations).
@@ -1465,7 +1465,6 @@ Declared in `src/modules/uptime/uptime.repository.interface.ts`, implemented in 
 
 <!-- gestalt:architecture feature=594d4d13-f841-45ca-9302-ff8e3c249e07 START -->
 ## Audit trail for a single leave request
-
 **Endpoint:** `GET /leaves/:id/history` — returns one leave request's audit entries, oldest first.
 **Scope:** read-only. No new table, no new column, no new index, no migration. The feature opens an existing access path on an existing table.
 
@@ -1498,16 +1497,16 @@ Indexes: `id` (PK; the lookup the history endpoint performs FIRST, via the exist
 **`IAuditRepository` -> `PgAuditLogRepository`** (PostgreSQL via the shared `pg` Pool from `src/shared/db/connection.ts`, constructor-injected `dbPool: Pool = defaultPool`). Declared in `src/modules/audit/audit.repository.interface.ts`, implemented in `src/modules/audit/audit.repository.ts`, both re-exported from `src/modules/audit/index.ts`.
 - `create(input, client?)` — EXISTING, unchanged. Generates `id` via `randomUUID()`, stamps `occurredAt`, JSON-stringifies `beforeState`/`afterState`.
 - `findById(id, client?)` — EXISTING, unchanged. Returns `null` when absent.
-- `findByEntity(entityType, entityId, client?)` — **NEW**. `SELECT` the existing COLUMNS list `FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY occurred_at ASC, id ASC`. Returns an array, possibly empty — never `null`, never throws on no rows. Ordering is owned by the repository's SQL, not by the caller; no caller may re-sort. Reuses `mapRow`/`parseState`.
+- `findByEntity(entityType, entityId)` — **NEW, DELIVERED (Phase 1)**. Takes NO optional trailing `PoolClient`: this read path opens no transaction and joins none, so it queries through the existing private `db(client?)` accessor with no client argument. `SELECT` the existing COLUMNS list `FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY occurred_at ASC, id ASC`. Returns an array, possibly empty — never `null`, never throws on no rows. Ordering is owned by the repository's SQL, not by the caller; no caller may re-sort. Reuses `mapRow`/`parseState`. No LIMIT/OFFSET, no date or action filter.
 
 **`IAuditService` -> `AuditService`** (backed by `IAuditRepository`/`PgAuditLogRepository`; constructed as `new AuditService(new PgAuditLogRepository())`). Declared in `src/modules/audit/audit.service.interface.ts`, implemented in `src/modules/audit/audit.service.ts`, both re-exported from `src/modules/audit/index.ts`.
 - `record(input, client?)` — EXISTING, unchanged. Validates non-empty `actorId`/`entityType`/`entityId` and AuditAction membership (ValidationError), then delegates with the optional client forwarded so the insert joins the caller's transaction.
 - `getById(id)` — EXISTING, unchanged. `NotFoundError` (404) on unknown id.
-- `getByEntity(entityType, entityId)` — **NEW**. Validates that `entityType` and `entityId` are non-empty strings (ValidationError) and delegates to `repository.findByEntity`. Returns the array unchanged, including an EMPTY array — an entity with no audit rows is a valid 200-with-`[]` outcome, never a `NotFoundError`. Takes NO optional `PoolClient`: this is a read path, it opens no transaction and joins none. It performs NO authorization and NO role check — `EmployeeRole` is an owned decision of the leave and web-leave modules, and the audit module must not branch on it.
+- `getByEntity(entityType, entityId)` — **NEW, DELIVERED (Phase 1)**. Validates that `entityType` and `entityId` are non-empty strings (ValidationError) and delegates to `repository.findByEntity`. Returns the array unchanged, including an EMPTY array — an entity with no audit rows is a valid 200-with-`[]` outcome, never a `NotFoundError`. Takes NO optional `PoolClient`: this is a read path, it opens no transaction and joins none. It performs NO authorization and NO role check — `EmployeeRole` is an owned decision of the leave and web-leave modules, and the audit module must not branch on it.
 
 **`ILeaveRepository` -> `PgLeaveRequestRepository`** (PostgreSQL via the shared `pg` Pool; declared inline in `src/modules/leave/leave.repository.ts`, re-exported from `src/modules/leave/index.ts`). UNCHANGED — no method added, no column added. Listed only to make the transitive read dependency explicit: `LeaveService.getHistory` calls the EXISTING `LeaveService.getById(actor, requestId)`, which calls `findById` and then applies the leave module's visibility rule. The audit module never calls this repository, and the history endpoint never queries `leave_requests` directly.
 
-**`ILeaveService` -> `LeaveService`** (`src/modules/leave/leave.service.ts`). Gains ONE method:
+**`ILeaveService` -> `LeaveService`** (`src/modules/leave/leave.service.ts`). Gains ONE method (NOT yet built — Phase 2):
 - `getHistory(actor, requestId)` — **NEW**. Calls the EXISTING `this.getById(actor, requestId)` FIRST and lets it throw (so an invisible request yields the SAME 404 as a nonexistent one, never a 403), then calls `this.auditService.getByEntity(LEAVE_REQUEST_ENTITY_TYPE, requestId)` and returns the entries oldest-first. Read-only: no `uow.withTransaction`, no client forwarding, no writes. It does NOT re-derive visibility and does NOT branch on `EmployeeRole`.
 
 ### Module boundaries
@@ -1558,16 +1557,31 @@ The visibility rule (ADMIN sees all; MANAGER sees own plus direct reports, one l
 9. A trail read returns ALL matching entries — no limit, offset, date filter, or action filter.
 10. Each entry is projected as exactly `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }` — the entity, not a summary. No field added, renamed, or dropped.
 
+### Phase 1 delivered (audit entity query: `findByEntity` / `getByEntity`)
+
+Four source files under `src/modules/audit/`, plus the two existing test fakes. No migration, no DDL, no index change, no new file under `src/shared/`, no change to any other module, no route.
+
+- `src/modules/audit/audit.repository.interface.ts` — `findByEntity(entityType: string, entityId: string): Promise<AuditLog[]>` added in place; `create`/`findById` left byte-identical.
+- `src/modules/audit/audit.repository.ts` — `PgAuditLogRepository.findByEntity` issues exactly one entity-scoped SELECT, reusing the existing `COLUMNS` constant and the existing `mapRow`/`parseState` helpers (so `beforeState`/`afterState` come back parsed — null column -> `null`, JSON column -> parsed value — and `occurredAt` is a `Date`):
+  `SELECT ${COLUMNS} FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY occurred_at ASC, id ASC`
+  It queries through the existing private `db(client?)` accessor with no client argument (the injected-pool test seam is unchanged) and returns `result.rows.map(mapRow)` — an empty array for zero matching rows, never `null`, never a throw. No LIMIT/OFFSET, no pagination, no date or action filter.
+- `src/modules/audit/audit.service.interface.ts` — `getByEntity(entityType: string, entityId: string): Promise<AuditLog[]>` added in place; `record`/`getById` unchanged.
+- `src/modules/audit/audit.service.ts` — `AuditService.getByEntity` calls a new private `validateEntityRef(entityType, entityId)` (the same `requiredStrings` loop idiom as the existing `validate()`: non-string or whitespace-only -> `ValidationError('Invalid entityType')` / `ValidationError('Invalid entityId')`, with the repository NOT reached), then returns `this.repository.findByEntity(entityType, entityId)` verbatim. An empty array is returned as a successful result and is never converted into `NotFoundError`. No `PoolClient` parameter, no transaction, no `EmployeeRole` import, no role branch, no literal `'leave_request'` anywhere in the module.
+- `src/modules/audit/index.ts` — unchanged; the same six symbols (`AuditLog`, `CreateAuditLogInput`, `IAuditRepository`, `PgAuditLogRepository`, `IAuditService`, `AuditService`) are still exported.
+- **Test fakes (divergence from the plan's "no tests in this phase"):** `tests/unit/modules/audit.service.test.ts` (`FakeAuditRepository.findByEntity`, filtering the in-memory rows on `entityType`/`entityId`) and `tests/unit/modules/leave/leave.service.test.ts` (`FakeAuditService.getByEntity`, filtering its recorded entries) each gained the new interface member so the fakes still satisfy `IAuditRepository`/`IAuditService` and both suites typecheck. No new test cases, no new assertions, and no test of ordering, tie-break, empty result, or validation were added — Phase 4 still owns those.
+- **Signature divergence, resolved in favour of the code:** the reconciled architecture originally specified `findByEntity(entityType, entityId, client?)` with an optional trailing `PoolClient` for symmetry with `create`/`findById`. The implementation takes NO client parameter — the read path opens no transaction and joins none — and the repository-interfaces subsection above has been corrected to the built signature.
+- Not built in this phase: `LeaveService.getHistory`, the `LEAVE_REQUEST_ENTITY_TYPE` constant, the `GET /leaves/:id/history` route, and the entity-query tests.
+
 ### Recommended phases
 
-1. **Phase 1 — audit entity query (`findByEntity` / `getByEntity`)** (4 files). Innermost dependency; unit-testable in isolation with an in-memory fake repository. No route, no leave change, no new module, no shared-types change.
+1. **Phase 1 — audit entity query (`findByEntity` / `getByEntity`)** (4 files). Innermost dependency; unit-testable in isolation with an in-memory fake repository. No route, no leave change, no new module, no shared-types change. **DELIVERED** (see above).
 2. **Phase 2 — `LeaveService.getHistory`** (1 file). Depends on Phase 1. Visibility via the existing `getById`; read-only; no `EmployeeRole` branch.
 3. **Phase 3 — `GET /leaves/:id/history` route** (1 file). Depends on Phase 2. Reuses `resolveActor` and `sendError`; no role guard; invisible and nonexistent ids produce byte-identical 404s.
 4. **Phase 4 — tests** (2 files). Depends on Phases 1–3: entity-query ordering; the request's own employee; a MANAGER reading a direct report's history; a requester who may not see the request getting 404; the empty-history case.
 
 ### Open questions
 
-1. **Ordering tie-break** for same-millisecond `occurred_at` — the domain slice asserts `ORDER BY occurred_at ASC, id ASC`; the data and application slices left it open. Must hold for every consumer of `findByEntity`, not just this endpoint.
+1. **Ordering tie-break** — RESOLVED by Phase 1: the repository SQL is `ORDER BY occurred_at ASC, id ASC`, so same-millisecond entries are deterministically ordered and repeated reads are stable. The tie-break is binding for every consumer of `findByEntity`, not just this endpoint.
 2. **GP-008 reversal trail** — should a reversal row have a non-empty trail of its own, or is the empty trail correct (the reversal is an event in the ORIGINAL's history)?
 3. **`beforeState`/`afterState` exposure** — the trail is visible to exactly the callers who may see the request, but it makes full snapshots bulk-readable and reveals the `actorId` of every actor who touched the request. Redaction must be decided now if wanted, because the projection rule is binding feature-wide.
 4. **Index extension** — should `(entity_type, entity_id)` be extended with `occurred_at` (and `id`) so the ordered scan is index-served? A migration decision that must be made once for the table.
@@ -1578,5 +1592,5 @@ The visibility rule (ADMIN sees all; MANAGER sees own plus direct reports, one l
 
 ### Documentation note
 
-`docs/ARCHITECTURE.md` previously recorded the audit module's repository/service interfaces as `create`/`findById` and `record`/`getById` only. This feature extends both interfaces (`findByEntity`, `getByEntity`), so the audit module's documented surface is updated in the same change — the doc is the contract the dependency check and later features read.
+`docs/ARCHITECTURE.md` previously recorded the audit module's repository/service interfaces as `create`/`findById` and `record`/`getById` only. Phase 1 of this feature extends both interfaces (`findByEntity`, `getByEntity`), so the audit module's documented surface is updated in the same change — the doc is the contract the dependency check and later features read. The documented `findByEntity` signature was also corrected from the planned `(entityType, entityId, client?)` to the built `(entityType, entityId)`: the read path takes no `PoolClient`.
 <!-- gestalt:architecture feature=594d4d13-f841-45ca-9302-ff8e3c249e07 END -->
