@@ -1,0 +1,214 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "leave"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "A new Jest test file exists under tests/unit/modules/audit/ (a directory that does not exist today) and is discovered by the existing jest.config.js testMatch `**/tests/**/*.test.(ts|js)`; `npx jest` runs it green.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The phase's diff touches no file under src/ \u2014 `git diff --name-only` for the phase lists only files under tests/. Phases 1\u20133 are treated as fixed contracts.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository.findByEntity is asserted to issue exactly one query through the injected fake pool, whose SQL selects from audit_logs with `WHERE entity_type = $1 AND entity_id = $2` and `ORDER BY occurred_at ASC, id ASC`, and whose parameter array is exactly [entityType, entityId] in that order.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Row mapping is asserted through the existing mapRow/parseState path: a JSON-string before_state/after_state column comes back as the parsed value, a null column comes back as null (not the string 'null', not undefined), and occurredAt is a Date instance.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A tie-break case is asserted: two rows sharing an identical occurredAt are returned in ascending id order, and a repeat call with the same input yields the same order (stability).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "An empty result set from the fake pool resolves to [] and does not throw \u2014 asserted at the repository level and, separately, at the endpoint level as 200 with an empty array for an existing, visible request with no audit rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Via the Fastify route seam, the history endpoint returns 200 with the entries for the request's own employee, and a MANAGER reading a direct report's history also returns 200.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A requester who may not see the request receives the SAME 404 as a nonexistent id: both responses are asserted byte-identical (statusCode, body, and code 'NOT_FOUND'), and the invisible case is asserted never to be 403.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Each returned entry is asserted to carry exactly the keys { id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt } \u2014 no added, renamed, or dropped field (e.g. an exact key-set comparison, not a partial matchObject).",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "No production source change: nothing under src/ may be modified, added, or deleted. Phases 1\u20133 (findByEntity/getByEntity, LeaveService.getHistory + LEAVE_REQUEST_ENTITY_TYPE, the GET /leaves/:id/history handler) are fixed contracts the tests assert against, not adjust.",
+    "In-memory fakes only \u2014 no jest.mock of the pg driver, no real Pool, no database connection. The repository is exercised by injecting a fake pool through the existing constructor seam `constructor(private readonly dbPool: Pool = defaultPool)`; the route is exercised by decorating the Fastify instance's `leaveService` seam, matching the existing suite.",
+    "Jest + ts-jest, TypeScript strict (no implicit any, strict null checks). HARNESS.json constraint `no-any` is enforced by CI lint: test doubles must be typed (e.g. `as unknown as ILeaveService` / `as unknown as Pool`), never `any`. Note tsconfig.json excludes `tests`, so ts-jest is the only typecheck gate these files pass through \u2014 they must compile under strict mode.",
+    "The tests must not assert implementation shape beyond the contract: no assertion on the exact whitespace/indentation of the SQL string, no assertion on the number of internal helper calls, no assertion that a specific private method exists. Assert the query's semantic content (table, WHERE predicate, ORDER BY, params) and the observable result.",
+    "The tests must not re-express the visibility rule. The route-level fake service may implement getById/getHistory for the seam, but no test may assert a role branch that the production code does not contain, and no test may assert a 403 from this endpoint.",
+    "The existing tests/unit/modules/leave/leave.routes.test.ts and tests/unit/modules/leave/leave.service.test.ts must keep passing unchanged in their existing cases; the extension is additive. The existing byte-identical-404 assertion pattern in leave.routes.test.ts is the pattern to mirror, not to replace.",
+    "The verification command runs `npm run build` (tsc --noEmit over src) and `npx jest --passWithNoTests --forceExit`; the new tests must pass under `--forceExit`, so no test may leave a handle open (close every Fastify instance in afterEach).",
+    "The phase must record its delivery in docs/ARCHITECTURE.md under the feature's \"Audit trail for a single leave request\" section (a \"Phase 4 delivered\" subsection), and correct the now-stale \"Recommended phases\" list which still shows Phases 2\u20134 as pending. The doc is the contract later features and the dependency check read."
+  ],
+  "outOfScope": [
+    "Any change to src/ \u2014 including refactors, added exports, new helpers, or \"testability\" seams. The dbPool constructor seam and the fastify.leaveService decoration seam already exist and are sufficient.",
+    "Integration/e2e coverage against a real PostgreSQL instance, and any extension of scripts/smoke.js. This phase is Jest unit tests with in-memory fakes only.",
+    "Tests for the write path (create/submit/approve/reject/cancel audit recording), for AuditService.record/getById, and for the leave list/getById endpoints beyond what already exists \u2014 those are covered by the existing suites and are not this phase's subject.",
+    "Pagination, filtering, LIMIT/OFFSET, index extension, beforeState/afterState redaction, and occurred_at clock authority \u2014 all recorded as open questions in the feature's architecture section and deliberately unasserted here.",
+    "Asserting the GP-008 reversal trail semantics (a reversal row's own trail being empty) as a new test case; the empty-trail contract is covered generically by the empty-history criterion."
+  ],
+  "ambiguities": [
+    {
+      "description": "PLAN.md says the leave-side tests extend \"the existing tests/unit/modules/leave/leave.routes.test.ts (or leave.service.test.ts)\" \u2014 the file is not fixed. The route seam is the only place the endpoint visibility and byte-identical-404 criteria can be asserted, so the routes file is the natural home; the service file would only cover getHistory's delegation.",
+      "options": [
+        "Extend leave.routes.test.ts only (route seam covers all three endpoint criteria)",
+        "Extend leave.routes.test.ts for endpoint criteria AND add getHistory delegation cases to leave.service.test.ts",
+        "Extend leave.service.test.ts only"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The new audit test file's scope is stated as the entity-query ordering/mapping/tie-break/empty-result behaviour of PgAuditLogRepository.findByEntity. It is unstated whether it should also cover AuditService.getByEntity (its ValidationError on empty entityType/entityId, and its verbatim passthrough of an empty array) \u2014 the existing tests/unit/modules/audit.service.test.ts has no getByEntity cases at all, so that behaviour is currently unasserted anywhere.",
+      "options": [
+        "Repository-level findByEntity only, as the plan enumerates",
+        "Repository-level findByEntity plus AuditService.getByEntity validation and empty-array passthrough",
+        "Service-level getByEntity only"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The tie-break criterion says two rows with an identical occurredAt come back in ascending id order. With a fake pool the repository returns whatever the fake yields, so the assertion can only verify that the repository does not re-sort and that the SQL carries the `id ASC` tie-break \u2014 it cannot prove PostgreSQL's ordering. Whether the test should additionally assert the SQL text contains the tie-break clause (rather than only the returned order) is unstated.",
+      "options": [
+        "Assert both the SQL tie-break clause and the returned order/stability",
+        "Assert returned order and stability only",
+        "Assert SQL tie-break clause only"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The endpoint-visibility criterion requires a MANAGER reading a direct report's history to return 200. The route-level fake service must therefore encode the manager/report relationship. Whether the fake should mirror the production getById rule (visibleIds = [actor.id, ...reports]) or simply return entries for the requested id is unstated; the former risks the test asserting the fake rather than the route.",
+      "options": [
+        "Fake mirrors the production visibility rule (as the existing buildApp fake does)",
+        "Fake returns entries unconditionally and the test asserts only the route's pass-through of 200",
+        "Drive the real LeaveService with fake repositories instead of a fake service"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle RECORDED \u2014 terminal and immutable; reached once at insert. The tests must treat an entry as read-only data: no test may assert an update, delete, or re-record path, and the mapped entry must be structurally identical to what findById already returns (same eight fields, beforeState/afterState as parsed `unknown | null`, occurredAt as a Date)."
+    },
+    {
+      "entity": "AuditTrail",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle EMPTY | POPULATED, with no error state. EMPTY (entity visible, zero matching rows) is a successful 200-with-[] outcome, never 404 and never a throw; POPULATED is one or more entries ordered occurredAt ASC then id ASC. NOTE \u2014 residual inconsistency: .gestalt/architecture/reconciled.json still declares AuditTrail with `entries`/`entryCount`, but Phase 2 delivered no AuditTrail type (getHistory returns the audit-owned AuditLog[] directly). docs/ARCHITECTURE.md records this divergence as resolved in favour of the code; the tests must assert the built shape (a bare array), not the reconciled wrapper."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Lifecycle DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED, unchanged by this feature. The history read is visibility-gated by the request's existence and the caller's relationship to it, not by its status: a request in any status that the caller may see yields its trail (or an empty one), and a request the caller may not see yields the same 404 as a nonexistent id regardless of status."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditRepository.findByEntity(entityType, entityId) \u2014 the entity-scoped trail read",
+      "authRule": "None. The audit module is role-blind and must stay so: no EmployeeRole import, no role branch, no authorization. Visibility is owned by the leave module.",
+      "idempotent": true,
+      "errorSemantics": "Returns AuditLog[] \u2014 possibly empty, never null, never throws on zero matching rows. Takes NO optional trailing PoolClient (the read path opens no transaction and joins none). Ordering is owned by the repository's SQL (occurred_at ASC, id ASC); no caller may re-sort. The tests must assert this signature and behaviour as built."
+    },
+    {
+      "operation": "IAuditService.getByEntity(entityType, entityId) \u2014 the service-level trail read",
+      "authRule": "None \u2014 no role check, no EmployeeRole branch.",
+      "idempotent": true,
+      "errorSemantics": "ValidationError (400, code VALIDATION_ERROR) for a non-string or whitespace-only entityType/entityId, with the repository NOT reached; otherwise the repository's array returned verbatim, including an empty array \u2014 never NotFoundError for an empty trail. No PoolClient parameter."
+    },
+    {
+      "operation": "ILeaveService.getHistory(actor, requestId) \u2014 the leave-owned trail read",
+      "authRule": "Authorization is exactly the existing getById(actor, requestId) visibility rule (ADMIN sees all; MANAGER sees own plus direct reports, one level; anyone else only own), called FIRST and allowed to throw. It must not be re-expressed, and the method must not branch on EmployeeRole.",
+      "idempotent": true,
+      "errorSemantics": "NotFoundError (404, code NOT_FOUND) propagated unchanged from getById for both an invisible and a nonexistent request \u2014 byte-identical, never 403. A visible request with zero audit rows returns [] (200), never NotFoundError. Read-only: no uow.withTransaction, no PoolClient accepted or forwarded, no writes."
+    },
+    {
+      "operation": "GET /leaves/:id/history \u2014 the HTTP trail read (asserted, not built)",
+      "authRule": "Authentication via the existing registerAuth preHandler populating request.user; the route's existing resolveActor helper enforces id presence and EmployeeRole membership (401 UnauthorizedError otherwise). No role guard and no EmployeeRole branch in the route \u2014 authorization is entirely the service's getById call.",
+      "idempotent": true,
+      "errorSemantics": "200 with the AuditLog[] array verbatim (oldest first, no wrapper, no re-sort, no mapping, no filter, no cap); 200 with [] for an existing visible request with no rows; 404 { error, code: 'NOT_FOUND' } byte-identical for an invisible and a nonexistent id; 401 for a missing/invalid actor; 500 via sendError for a non-AppError throw. 403 is never produced by this endpoint."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The repository test must inject its fake pool through the EXISTING constructor seam `constructor(private readonly dbPool: Pool = defaultPool)` and assert the query issued through the private `db(client?)` accessor with no client argument \u2014 do not add a seam, do not jest.mock the pg module.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The mapping assertions must target the existing mapRow/parseState behaviour (JSON column -> parsed value, null column -> null, occurred_at -> Date) and the existing COLUMNS constant \u2014 the test must not re-implement or duplicate the mapping, and must not assert a json/jsonb column type (before_state/after_state are TEXT holding JSON strings).",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The route tests must reuse the existing Fastify buildApp pattern: decorate the instance's `leaveService` seam with an in-memory ILeaveService fake, `decorateRequest('user', undefined)` plus a preHandler hook setting request.user, `app.register(leaveRoutes)`, `app.ready()`, `app.inject(...)`, and `app.close()` in afterEach. Mirror the existing byte-identical-404 assertion (`expect(invisible.json()).toEqual(missing.json())`).",
+      "referencePath": "tests/unit/modules/leave/leave.routes.test.ts"
+    },
+    {
+      "requirement": "The leave-side fake service must satisfy the current ILeaveService interface (which now includes getHistory) and be typed via `as unknown as ILeaveService`, matching the existing suite's convention \u2014 not `any` (HARNESS.json `no-any`).",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The audit-side fake repository must satisfy the current IAuditRepository (create, findById, findByEntity) so it typechecks under ts-jest strict mode, matching the existing FakeAuditRepository in the audit service suite.",
+      "referencePath": "tests/unit/modules/audit.service.test.ts"
+    },
+    {
+      "requirement": "The response-field assertion must match the audit-owned AuditLog entity exactly \u2014 the eight fields { id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt } \u2014 imported from the audit module's public entry point, with no leave-owned projection or DTO introduced.",
+      "referencePath": "src/modules/audit/audit.model.ts"
+    },
+    {
+      "requirement": "The 404 body assertion must match the existing sendError contract: `{ error: string, code: string }` with NotFoundError producing statusCode 404 and code 'NOT_FOUND' \u2014 assert the code, not a hardcoded message string.",
+      "referencePath": "src/shared/errors/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/audit/audit.repository.ts \u2014 PgAuditLogRepository constructor dbPool seam and the private db(client?) accessor",
+      "why": "The only way to observe the entity-scoped SQL and its params without a database; the fake pool is injected here."
+    },
+    {
+      "target": "src/modules/leave/leave.routes.ts \u2014 the fastify.leaveService decoration seam and the leaveRoutes(fastify) registration",
+      "why": "The route-level visibility, byte-identical-404, empty-history, and response-field criteria are only assertable through this seam."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.routes.test.ts \u2014 the existing buildApp helper, actor preHandler hook, and byte-identical-404 assertion",
+      "why": "The extension must be additive to this file and reuse its established pattern rather than introduce a second harness."
+    },
+    {
+      "target": "jest.config.js \u2014 testMatch `**/tests/**/*.test.(ts|js)` with the ts-jest preset",
+      "why": "The new file under tests/unit/modules/audit/ is only discovered if it matches this pattern; ts-jest is the sole typecheck gate for tests since tsconfig.json excludes tests."
+    },
+    {
+      "target": "src/modules/audit/index.ts \u2014 the public entry point exporting AuditLog, IAuditRepository, PgAuditLogRepository, IAuditService, AuditService",
+      "why": "Tests must import through the module's public surface (as the existing audit service suite does), not reach into internal file paths."
+    },
+    {
+      "target": "src/modules/leave/leave.model.ts \u2014 LEAVE_REQUEST_ENTITY_TYPE = 'leave_request'",
+      "why": "The entity discriminator the trail is keyed by; the tests' fixture entityType must use this constant so a writer/reader literal divergence cannot hide behind a matching hardcoded string."
+    }
+  ]
+}
