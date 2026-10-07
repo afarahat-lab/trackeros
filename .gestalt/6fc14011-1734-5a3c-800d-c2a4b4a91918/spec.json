@@ -1,0 +1,162 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "audit",
+      "leave"
+    ],
+    "affectedLayers": [
+      "domain",
+      "application",
+      "infrastructure"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "IAuditRepository (src/modules/audit/audit.repository.interface.ts) declares findByEntity(entityType: string, entityId: string): Promise<AuditLog[]> with NO optional trailing PoolClient parameter, alongside the unchanged create/findById declarations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "PgAuditLogRepository.findByEntity issues exactly one entity-scoped SELECT against audit_logs filtering on entity_type = $1 AND entity_id = $2 and ordering by occurred_at ASC then id ASC, reusing the existing COLUMNS constant (no hand-written column list) and the existing mapRow/parseState helpers.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "findByEntity returns AuditLog[] mapped through mapRow: beforeState/afterState come back parsed (a null column yields null, a JSON column yields the parsed value) and occurredAt is a Date; a result set with zero matching rows returns an empty array rather than null or a throw.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "IAuditService (src/modules/audit/audit.service.interface.ts) declares getByEntity(entityType: string, entityId: string): Promise<AuditLog[]> with no PoolClient parameter, alongside the unchanged record/getById declarations.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.getByEntity rejects a blank/whitespace-only or non-string entityType or entityId with ValidationError (same requiredStrings style as the existing validate() helper) and does NOT reach the repository in that case.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "AuditService.getByEntity delegates the two arguments verbatim to this.repository.findByEntity and returns the resulting array unchanged (same reference/contents, same order) \u2014 including an empty array, which is returned as a successful result and never converted into a NotFoundError.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The change is confined to the four audit-module files; no migration, no DDL, no index change, no new file under src/shared/, and no edit to any other module. The project still typechecks and the existing audit/leave unit suites still pass.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "findByEntity and getByEntity take NO optional trailing PoolClient. This read path opens no transaction and joins none; src/shared/db (pool + IUnitOfWork) is unchanged by this phase. Do not add a client parameter \"for symmetry\" with create/findById.",
+    "The audit module stays keyed generically on the (entityType, entityId) pair. No literal 'leave_request' (or any other concrete entity-type value) may appear anywhere under src/modules/audit/; the discriminator is a caller-supplied string.",
+    "No EmployeeRole import, no role comparison, and no authorization/visibility logic in the audit module. Visibility is owned by the leave module; the audit read is purely mechanical.",
+    "No new type is promoted to src/shared/types/ and no new shared DTO is declared. The return type is the existing audit-owned AuditLog entity; the audit module's public surface (src/modules/audit/index.ts) keeps exporting the same symbols.",
+    "No migration, no DDL, no new column, and no change to the existing (entity_type, entity_id) index. The feature opens an existing access path on an existing table.",
+    "No LIMIT, OFFSET, pagination, date filter, or action filter. The read returns every matching entry; bounding is explicitly out of scope for this phase.",
+    "No tests in this phase (Phase 4 owns tests) and no route/controller/HTTP surface (Phase 3 owns it). Do not modify files outside src/modules/audit/.",
+    "Ordering is owned by the repository's SQL, not by the caller: no caller may re-sort, reverse, or re-order the returned array. The service returns the array verbatim."
+  ],
+  "outOfScope": [
+    "LeaveService.getHistory, the LEAVE_REQUEST_ENTITY_TYPE constant, and any change to the leave module (Phase 2).",
+    "The HTTP surface for the trail (route, handler, actor resolution, error mapping) \u2014 Phase 3.",
+    "All tests for the entity query (ordering, tie-break, empty result, validation) \u2014 Phase 4.",
+    "Pagination, result bounding, date/action filtering, and any index extension (e.g. adding occurred_at to the (entity_type, entity_id) index) \u2014 recorded as an open question, not this phase.",
+    "Redaction or projection of beforeState/afterState, and any change to the AuditLog entity shape or the audit write path (create/record).",
+    "Any authorization, visibility, or role logic in the audit module \u2014 the audit read is role-blind by design."
+  ],
+  "ambiguities": [
+    {
+      "description": "The reconciled architecture's repository-interfaces section specifies findByEntity(entityType, entityId, client?) with an optional trailing PoolClient, while this phase's intent explicitly forbids the client parameter. The two authoritative sources disagree.",
+      "options": [
+        "Follow the phase intent: no PoolClient parameter (read path opens no transaction); treat the reconciled.json signature as stale and update it",
+        "Follow reconciled.json: add the optional trailing PoolClient for symmetry with create/findById"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the audit module's documented surface in docs/ARCHITECTURE.md must be updated in this same change (the reconciled architecture's documentation note says the audit module's documented surface is updated in the same change), or whether that doc update belongs to a later phase.",
+      "options": [
+        "Update the audit module's documented interface surface in docs/ARCHITECTURE.md as part of this phase",
+        "Leave docs/ARCHITECTURE.md untouched in this phase; the doc update lands with the feature's later phases"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the ordering tie-break on id ASC is binding for this phase. The domain slice asserts ORDER BY occurred_at ASC, id ASC; the data and application slices left it open, and the phase intent's SQL includes it.",
+      "options": [
+        "Treat the id ASC tie-break as binding now (deterministic repeated reads)",
+        "Treat it as an open question to be settled later"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "AuditLog (src/modules/audit/audit.model.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "Existing entity, shape UNCHANGED by this phase: id, actorId, action (AuditAction), entityType, entityId, beforeState (unknown | null), afterState (unknown | null), occurredAt (Date). Lifecycle is RECORDED \u2014 terminal and immutable; an entry is never updated, deleted, or re-recorded. This phase only makes existing rows readable by (entityType, entityId); it adds no field, no state, and no write path."
+    },
+    {
+      "entity": "AuditTrail (read model / projection \u2014 no id, no table, no persistence)",
+      "mustExistOrExtend": true,
+      "invariant": "Identified by the PAIR (entityType, entityId), never by entityId alone. Two lifecycle states only: EMPTY (no matching rows \u2014 a normal, successful outcome, never an error) and POPULATED (one or more entries ordered occurredAt ASCENDING, ties broken on id ASCENDING). There is no partial or error state: a failed read throws rather than producing a trail. The trail is append-only and read-only \u2014 reading it writes nothing."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "IAuditRepository.findByEntity(entityType, entityId) \u2014 entity-scoped audit read",
+      "authRule": "None. The repository performs no authorization and no role check; it is a mechanical (entityType, entityId) lookup.",
+      "idempotent": true,
+      "errorSemantics": "Returns Promise<AuditLog[]>, possibly empty. Never returns null and never throws on zero matching rows. Takes no PoolClient. Ordering (occurredAt ASC, id ASC) is part of the contract, not the caller's job."
+    },
+    {
+      "operation": "IAuditService.getByEntity(entityType, entityId) \u2014 entity-scoped audit read",
+      "authRule": "None. No role check, no EmployeeRole import, no visibility logic \u2014 visibility is owned by the leave module and applied before this call.",
+      "idempotent": true,
+      "errorSemantics": "Throws ValidationError when entityType or entityId is missing, non-string, or blank/whitespace-only. Returns the repository's array verbatim, including an empty array \u2014 an empty trail is a valid, non-error result and must NEVER be converted into NotFoundError. Takes no PoolClient and opens no transaction."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "findByEntity must reuse the existing COLUMNS constant and the existing mapRow/parseState helpers rather than re-listing columns or re-implementing JSON parsing, so a history entry is structurally identical to what findById already returns (null column -> null, JSON column -> parsed value, occurredAt as Date).",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "getByEntity's input validation must follow the existing validate() requiredStrings loop style (typeof value !== 'string' || value.trim() === '' -> ValidationError(`Invalid <label>`)), not a new validation idiom.",
+      "referencePath": "src/modules/audit/audit.service.ts"
+    },
+    {
+      "requirement": "The new declarations must be added to the existing IAuditRepository / IAuditService interfaces in place, keeping the existing create/findById and record/getById signatures byte-identical; the concrete classes must keep implementing the interfaces (no structural drift between interface and implementation).",
+      "referencePath": "src/modules/audit/audit.repository.interface.ts"
+    },
+    {
+      "requirement": "The concrete repository must keep its existing constructor seam (constructor(private readonly dbPool: Pool = defaultPool)) and the private db(client?) accessor pattern; findByEntity queries through that same pool accessor so the injected-pool test seam continues to work.",
+      "referencePath": "src/modules/audit/audit.repository.ts"
+    },
+    {
+      "requirement": "The module's public entry point must keep exporting the same symbols (AuditLog, CreateAuditLogInput, IAuditRepository, PgAuditLogRepository, IAuditService, AuditService) so the leave module's Phase 2 import of AuditLog from '../audit' resolves unchanged.",
+      "referencePath": "src/modules/audit/index.ts"
+    },
+    {
+      "requirement": "ValidationError must be imported from the existing shared-errors module (as audit.service.ts already does) \u2014 no new error class, no local error type, and no change to the shared error surface.",
+      "referencePath": "src/shared/errors/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts (Phase 2)",
+      "why": "LeaveService.getHistory will call this.auditService.getByEntity(LEAVE_REQUEST_ENTITY_TYPE, requestId) and return the array oldest-first. The exact signature getByEntity(entityType: string, entityId: string): Promise<AuditLog[]> and the empty-array-is-success semantics are the contract Phase 2 depends on."
+    },
+    {
+      "target": "src/modules/audit/index.ts",
+      "why": "The leave module consumes the audit module only through this public entry point (AGENTS.md rule 1). AuditLog must remain exported here for Phase 2's return type; no new export is required by this phase."
+    },
+    {
+      "target": "audit_logs table (existing, via src/shared/db/connection.ts pool)",
+      "why": "The new query reads the existing (entity_type, entity_id) composite index. No migration, no DDL, no index change \u2014 the phase must not touch schema."
+    }
+  ]
+}
