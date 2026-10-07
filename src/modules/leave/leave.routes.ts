@@ -197,6 +197,18 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
     }
   });
 
+  fastify.get('/leaves/:id/history', async (request: LeaveAuthRequest, reply) => {
+    try {
+      const actor = resolveActor(request);
+      const { id } = request.params as { id: string };
+      const history = await leaveService.getHistory(actor, id);
+      return reply.status(200).send(history);
+    } catch (error) {
+      request.log.error(error);
+      return sendError(reply, error);
+    }
+  });
+
   fastify.post('/leaves/:id/submit', async (request: LeaveAuthRequest, reply) => {
     try {
       const actor = resolveActor(request);
