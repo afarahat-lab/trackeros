@@ -21,6 +21,24 @@ export class AuditService implements IAuditService {
     return auditLog;
   }
 
+  async getByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    this.validateEntityRef(entityType, entityId);
+    return this.repository.findByEntity(entityType, entityId);
+  }
+
+  private validateEntityRef(entityType: string, entityId: string): void {
+    const requiredStrings: Array<[string, string]> = [
+      [entityType, 'entityType'],
+      [entityId, 'entityId'],
+    ];
+
+    for (const [value, label] of requiredStrings) {
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new ValidationError(`Invalid ${label}`);
+      }
+    }
+  }
+
   private validate(input: CreateAuditLogInput): void {
     const requiredStrings: Array<[keyof CreateAuditLogInput, string]> = [
       ['actorId', 'actorId'],

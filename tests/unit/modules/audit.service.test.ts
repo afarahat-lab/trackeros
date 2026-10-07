@@ -26,6 +26,10 @@ class FakeAuditRepository implements IAuditRepository {
   async findById(id: string): Promise<AuditLog | null> {
     return this.rows.find((a) => a.id === id) ?? null;
   }
+
+  async findByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    return this.rows.filter((a) => a.entityType === entityType && a.entityId === entityId);
+  }
 }
 
 function makeInput(overrides: Partial<CreateAuditLogInput> = {}): CreateAuditLogInput {

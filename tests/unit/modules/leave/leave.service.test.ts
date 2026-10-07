@@ -169,6 +169,12 @@ class FakeAuditService implements IAuditService {
   async getById(): Promise<AuditLog> {
     throw new Error('Not implemented');
   }
+
+  async getByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    return this.records
+      .filter((r) => r.entityType === entityType && r.entityId === entityId)
+      .map((r, index) => ({ id: `audit-${index + 1}`, occurredAt: new Date(), ...r }));
+  }
 }
 
 class FakeNotificationService implements INotificationService {

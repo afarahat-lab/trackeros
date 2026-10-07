@@ -71,4 +71,14 @@ export class PgAuditLogRepository implements IAuditRepository {
     const result: QueryResult<AuditLogRow> = await this.db(client).query(query, [id]);
     return result.rows.length ? mapRow(result.rows[0]) : null;
   }
+
+  async findByEntity(entityType: string, entityId: string): Promise<AuditLog[]> {
+    const query = `
+      SELECT ${COLUMNS} FROM audit_logs
+      WHERE entity_type = $1 AND entity_id = $2
+      ORDER BY occurred_at ASC, id ASC
+    `;
+    const result: QueryResult<AuditLogRow> = await this.db().query(query, [entityType, entityId]);
+    return result.rows.map(mapRow);
+  }
 }
