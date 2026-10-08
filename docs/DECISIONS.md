@@ -114,3 +114,42 @@ the audit trail rather than silent, and is never repaired. The requester notific
 CANCEL audit entry are otherwise byte-identical to before. `resolveApproverRecipient` is private
 and is NOT added to `ILeaveService`. The approver notification is created `PENDING` and is not
 advanced by the cancellation.
+
+## ADR-004 — `GET /leaves/pending-decisions` is registered before `GET /leaves/:id`, and returns the `PendingDecision` projection
+
+Date: 2026-09-15
+Status: Accepted
+
+Decision: the new static route `GET /leaves/pending-decisions` is registered inside
+`leaveRoutes(fastify)` BEFORE the existing parametric `GET /leaves/:id`, and its 200 body is a
+bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows.
+
+Context: Fastify matches routes in registration order, so a static path registered after a
+parametric sibling is shadowed by it. Registered after `GET /leaves/:id`, a request to
+`/leaves/pending-decisions` resolves as `id = 'pending-decisions'`, reaches `getById`, and
+returns 404 — a silent, order-dependent failure that no type check or unit test of the handler
+would catch. Separately, the queue renders only what a decision needs, and the design's
+`findPendingDecisions(actorId, actorRole)` signature would have put role scoping in the
+repository.
+
+Alternatives rejected:
+- Registering the route after `GET /leaves/:id` and relying on a path-parameter constraint or a
+  UUID regex on `:id`: it would make the parametric route's contract carry knowledge of every
+  static sibling, and the failure mode (404) is indistinguishable from a genuinely missing
+  request.
+- Returning full `LeaveRequest` rows and letting the client project: it would expose
+  `approverId`, `approvalComment`, `reason` and the cancellation fields to a queue view that
+  renders none of them, and would make the response shape drift with the entity.
+- Passing `actorId`/`actorRole` into the repository and re-expressing the role-scoped visibility
+  rule in SQL: the rule already lives in `LeaveService.list`, and a second copy in the
+  repository would be a second place to keep in sync. The service mirrors `list`'s branch and
+  passes `employeeIds`; the repository applies only the `employeeIds` filter and the
+  `status = 'SUBMITTED'` predicate.
+
+Consequences: the route handler is a thin pass-through (`resolveActor` -> service -> 200) with no
+query parsing, no role branch and no SQL, and the ordering comment in the file is load-bearing —
+moving the registration below `GET /leaves/:id` breaks the endpoint. `PendingDecision` stays in
+`src/modules/leave/leave.model.ts` and is exported from the module's `index.ts`; it is not
+promoted to `src/shared/types/`. The endpoint is not added to `PUBLIC_PATHS`, so it requires a
+valid bearer token. No unit test covers the route yet (the feature's test phase was not
+delivered), so the ordering constraint is currently protected only by the comment and this ADR.
