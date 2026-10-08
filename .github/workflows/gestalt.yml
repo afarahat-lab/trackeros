@@ -116,6 +116,14 @@ jobs:
       - run: npm install -g npm@10.5.0
       - run: npm install --force --legacy-peer-deps
 
+      # The frontend is a SEPARATE npm project (no workspaces), so the root install above does
+      # not reach it. Without this, every `web/` step below fails on missing modules.
+      - name: Install web dependencies
+        run: |
+          if [ -f web/package.json ]; then
+            cd web && npm install --force --legacy-peer-deps
+          fi
+
       # ── Every check is NON-BLOCKING (continue-on-error) — the Gestalt CI-agent is the SOLE gate.
       # No individual check's exit code decides "does this phase proceed"; each check RUNS and
       # REPORTS its outcome (collected below into ci-results.json), and the CI-agent judges the
@@ -148,6 +156,34 @@ jobs:
             npm run test
           else
             echo "No project manifest found yet — skipping tests (run 'gestalt run' to scaffold the project)"
+          fi
+
+      # ── The frontend was compiled and tested by NOTHING. The root `npm run build` is
+      # `tsc --noEmit` over `include: ["src"]` and the root `npm test` is jest with
+      # `testMatch: **/tests/**`, so `web/src/**` — 17 test files and the whole React app —
+      # reached neither. This is the same #152 frontend blindness the Lint step below already
+      # fixed for lint: `web` appeared in this workflow exactly once, in a comment.
+      #
+      # Both steps are `continue-on-error` and recorded in ci-results.json like the rest, so the
+      # CI-agent judges them rather than the job failing outright.
+      - name: Compile (web)
+        id: compile_web
+        continue-on-error: true
+        run: |
+          if [ -f web/package.json ]; then
+            cd web && npx tsc --noEmit
+          else
+            echo "No web/ project — skipping web compile"
+          fi
+
+      - name: Test (web)
+        id: test_web
+        continue-on-error: true
+        run: |
+          if [ -f web/package.json ] && node -p "!!(require('./web/package.json').scripts||{}).test" 2>/dev/null | grep -q true; then
+            cd web && npm run test
+          else
+            echo "No web/ test script — skipping web tests"
           fi
 
       - name: Lint
@@ -199,6 +235,8 @@ jobs:
           { "checks": [
             { "name": "compile", "outcome": "${{ steps.compile.outcome }}" },
             { "name": "test",    "outcome": "${{ steps.test.outcome }}" },
+            { "name": "compile-web", "outcome": "${{ steps.compile_web.outcome }}" },
+            { "name": "test-web",    "outcome": "${{ steps.test_web.outcome }}" },
             { "name": "lint",    "outcome": "${{ steps.lint.outcome }}" },
             { "name": "semgrep", "outcome": "${{ steps.semgrep.outcome }}" }
           ] }
