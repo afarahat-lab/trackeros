@@ -116,10 +116,6 @@ and is NOT added to `ILeaveService`. The approver notification is created `PENDI
 advanced by the cancellation.
 
 ## ADR-004 — `GET /leaves/pending-decisions` is registered before `GET /leaves/:id`, and returns the `PendingDecision` projection
-
-Date: 2026-09-15
-Status: Accepted
-
 Decision: the new static route `GET /leaves/pending-decisions` is registered inside
 `leaveRoutes(fastify)` BEFORE the existing parametric `GET /leaves/:id`, and its 200 body is a
 bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows.
@@ -151,5 +147,15 @@ query parsing, no role branch and no SQL, and the ordering comment in the file i
 moving the registration below `GET /leaves/:id` breaks the endpoint. `PendingDecision` stays in
 `src/modules/leave/leave.model.ts` and is exported from the module's `index.ts`; it is not
 promoted to `src/shared/types/`. The endpoint is not added to `PUBLIC_PATHS`, so it requires a
-valid bearer token. No unit test covers the route yet (the feature's test phase was not
-delivered), so the ordering constraint is currently protected only by the comment and this ADR.
+valid bearer token.
+
+**Test coverage (added by the feature's test phase).** The ordering constraint is no longer
+protected only by the comment and this ADR: `tests/unit/modules/leave/leave.routes.test.ts` now
+registers `leaveRoutes` and injects `GET /leaves/pending-decisions` through the real Fastify
+router, asserting 200 with the queue, 200 with `[]`, 401 `UNAUTHORIZED` with the service never
+called, the resolved actor forwarded unchanged, and a bare array of exactly the seven
+`PendingDecision` fields. Registering the route after `GET /leaves/:id` would resolve the path as
+`id = 'pending-decisions'` and fail those 200 assertions, so the ordering is now pinned by a test
+rather than by convention. The projection's shape is likewise pinned by the field-set assertion,
+and `LeaveService.listPendingDecisions`'s role scoping and verbatim array return are covered in
+`tests/unit/modules/leave/leave.service.test.ts`.
