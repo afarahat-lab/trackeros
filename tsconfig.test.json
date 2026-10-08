@@ -1,0 +1,25 @@
+{
+  // Type-checks the TEST tree, which `tsconfig.json` deliberately excludes.
+  //
+  // WHY THIS FILE EXISTS. `tsconfig.json` sets `rootDir: ./src` and `exclude: [..., "tests"]`,
+  // so `npm run build` (`tsc --noEmit`) never type-checks a test file. The only thing that did
+  // was jest, and only for a file its `testMatch` actually runs — so a type error in a test
+  // reached CI's Compile step as a pass. It was a broken import that exposed this: moving
+  // LEAVE_REQUEST_ENTITY_TYPE out of `leave.model` left a third importer stale, `npm run build`
+  // stayed green, and only `npm test` caught it.
+  //
+  // A SEPARATE config rather than widening `tsconfig.json`: the base config emits to `dist` with
+  // `rootDir: ./src`, and a file outside `rootDir` is a compile error there. Widening it would
+  // also put jest's globals in the application's type environment, where they do not belong —
+  // `describe`/`it` should not resolve in `src`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // The checked set spans `src` and `tests`, so the root is the repository.
+    "rootDir": ".",
+    // Jest's globals exist HERE and only here.
+    "types": ["jest", "node"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist", "web"]
+}
