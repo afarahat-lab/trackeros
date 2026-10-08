@@ -1647,7 +1647,6 @@ Phase 4 adds the tests that pin the built behaviour — `tests/unit/modules/audi
 
 <!-- gestalt:architecture feature=93f4284a-e320-4118-8414-2e6818ef21e0 START -->
 ## Feature: Notify the approver when a leave request is cancelled
-
 When an employee cancels a leave request that was already SUBMITTED or APPROVED, the manager who would have decided it (or did decide it) is notified, inside the same unit of work as the status change. A DRAFT cancellation notifies no approver, matching the existing rule that a DRAFT cancellation touches no balance. The approver's own view, `GET /leaves/pending-decisions`, stops listing a request once it is cancelled. The existing CANCEL audit entry is unchanged.
 
 ### Domain entities
@@ -1675,7 +1674,7 @@ Named transitions: `cancelInPlace` (`DRAFT -> CANCELLED`, no balance touch, no a
 ### Conceptual tables
 
 - **`notifications`** (EXTENDED) — `id`, `recipient_id`, `type`, `title`, `message`, `related_entity_type`, `related_entity_id`, `related_entity_code` (NEW, nullable), `status`, `created_at`, `read_at`. PK `id`; FK `recipient_id -> employees.id`. Indexes: `id` (PK, findById/updateStatus); `(recipient_id, status)` (inbox read, existing); `(related_entity_type, related_entity_id)` (entity correlation — documented in GP-008 but absent from the initial migration, added here); `related_entity_code` deliberately unindexed. `related_entity_code` is generic (a code for whatever `related_entity_type` names), not leave-specific, so the single notifications table stays one concept.
-- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry.
+- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.
 - **`employees`** (UNCHANGED, referenced by name) — `manager_id` resolves the SUBMITTED recipient and scopes the MANAGER queue predicate.
 - **`audit_logs`** and **`leave_balances`** are unchanged and participate only in the cancellation unit of work.
 
@@ -1759,6 +1758,22 @@ Every method takes an optional trailing `PoolClient` defaulting to the shared po
 5. `GET /leaves/pending-decisions` route (1 file).
 6. Tests: approver notification + pending-decisions read (2 files).
 7. (optional) Web approvals queue consumes the new endpoint (2 files).
+
+### Phase 1 delivered (notifications.related_entity_code migration)
+
+Phase 1 of the recommended list is delivered: ONE new knex migration, `migrations/20260915000000_add_related_entity_code_to_notifications.js`. No source file, repository, service, route, or test changed; phases 2–7 are not yet implemented.
+
+- `exports.up` does exactly two things on `notifications`: `t.text('related_entity_code')` (nullable, no default, no backfill, no NOT NULL) and `t.index(['related_entity_type', 'related_entity_id'], 'notifications_related_entity_type_related_entity_id_index')`. `exports.down` drops the index first, then the column.
+- The index is added HERE, in the same migration as the column, because the entity linkage on `notifications` is load-bearing for the first time in this feature and the initial migration (`20260913000000_initial_schema.js`) creates only `(recipient_id, status)`. Only that drift is fixed; the rest of the initial migration is left as-is.
+- The column is generic (a code for whatever `related_entity_type` names), not leave-specific, so the single `notifications` table stays one concept and no new table is introduced. The request id continues to live in `related_entity_id`; the leave type is not derivable from it without the join the requirement forbids, and free text is not machine-readable.
+- Nullable with no backfill: notifications unrelated to a coded entity, and every row written before this migration, legitimately carry no code. The repository/service never synthesize a non-null value.
+- Follows the existing migration conventions (`exports.up` / `exports.down`, `knex.schema.alterTable`), targets PostgreSQL, and is reversible.
+
+**Divergences from the plan / design worth noting:**
+- Column type: PLAN.md prescribed `t.string('related_entity_code')`; the migration uses `t.text(...)` to match the string/text style of the initial schema. Same nullable semantics, no default, no backfill.
+- `leave_requests` indexes: the *Conceptual tables* section above claims NEW standalone `status` and `approver_id` indexes on `leave_requests`. The migration adds NEITHER — Phase 1 deliberately leaves `leave_requests` DDL untouched (the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for this query). That design claim is therefore unbuilt.
+- `findPendingDecisions` predicate: the design specifies `status = SUBMITTED AND reverses_request_id IS NULL`; the phase plan specifies `status = 'SUBMITTED'` only, with no `reverses_request_id` filter. Phase 2 is not yet built, so no code diverges yet — but the two documents disagree and the built repository will settle it.
+- The column is not yet read or written by any code: `src/modules/notification/notification.model.ts` and `notification.repository.ts` still carry only `relatedEntityType`/`relatedEntityId` (Phase 2). The column exists in the schema only.
 
 ### Open questions
 
