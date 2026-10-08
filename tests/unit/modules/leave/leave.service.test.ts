@@ -1376,6 +1376,135 @@ describe('LeaveService', () => {
       expect(notificationService.inputs[1].recipientId).toBe(REQUESTER_ID);
       expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
     });
+
+    it('carries the request id and the leave type code in the approver notification message', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      const requesterNotification = notificationService.inputs[0];
+      const approverNotification = notificationService.inputs[1];
+      // The column is the contract; the message is the human-readable echo of it.
+      expect(requesterNotification.message).toContain('lr-1');
+      expect(approverNotification.message).toContain('lr-1');
+      expect(approverNotification.message).toContain(LeaveTypeCode.ANNUAL);
+    });
+
+    it('writes the row in place with an UNMARKED audit entry when a recipient resolves', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      // SUBMITTED is cancelled in place: one update, no reversal row.
+      expect(repository.updateCalls).toHaveLength(1);
+      expect(repository.rows.filter((r) => r.reversesRequestId !== null)).toHaveLength(0);
+
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+      expect(auditService.records[0].entityType).toBe(LEAVE_REQUEST_ENTITY_TYPE);
+      expect(auditService.records[0].entityId).toBe('lr-1');
+      const after = auditService.records[0].afterState as Record<string, unknown>;
+      expect(after.status).toBe(LeaveStatus.CANCELLED);
+      // Nothing was skipped, so the skip marker is absent rather than false.
+      expect(after.approverNotificationSkipped).toBeUndefined();
+    });
+
+    it('keys the approver notification to the original id while the reversal row has a null approverId', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(admin, 'lr-1');
+
+      // The immutable original is never touched.
+      expect(repository.rows.find((r) => r.id === 'lr-1')?.status).toBe(LeaveStatus.APPROVED);
+
+      const reversal = repository.rows.find((r) => r.reversesRequestId === 'lr-1');
+      expect(reversal).toBeDefined();
+      expect(reversal?.approverId).toBeNull();
+
+      expect(notificationService.inputs).toHaveLength(2);
+      const approverNotification = notificationService.inputs[1];
+      // Read from the ORIGINAL row, keyed to the ORIGINAL id — the reversal row
+      // carries a null approverId by construction, so reading it there would drop
+      // every notification on this path.
+      expect(approverNotification.recipientId).toBe(MANAGER_ID);
+      expect(approverNotification.relatedEntityId).toBe('lr-1');
+      expect(approverNotification.relatedEntityId).not.toBe(reversal?.id);
+      expect(approverNotification.relatedEntityCode).toBe(LeaveTypeCode.ANNUAL);
+      expect(approverNotification.relatedEntityType).toBe('leave_request');
+      expect(approverNotification.type).toBe('leave_request');
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('records the unchanged CANCEL entry alongside the skip marker when the requester has no manager', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: null }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      expect(auditService.records).toHaveLength(1);
+      const entry = auditService.records[0];
+      expect(entry.action).toBe(AuditAction.CANCEL);
+      expect(entry.entityType).toBe(LEAVE_REQUEST_ENTITY_TYPE);
+      expect(entry.entityId).toBe('lr-1');
+      expect(entry.beforeState).toMatchObject({
+        id: 'lr-1',
+        status: LeaveStatus.SUBMITTED,
+      });
+      const after = entry.afterState as Record<string, unknown>;
+      expect(after.status).toBe(LeaveStatus.CANCELLED);
+      expect(after.approverNotificationSkipped).toBe(true);
+
+      // The skip suppresses only the approver notification — the cancellation and
+      // its single requester notification still happen, in one unit of work.
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
+      expect(repository.rows.filter((r) => r.reversesRequestId !== null)).toHaveLength(0);
+      expect(uow.callCount).toBe(1);
+    });
   });
 
   // -------------------------------------------------------------------------
