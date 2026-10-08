@@ -1750,7 +1750,7 @@ Every method takes an optional trailing `PoolClient` defaulting to the shared po
 7. (optional) Web approvals queue consumes the new endpoint (2 files).
 
 ### Phase 1 delivered (notifications.related_entity_code migration)
-Phase 1 of the recommended list is delivered: ONE new knex migration, `migrations/20260915000000_add_related_entity_code_to_notifications.js`. No source file, repository, service, route, or test changed in that phase; phases 2 and 3 are now delivered (see *Phase 3 delivered* below), phases 4–7 are not.
+Phase 1 of the recommended list is delivered: ONE new knex migration, `migrations/20260915000000_add_related_entity_code_to_notifications.js`. No source file, repository, service, route, or test changed in that phase. Phases 2 and 3 are also delivered (see ADR-002/ADR-003 in `docs/DECISIONS.md` and the *Repository interfaces* / *Business rules* sections above); phase 4 is delivered (see *Phase 4 delivered (LeaveService.listPendingDecisions)* below); phases 5–7 are not.
 
 - `exports.up` does exactly two things on `notifications`: `t.text('related_entity_code')` (nullable, no default, no backfill, no NOT NULL) and `t.index(['related_entity_type', 'related_entity_id'], 'notifications_related_entity_type_related_entity_id_index')`. `exports.down` drops the index first, then the column.
 - The index is added HERE, in the same migration as the column, because the entity linkage on `notifications` is load-bearing for the first time in this feature and the initial migration (`20260913000000_initial_schema.js`) creates only `(recipient_id, status)`. Only that drift is fixed; the rest of the initial migration is left as-is.
