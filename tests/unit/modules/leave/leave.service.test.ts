@@ -46,6 +46,7 @@ import {
   CreateLeaveRequestDto,
   UpdateLeaveRequestDto,
   EmployeeProfile,
+  LEAVE_REQUEST_ENTITY_TYPE,
 } from '../../../../src/shared/types';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,8 @@ class FakeLeaveRepository implements ILeaveRepository {
   updateCalls: { id: string; changes: UpdateLeaveRequestDto; client?: PoolClient }[] = [];
   findByIdCalls: { id: string; client?: PoolClient }[] = [];
   findReversesCalls: { reversesRequestId: string; client?: PoolClient }[] = [];
+  findPendingCalls: (string[] | undefined)[] = [];
+  pendingOverride: PendingDecision[] | null = null;
   private idCounter = 0;
 
   async create(input: CreateLeaveRequestInput, client?: PoolClient): Promise<LeaveRequest> {
@@ -100,6 +103,10 @@ class FakeLeaveRepository implements ILeaveRepository {
   }
 
   async findPendingDecisions(employeeIds?: string[]): Promise<PendingDecision[]> {
+    this.findPendingCalls.push(employeeIds);
+    if (this.pendingOverride !== null) {
+      return this.pendingOverride;
+    }
     return this.rows
       .filter((r) => r.status === LeaveStatus.SUBMITTED)
       .filter((r) => employeeIds === undefined || employeeIds.length === 0 || employeeIds.includes(r.employeeId))
@@ -1108,6 +1115,381 @@ describe('LeaveService', () => {
       expect(repository.rows.filter((r) => r.reversesRequestId !== null)).toHaveLength(0);
       expect(repository.updateCalls).toHaveLength(1);
       expect(repository.updateCalls[0].id).toBe('lr-submitted');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Cancel notifications: recipient resolution, missing-recipient tolerance and
+  // the "always notify" rule when the actor IS the resolved recipient.
+  // -------------------------------------------------------------------------
+  describe('cancel notifications', () => {
+    const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+    const admin = makeActor({ id: 'admin-1', role: EmployeeRole.ADMIN });
+    const FUTURE_START = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const FUTURE_END = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000);
+
+    beforeEach(async () => {
+      await balanceRepository.create(makeBalance());
+    });
+
+    it('notifies the requester AND the direct manager when the owner cancels a SUBMITTED request', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+
+      const requesterNotification = notificationService.inputs[0];
+      expect(requesterNotification.recipientId).toBe(REQUESTER_ID);
+      expect(requesterNotification.relatedEntityId).toBe('lr-1');
+      expect(requesterNotification.relatedEntityCode).toBeUndefined();
+
+      const approverNotification = notificationService.inputs[1];
+      expect(approverNotification.recipientId).toBe(MANAGER_ID);
+      expect(approverNotification.relatedEntityId).toBe('lr-1');
+      // The canonical lowercase code is carried verbatim, never re-cased.
+      expect(approverNotification.relatedEntityCode).toBe(LeaveTypeCode.ANNUAL);
+      expect(approverNotification.relatedEntityCode).toBe('annual');
+      expect(approverNotification.relatedEntityType).toBe('leave_request');
+      expect(approverNotification.type).toBe('leave_request');
+
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('records a single CANCEL audit entry against the original request id', async () => {
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+      expect(auditService.records[0].entityType).toBe(LEAVE_REQUEST_ENTITY_TYPE);
+      expect(auditService.records[0].entityId).toBe('lr-1');
+      expect(auditService.recordClients[0]).toBe(uow.stubClient);
+    });
+
+    it('notifies the ORIGINAL approver on the GP-008 reversal path, keyed to the original id', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(admin, 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+
+      const approverNotification = notificationService.inputs[1];
+      expect(approverNotification.recipientId).toBe(MANAGER_ID);
+      expect(approverNotification.relatedEntityId).toBe('lr-1');
+      expect(approverNotification.relatedEntityCode).toBe(LeaveTypeCode.ANNUAL);
+      expect(approverNotification.relatedEntityType).toBe('leave_request');
+      expect(approverNotification.type).toBe('leave_request');
+
+      // The notification is keyed to the ORIGINAL row, never the reversal row.
+      const reversal = repository.rows.find((r) => r.reversesRequestId === 'lr-1');
+      expect(reversal).toBeDefined();
+      expect(notificationService.inputs[1].relatedEntityId).not.toBe(reversal!.id);
+      expect(reversal!.id).not.toBe('lr-1');
+
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('records one CANCEL audit entry against the ORIGINAL id on the reversal path', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(admin, 'lr-1');
+
+      expect(auditService.records).toHaveLength(1);
+      expect(auditService.records[0].action).toBe(AuditAction.CANCEL);
+      expect(auditService.records[0].entityType).toBe(LEAVE_REQUEST_ENTITY_TYPE);
+      expect(auditService.records[0].entityId).toBe('lr-1');
+    });
+
+    it('notifies both recipients when the direct manager cancels an APPROVED request', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(manager, 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.inputs[1].recipientId).toBe(MANAGER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(uow.callCount).toBe(1);
+    });
+
+    it('notifies only the requester when a DRAFT is cancelled', async () => {
+      await repository.create(
+        makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
+    });
+
+    it('still cancels and notifies only the requester when a SUBMITTED requester has no manager', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: null }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      const result = await service.cancel(makeActor(), 'lr-1');
+
+      expect(result).toBeDefined();
+      expect(result).not.toBeInstanceOf(ConflictError);
+      expect(result.status).toBe(LeaveStatus.CANCELLED);
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+
+      expect(auditService.records).toHaveLength(1);
+      const after = auditService.records[0].afterState as Record<string, unknown>;
+      expect(after.approverNotificationSkipped).toBe(true);
+    });
+
+    it('still cancels and notifies only the requester when an APPROVED request has no approver', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: null,
+        })
+      );
+
+      const result = await service.cancel(admin, 'lr-1');
+
+      expect(result).toBeDefined();
+      expect(result).not.toBeInstanceOf(ConflictError);
+      expect(result.status).toBe(LeaveStatus.CANCELLED);
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+
+      expect(auditService.records).toHaveLength(1);
+      const after = auditService.records[0].afterState as Record<string, unknown>;
+      expect(after.approverNotificationSkipped).toBe(true);
+    });
+
+    it('still notifies the approver when the actor IS the resolved approver recipient', async () => {
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(manager, 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs[1].recipientId).toBe(MANAGER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+    });
+
+    it('still notifies the owner when they are both canceller and resolved recipient', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: REQUESTER_ID }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+      await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.SUBMITTED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+        })
+      );
+
+      await service.cancel(makeActor(), 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs[1].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // listPendingDecisions — a status-filtered read that mirrors list's role
+  // scoping and hands the repository's array back untouched.
+  // -------------------------------------------------------------------------
+  describe('listPendingDecisions', () => {
+    const manager = makeActor({ id: MANAGER_ID, role: EmployeeRole.MANAGER });
+    const admin = makeActor({ id: 'admin-1', role: EmployeeRole.ADMIN });
+
+    it('lets an ADMIN read every SUBMITTED decision with no employee filter', async () => {
+      await repository.create(
+        makeRequest({ id: 'lr-a', employeeId: 'emp-a', status: LeaveStatus.SUBMITTED })
+      );
+      await repository.create(
+        makeRequest({ id: 'lr-b', employeeId: 'emp-b', status: LeaveStatus.SUBMITTED })
+      );
+      // The SUBMITTED-only predicate belongs to the repository, not the service.
+      await repository.create(
+        makeRequest({ id: 'lr-draft', employeeId: 'emp-a', status: LeaveStatus.DRAFT })
+      );
+      await repository.create(
+        makeRequest({ id: 'lr-approved', employeeId: 'emp-b', status: LeaveStatus.APPROVED })
+      );
+
+      const result = await service.listPendingDecisions(admin);
+
+      expect(repository.findPendingCalls).toHaveLength(1);
+      expect(repository.findPendingCalls[0]).toBeUndefined();
+      expect(result.map((d) => d.requestId).sort()).toEqual(['lr-a', 'lr-b']);
+      expect(result.every((d) => d.status === LeaveStatus.SUBMITTED)).toBe(true);
+      expect(uow.callCount).toBe(0);
+    });
+
+    it('scopes a MANAGER to their own id plus their direct reports', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: MANAGER_ID }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER, managerId: null }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+      await repository.create(
+        makeRequest({ id: 'lr-report', employeeId: REQUESTER_ID, status: LeaveStatus.SUBMITTED })
+      );
+      await repository.create(
+        makeRequest({ id: 'lr-unrelated', employeeId: 'emp-999', status: LeaveStatus.SUBMITTED })
+      );
+
+      const result = await service.listPendingDecisions(manager);
+
+      expect(repository.findPendingCalls).toHaveLength(1);
+      expect(repository.findPendingCalls[0]).toEqual([MANAGER_ID, REQUESTER_ID]);
+      expect(result.map((d) => d.requestId)).toEqual(['lr-report']);
+      expect(uow.callCount).toBe(0);
+    });
+
+    it('returns the repository array verbatim — no copy, no re-sort, no filter', async () => {
+      const later: PendingDecision = {
+        requestId: 'lr-later',
+        employeeId: REQUESTER_ID,
+        leaveTypeCode: LeaveTypeCode.ANNUAL,
+        startDate: new Date('2024-08-01T00:00:00Z'),
+        endDate: new Date('2024-08-03T00:00:00Z'),
+        requestedDays: REQUESTED_DAYS,
+        status: LeaveStatus.SUBMITTED,
+      };
+      const earlier: PendingDecision = {
+        ...later,
+        requestId: 'lr-earlier',
+        startDate: new Date('2024-07-01T00:00:00Z'),
+        endDate: new Date('2024-07-03T00:00:00Z'),
+      };
+      // Deliberately non-sorted (later startDate first) and distinct from the
+      // rows the repository would otherwise project.
+      repository.pendingOverride = [later, earlier];
+
+      const result = await service.listPendingDecisions(admin);
+
+      expect(result).toEqual(repository.pendingOverride);
+      expect(result).toBe(repository.pendingOverride);
+      expect(result.map((d) => d.requestId)).toEqual(['lr-later', 'lr-earlier']);
+      expect(uow.callCount).toBe(0);
+    });
+
+    it('resolves to an empty array rather than throwing when nothing is pending', async () => {
+      repository.pendingOverride = [];
+
+      await expect(service.listPendingDecisions(admin)).resolves.toEqual([]);
+      expect(uow.callCount).toBe(0);
+    });
+
+    it('does not open a transaction or forward a client to the repository', async () => {
+      repository.pendingOverride = [];
+
+      await service.listPendingDecisions(admin);
+
+      expect(uow.callCount).toBe(0);
+      // findPendingDecisions takes only employeeIds — no client argument exists.
+      expect(repository.findPendingCalls).toEqual([undefined]);
+    });
+
+    it('rejects a missing actor with UnauthorizedError and opens no transaction', async () => {
+      await expect(
+        service.listPendingDecisions({ id: '', role: EmployeeRole.EMPLOYEE })
+      ).rejects.toThrow(UnauthorizedError);
+      expect(uow.callCount).toBe(0);
     });
   });
 });
