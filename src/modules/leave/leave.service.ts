@@ -26,7 +26,7 @@ import { IValidationService, ValidationService } from '../validation';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
 import { IPolicyService, createPolicyService } from '../policy';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
-import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
+import { CreateLeaveRequestInput, LeaveRequest, PendingDecision } from './leave.model';
 import { LEAVE_REQUEST_ENTITY_TYPE } from '../../shared/types';
 import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';
 
@@ -46,6 +46,7 @@ export interface ILeaveService {
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
+  listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]>;
   getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   getHistory(actor: LeaveActor, requestId: string): Promise<AuditLog[]>;
 }
@@ -501,6 +502,24 @@ export class LeaveService implements ILeaveService {
     // ADMIN: no employeeIds filter — sees every request.
 
     return this.repository.findByQuery(query);
+  }
+
+  async listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]> {
+    this.assertAuthenticated(actor);
+
+    // The queue is a status-filtered read of the SAME role-scoped visibility rule
+    // `list` applies, so it mirrors `list`'s branch rather than restating it. The
+    // repository owns the SUBMITTED-only predicate and the start_date ASC order.
+    let employeeIds: string[] | undefined;
+    if (actor.role === EmployeeRole.EMPLOYEE) {
+      employeeIds = [actor.id];
+    } else if (actor.role === EmployeeRole.MANAGER) {
+      const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
+      employeeIds = [actor.id, ...reports.map((e) => e.id)];
+    }
+    // ADMIN: no employeeIds filter — sees every pending decision.
+
+    return this.repository.findPendingDecisions(employeeIds);
   }
 
   async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
