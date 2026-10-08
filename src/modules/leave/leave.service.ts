@@ -26,11 +26,8 @@ import { IValidationService, ValidationService } from '../validation';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
 import { IPolicyService, createPolicyService } from '../policy';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
-import {
-  CreateLeaveRequestInput,
-  LeaveRequest,
-  LEAVE_REQUEST_ENTITY_TYPE,
-} from './leave.model';
+import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
+import { LEAVE_REQUEST_ENTITY_TYPE } from '../../shared/types';
 import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';
 
 /**

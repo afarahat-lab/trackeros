@@ -112,3 +112,20 @@ export function requestedDays(startDate: Date, endDate: Date): number {
   );
   return Math.round((utcEnd - utcStart) / MS_PER_DAY) + 1;
 }
+
+/**
+ * The audit discriminator for a leave request.
+ *
+ * SHARED, not module-local. It was declared in `src/modules/leave/leave.model.ts`, which forced
+ * every reader to import from inside the leave module: `tests/unit/modules/audit/` did exactly
+ * that, creating an `audit -> leave` edge. The dependency map forbids it in two ways — it states
+ * "No module depends back on leave." and declares `leave -> ... audit ...`, so the edge is the
+ * direct inversion — and the import reached past `src/modules/leave/index.ts`, which does not
+ * re-export this symbol, into leave's internals.
+ *
+ * Re-exporting it from leave's barrel would have fixed the second problem and left the first: the
+ * edge would still be `audit -> leave`. `shared/types` is a foundation BOTH modules already
+ * declare an edge to, so the write path (leave) and the generic reader (audit) can share one
+ * value without either depending on the other — which is what the constant existed for.
+ */
+export const LEAVE_REQUEST_ENTITY_TYPE = 'leave_request';

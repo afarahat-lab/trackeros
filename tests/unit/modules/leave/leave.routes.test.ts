@@ -1,16 +1,14 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { leaveRoutes } from '../../../../src/modules/leave/leave.routes';
 import { LeaveActor, ILeaveService } from '../../../../src/modules/leave/leave.service';
-import {
-  LeaveRequest,
-  LEAVE_REQUEST_ENTITY_TYPE,
-} from '../../../../src/modules/leave/leave.model';
+import { LeaveRequest } from '../../../../src/modules/leave/leave.model';
 import { AuditLog } from '../../../../src/modules/audit';
 import { NotFoundError } from '../../../../src/shared/errors';
 import {
   AuditAction,
   CreateLeaveRequestDto,
   EmployeeRole,
+  LEAVE_REQUEST_ENTITY_TYPE,
   LeaveStatus,
   LeaveTypeCode,
 } from '../../../../src/shared/types';

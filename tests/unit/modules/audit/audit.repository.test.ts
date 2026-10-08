@@ -5,8 +5,7 @@ import {
   AuditService,
   IAuditRepository,
 } from '../../../../src/modules/audit';
-import { LEAVE_REQUEST_ENTITY_TYPE } from '../../../../src/modules/leave/leave.model';
-import { AuditAction } from '../../../../src/shared/types';
+import { AuditAction, LEAVE_REQUEST_ENTITY_TYPE } from '../../../../src/shared/types';
 import { ValidationError } from '../../../../src/shared/errors';
 
 /**
