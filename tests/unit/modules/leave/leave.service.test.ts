@@ -5,6 +5,7 @@ import {
   ILeaveRepository,
   LeaveRequest,
   CreateLeaveRequestInput,
+  PendingDecision,
 } from '../../../../src/modules/leave';
 import {
   IBalanceRepository,
@@ -96,6 +97,22 @@ class FakeLeaveRepository implements ILeaveRepository {
 
   async findByQuery(): Promise<LeaveRequest[]> {
     return [...this.rows];
+  }
+
+  async findPendingDecisions(employeeIds?: string[]): Promise<PendingDecision[]> {
+    return this.rows
+      .filter((r) => r.status === LeaveStatus.SUBMITTED)
+      .filter((r) => employeeIds === undefined || employeeIds.length === 0 || employeeIds.includes(r.employeeId))
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+      .map((r) => ({
+        requestId: r.id,
+        employeeId: r.employeeId,
+        leaveTypeCode: r.leaveTypeCode,
+        startDate: r.startDate,
+        endDate: r.endDate,
+        requestedDays: r.requestedDays,
+        status: r.status,
+      }));
   }
 }
 
