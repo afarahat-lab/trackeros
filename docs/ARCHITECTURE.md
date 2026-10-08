@@ -1644,3 +1644,127 @@ Two test files — one new, one extended additively. **No file under `src/` was 
 Phase 4 adds the tests that pin the built behaviour — `tests/unit/modules/audit/audit.repository.test.ts` (new) and the additive `GET /leaves/:id/history` block in `tests/unit/modules/leave/leave.routes.test.ts` — with no change under `src/`. The feature's four phases are now all delivered; the "Recommended phases" list above is updated accordingly.
 
 **Known drift, not corrected by this phase:** `docs/DOMAIN.md`'s `audit` section still describes `Audit`/`AuditLog`/`AuditRecord`/`AuditServiceInterface` with `oldValues`/`newValues`/`performedBy`/`performedAt` fields. The built entity — and the shape the Phase 4 tests pin exactly — is `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }`. The drift predates this phase and is recorded here so the next reader of DOMAIN.md is not misled.
+
+<!-- gestalt:architecture feature=93f4284a-e320-4118-8414-2e6818ef21e0 START -->
+## Feature: Notify the approver when a leave request is cancelled
+
+When an employee cancels a leave request that was already SUBMITTED or APPROVED, the manager who would have decided it (or did decide it) is notified, inside the same unit of work as the status change. A DRAFT cancellation notifies no approver, matching the existing rule that a DRAFT cancellation touches no balance. The approver's own view, `GET /leaves/pending-decisions`, stops listing a request once it is cancelled. The existing CANCEL audit entry is unchanged.
+
+### Domain entities
+
+| Entity | Kind | Notes |
+| --- | --- | --- |
+| `LeaveRequest` | aggregate root, table `leave_requests` | 15 fields, unchanged shape. `approverId` becomes load-bearing as the APPROVED-cancellation recipient. |
+| `LeaveRequestReversal` | domain ROLE of `LeaveRequest` (non-null `reversesRequestId`) — NOT a table or type | Born CANCELLED, terminal and inert; reserves no balance. |
+| `Notification` | entity, table `notifications` | Reused; gains `relatedEntityCode` (the leave type) so the approver can act without a second lookup. |
+| `Employee` | entity, table `employees` | Unchanged; `managerId` becomes load-bearing on the cancellation and queue paths. |
+| `AuditLog` | entity, table `audit_logs` | Unchanged by explicit requirement. |
+| `PendingDecision` | read-model projection — no id, no table | Membership is derived from `LeaveRequest.status` on every read. |
+
+### Lifecycle states
+
+- **LeaveRequest**: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELLED`. `APPROVED` is terminal/immutable (GP-008); `DRAFT` and `SUBMITTED` are cancelled in place.
+- **LeaveRequestReversal**: `CANCELLED` — single state, born CANCELLED, never transitions.
+- **Notification**: `PENDING`, `SENT`, `READ`, `ARCHIVED`. A cancellation notification is created `PENDING` and is NOT advanced by this feature — there is no delivery step; `PENDING` is the honest state for a recorded-but-undelivered notification.
+- **AuditLog**: `RECORDED` — terminal, immutable.
+- **Employee**: `ACTIVE`, `TERMINATED`, `ON_LEAVE`. A TERMINATED recorded approver is still the notification recipient.
+- **PendingDecision**: `AWAITING_DECISION` (status SUBMITTED), `RESOLVED` (left the queue — by decision or by cancellation). `CANCELLED` is never a member state.
+
+Named transitions: `cancelInPlace` (`DRAFT -> CANCELLED`, no balance touch, no approver notification; `SUBMITTED -> CANCELLED`, releases `pendingDays`, emits the approver notification); `reverseApproved` (`APPROVED -> original row byte-identical + new LeaveRequestReversal in CANCELLED`, releases `usedDays`, emits the approver notification keyed to the ORIGINAL id); `PendingDecision` `AWAITING_DECISION -> RESOLVED` on cancellation or on any decision.
+
+### Conceptual tables
+
+- **`notifications`** (EXTENDED) — `id`, `recipient_id`, `type`, `title`, `message`, `related_entity_type`, `related_entity_id`, `related_entity_code` (NEW, nullable), `status`, `created_at`, `read_at`. PK `id`; FK `recipient_id -> employees.id`. Indexes: `id` (PK, findById/updateStatus); `(recipient_id, status)` (inbox read, existing); `(related_entity_type, related_entity_id)` (entity correlation — documented in GP-008 but absent from the initial migration, added here); `related_entity_code` deliberately unindexed. `related_entity_code` is generic (a code for whatever `related_entity_type` names), not leave-specific, so the single notifications table stays one concept.
+- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry.
+- **`employees`** (UNCHANGED, referenced by name) — `manager_id` resolves the SUBMITTED recipient and scopes the MANAGER queue predicate.
+- **`audit_logs`** and **`leave_balances`** are unchanged and participate only in the cancellation unit of work.
+
+### Repository interfaces and concrete implementations
+
+| Interface | Concrete | Backing |
+| --- | --- | --- |
+| `ILeaveRepository` | `PgLeaveRequestRepository` | PostgreSQL via the shared pg Pool (`src/shared/db/connection.ts`), constructor-injected `dbPool` |
+| `INotificationRepository` | `PgNotificationRepository` | same |
+| `IAuditRepository` | `PgAuditLogRepository` | same |
+| `IBalanceRepository` | `PgLeaveBalanceRepository` | same |
+| `IEmployeeRepository` | `PgEmployeeRepository` | same |
+
+New / changed methods:
+
+- `ILeaveRepository.findPendingDecisions(actorId: string, actorRole: EmployeeRole, client?: PoolClient): Promise<LeaveRequest[]>` — NEW. Returns the requests still awaiting this actor's decision: `status = SUBMITTED` AND `reverses_request_id IS NULL`, scoped by role (ADMIN: all; MANAGER: the requester's `employees.manager_id = actorId`; EMPLOYEE: none). `ORDER BY start_date ASC, id ASC`. Read-only: no `forUpdate`, no transaction, returns an array (possibly empty), never null. `CANCELLED` is excluded by construction, which is what makes a cancelled request stop being listed.
+- `INotificationRepository.create(input, client?)` — EXISTING, EXTENDED end-to-end for `related_entity_code` (COLUMNS, `NotificationRow`, `mapRow`, INSERT). The optional `client` is forwarded so the insert joins the caller's transaction — the mechanism by which a failed notification insert rolls back the cancellation.
+- `ILeaveRepository.create/findById/findByReversesRequestId/update/findByQuery`, `IAuditRepository.create/findById/findByEntity`, `IBalanceRepository.findByKey/update/findById/create`, `IEmployeeRepository.findById/findByManagerId/create/findByEmployeeNumber/findByEmail` — EXISTING, unchanged.
+
+Every method takes an optional trailing `PoolClient` defaulting to the shared pool; no repository opens `BEGIN`/`COMMIT`/`ROLLBACK`.
+
+### Module boundaries
+
+- **Presentation** — `src/modules/leave/leave.routes.ts`. Adds one handler, `GET /leaves/pending-decisions`, mirroring the existing `GET /leaves` handler exactly: `resolveActor` -> service -> `reply.status(200).send(rows)`, `try/catch -> request.log.error -> sendError`. No controller file, no SQL, no role branch, no business logic.
+- **Application** — `LeaveService.cancel` (extended) and `LeaveService.listPendingDecisions` (new), both declared on `ILeaveService` before implementation. `cancel` keeps ownership of the unit of work; the approver notification is one more step inside the two existing `uow.withTransaction` callbacks, with the same `client` threaded through. `listPendingDecisions` is read-only.
+- **Domain** — `LeaveRequest`, `Notification`, `LeaveStatus`, `LeaveTypeCode`, `EmployeeRole`, `AuditAction` in `src/shared/types/`. No new type is introduced: the approver notification payload is composed inline in `leave`, exactly as the existing approve/reject/cancel notifications are, and `listPendingDecisions` takes no query DTO.
+- **Infrastructure** — `PgLeaveRequestRepository.findPendingDecisions` (the only new SQL), `PgNotificationRepository` (extended for `related_entity_code`), `src/shared/db` pool + `PgUnitOfWork`.
+
+### Dependency map
+
+- leave -> notification, employee, audit, balance, validation, policy, shared-types, shared-errors, shared-db, shared-auth
+- notification -> shared-types, shared-errors, shared-db
+- employee -> shared-types, shared-errors, shared-db
+- audit -> shared-types, shared-errors, shared-db
+- balance -> policy, employee, shared-db, shared-types, shared-errors
+- validation -> shared-types, shared-errors
+- policy -> leave-type, shared-types, shared-errors, shared-db
+- leave-type -> shared-types, shared-errors, shared-db
+- shared-auth -> shared-types, shared-errors
+- app -> leave, shared-auth
+- web-leave -> web-infrastructure-api, web-shared-types
+- web-approvals -> web-leave, web-employee, web-infrastructure-api, web-shared-types
+- web-presentation-pages -> web-approvals, web-leave, web-shared-types, web-presentation-guards
+
+`leave` remains the sole orchestrator and the only module that changes. Every edge this feature uses already exists; no new edge is added and no cycle is introduced. No module depends back on `leave`.
+
+### Cross-cutting contracts
+
+**Auth.** `request.user: { id: string; role: EmployeeRole }` where `EmployeeRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN'`. Identity and role come from a JWT bearer token verified by the existing `registerAuth` preHandler (`src/shared/auth/index.ts`), which populates `request.user` from `payload.sub` (id) and `payload.role`; only `/auth/login` is in `PUBLIC_PATHS`. `GET /leaves/pending-decisions` is NOT added to `PUBLIC_PATHS`, so it requires a valid token. The route-level `resolveActor` helper (reused unchanged) extracts `request.user` and enforces id presence plus `EmployeeRole` membership at the API boundary, throwing `UnauthorizedError` on a missing/invalid actor. RBAC is enforced in the service, never inline in the route: `listPendingDecisions` calls `assertAuthenticated` and scopes the queue to `actor.id`/`actor.role`; `cancel` keeps its existing `assertCanCancel` (owner for DRAFT/SUBMITTED; direct manager or ADMIN for APPROVED). The approver notification recipient is resolved server-side from the request row and is never taken from the caller.
+
+**Transaction.** Cancelling a SUBMITTED or APPROVED request performs, in ONE unit of work: (a) the status change — an in-place `update` to CANCELLED for SUBMITTED, or the GP-008 insert of a NEW CANCELLED reversal row for APPROVED; (b) the balance release — `pendingDays -= requestedDays` for SUBMITTED, `usedDays -= requestedDays` for APPROVED; (c) the CANCEL audit entry (unchanged in shape); (d) the approver notification insert. Repository and service methods that must join a caller's transaction take an OPTIONAL trailing `client?: PoolClient` defaulting to the shared pool. `LeaveService.cancel` calls `this.uow.withTransaction(async (client) => { ... })`; `PgUnitOfWork` acquires a client, issues BEGIN, runs the callback, COMMITs on resolve / ROLLBACKs on throw, and always releases the client. Inside the callback the SAME `client` is threaded to every participating call. `BEGIN`/`COMMIT`/`ROLLBACK` appear ONLY in `PgUnitOfWork`. The approver is resolved before the notification insert and inside the same callback: for an APPROVED request, `request.approverId` read from the ORIGINAL row (the reversal row's `approverId` is null by construction); for a SUBMITTED request, `employeeService.getEmployeeById(request.employeeId).managerId`. A DRAFT cancellation notifies nobody and performs no balance read or write. `GET /leaves/pending-decisions` is read-only: it opens NO transaction and forwards NO client.
+
+**Errors.** Errors return `{ error: string; code: string }` via the existing `sendError` helper (`AppError` -> its `statusCode` + `code`; any other throw -> 500 `{ error: 'Internal Server Error' }`). For `GET /leaves/pending-decisions`: 401 (`UnauthorizedError`, code `UNAUTHORIZED`) for a missing or invalid actor; 200 with an array of `LeaveRequest` rows (possibly empty) on success — an empty queue is a valid 200 with `[]`, not a 404. For `POST /leaves/:id/cancel` the existing contract is unchanged: 400 validation, 401 missing/invalid actor, 403 `ForbiddenError` from `assertCanCancel`, 404 `NotFoundError` for an unknown id, 409 `ConflictError` for an already-begun leave or an already-reversed APPROVED request, 200 with the cancelled (or reversal) row on success. A failure to insert the approver notification is not mapped to a new status: it throws inside the unit of work, the transaction rolls back, and the caller receives the underlying error (500) — the cancelled request is never left committed without its notification record.
+
+### Business rules (reconciled)
+
+1. The approver recipient is resolved from the request's status and nothing else: APPROVED -> the request's recorded `approverId`; SUBMITTED -> the requester's direct manager (`employee.managerId` at the moment of cancellation); DRAFT -> none. The current manager is never substituted for a recorded `approverId`, and `approverId` is never used for a SUBMITTED request (it is null there by construction).
+2. Exactly one approver notification per cancellation, and only for a request cancelled from SUBMITTED or APPROVED. DRAFT notifies no approver. The notification is not duplicated per approver candidate, not sent to both the recorded approver and the current manager, and not re-sent on a retry (a repeat cancel fails its state guard and emits nothing).
+3. The notification carries the request id and the leave type: the request id in `relatedEntityId` (with `relatedEntityType = 'leave_request'`) and both values in `message`; the leave type additionally in `relatedEntityCode` as the canonical lowercase `leaveTypeCode`. On the APPROVED reversal path the leave type is the reversal row's `leaveTypeCode` (copied verbatim) and the request id is the ORIGINAL request id.
+4. The approver notification is written inside the SAME unit of work as the status change. A failure to notify rolls back the cancellation itself. The notification must not be emitted after commit, must not be fire-and-forget, and must not be moved to an out-of-band queue in this feature.
+5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).
+6. A request is a member of the approver's pending-decisions queue if and only if its status is SUBMITTED. CANCELLED is never a member state, so a request leaves the queue the instant it is cancelled. Membership is derived from the request's current status on every read; there is no separate queue record, tombstone, or cached membership.
+7. Queue visibility reuses the module's existing role-scoped rule: an ADMIN sees every SUBMITTED request; a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none. Queue membership and decide authority are separate concerns — the existing decide guards remain the sole authority on whether a decision may be taken.
+8. When a SUBMITTED request is cancelled and the requester's `managerId` is null, the cancellation still succeeds and the requester notification is still written; only the approver notification is skipped. The notification is never addressed to the requester, the cancelling actor, or an arbitrary ADMIN as a fallback.
+9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.
+10. An ADMIN may cancel an APPROVED request for anyone; the recipient is still the request's recorded `approverId`, not the ADMIN.
+11. For a SUBMITTED cancellation the recipient is the requester's manager AS OF the cancellation, resolved live from `employee.managerId` inside the unit of work. No historical manager snapshot is stored or consulted.
+12. For an APPROVED cancellation the recipient is the recorded `approverId` even if that employee has since been TERMINATED or is ON_LEAVE.
+13. Self-approval is forbidden by the existing decide guards, so the requester and the approver are always distinct people and no call site needs to de-duplicate recipients.
+14. The SUBMITTED recipient is the requester's `managerId` regardless of that employee's `role`. No role check is applied when resolving the recipient.
+15. A cancellation notification is created `PENDING` and is never advanced to `SENT` by the cancellation operation. There is no delivery step in this feature; the notification's existence inside the committed unit of work IS the record of the notification attempt. Advancing `PENDING -> SENT` is a separate, out-of-band concern owned by the notification module.
+16. The approver notification reuses the existing `type` literal `'leave_request'` and introduces no new type value, enum member, or discriminator. It is distinguished by recipient and message text.
+17. This feature changes no authorization and no timing rule. Who may cancel is unchanged: the owner may cancel their own DRAFT or SUBMITTED request; only the requester's direct manager or an ADMIN may cancel an APPROVED request; cancellation is blocked once `startDate <= today` (UTC day comparison) with `ConflictError`. A rejected cancellation emits no notification of any kind.
+
+### Recommended phases
+
+1. Migration: `notifications.related_entity_code` + `leave_requests` status/approver_id indexes (1 file).
+2. Repositories: `findPendingDecisions` + `related_entity_code` plumbing (2 files).
+3. `LeaveService.cancel`: notify the approver inside the existing unit of work (1 file).
+4. `LeaveService.listPendingDecisions` (1 file).
+5. `GET /leaves/pending-decisions` route (1 file).
+6. Tests: approver notification + pending-decisions read (2 files).
+7. (optional) Web approvals queue consumes the new endpoint (2 files).
+
+### Open questions
+
+See the reconciled `openQuestions` list: null `managerId` on a SUBMITTED cancellation; null `approverId` on a legacy APPROVED row; whether the approver notification accompanies or replaces the existing requester notification; confirmation of the `related_entity_code` schema decision; queue membership (SUBMITTED-only vs SUBMITTED+APPROVED); ADMIN queue scope; self-notification suppression; the reversal path's notification keying; and the documented-vs-built `(related_entity_type, related_entity_id)` index drift.
+
+### Stack compliance
+
+TypeScript on Node 20, npm, Jest, Fastify, React (Vite SPA), PostgreSQL, modular monolith. All three specialist slices comply: Fastify routes and preHandlers, `pg` Pool with a `PoolClient`-threaded unit of work, Jest unit tests over the existing `dbPool`/service seams, and a React SPA consumer in the optional Phase 7. No non-stack framework appears in any slice.
+<!-- gestalt:architecture feature=93f4284a-e320-4118-8414-2e6818ef21e0 END -->
