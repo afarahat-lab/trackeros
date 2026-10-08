@@ -303,6 +303,15 @@ export class LeaveService implements ILeaveService {
       throw new ConflictError('Leave that has already begun cannot be cancelled');
     }
 
+    // Recipient resolution reads the employee, not the transaction, so it happens
+    // before the unit of work opens (getEmployeeById takes no client). A null
+    // recipient is never fatal: the notification set is a function of the state
+    // change, and a missing approver only suppresses the second notification.
+    const approverRecipient = await this.resolveApproverRecipient(request);
+    const approverNotificationSkipped =
+      approverRecipient === null &&
+      (request.status === LeaveStatus.SUBMITTED || request.status === LeaveStatus.APPROVED);
+
     return this.uow.withTransaction(async (client) => {
       const now = new Date();
 
@@ -363,7 +372,9 @@ export class LeaveService implements ILeaveService {
             entityType: LEAVE_REQUEST_ENTITY_TYPE,
             entityId: request.id,
             beforeState: request,
-            afterState: reversal,
+            afterState: approverNotificationSkipped
+              ? { ...reversal, approverNotificationSkipped: true }
+              : reversal,
           },
           client,
         );
@@ -379,6 +390,24 @@ export class LeaveService implements ILeaveService {
           },
           client,
         );
+
+        // GP-008: the reversal row carries a null approverId by construction, so the
+        // recipient is read from the ORIGINAL row and the notification is keyed to the
+        // ORIGINAL request id — never the reversal row's id.
+        if (approverRecipient !== null) {
+          await this.notificationService.create(
+            {
+              recipientId: approverRecipient,
+              type: 'leave_request',
+              title: 'Leave request cancelled',
+              message: `Leave request ${request.id} (${request.leaveTypeCode}) was cancelled.`,
+              relatedEntityType: 'leave_request',
+              relatedEntityId: request.id,
+              relatedEntityCode: request.leaveTypeCode,
+            },
+            client,
+          );
+        }
 
         return reversal;
       }
@@ -419,7 +448,9 @@ export class LeaveService implements ILeaveService {
           entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
-          afterState: updated,
+          afterState: approverNotificationSkipped
+            ? { ...updated, approverNotificationSkipped: true }
+            : updated,
         },
         client,
       );
@@ -435,6 +466,23 @@ export class LeaveService implements ILeaveService {
         },
         client,
       );
+
+      // DRAFT notifies nobody else, matching the rule that a DRAFT cancellation
+      // touches no balance. SUBMITTED notifies the requester's direct manager.
+      if (approverRecipient !== null) {
+        await this.notificationService.create(
+          {
+            recipientId: approverRecipient,
+            type: 'leave_request',
+            title: 'Leave request cancelled',
+            message: `Leave request ${requestId} (${request.leaveTypeCode}) was cancelled.`,
+            relatedEntityType: 'leave_request',
+            relatedEntityId: requestId,
+            relatedEntityCode: request.leaveTypeCode,
+          },
+          client,
+        );
+      }
 
       return updated;
     });
@@ -544,6 +592,24 @@ export class LeaveService implements ILeaveService {
     if (employee.managerId !== actor.id) {
       throw new ForbiddenError('Canceller must be the requester manager');
     }
+  }
+
+  /**
+   * The recipient of the approver-side cancellation notification. Reads the
+   * employee record (never the transaction: getEmployeeById takes no client) and
+   * returns null rather than throwing when there is nobody to notify — a DRAFT,
+   * a SUBMITTED request whose requester has no direct manager, or an APPROVED
+   * request with a null approverId (a known, reachable legacy state).
+   */
+  private async resolveApproverRecipient(request: LeaveRequest): Promise<string | null> {
+    if (request.status === LeaveStatus.APPROVED) {
+      return request.approverId;
+    }
+    if (request.status === LeaveStatus.SUBMITTED) {
+      const employee = await this.employeeService.getEmployeeById(request.employeeId);
+      return employee.managerId;
+    }
+    return null;
   }
 
   /**

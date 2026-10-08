@@ -231,6 +231,8 @@ Day-count calendar vs business days; accrual model; carry-forward cap; migration
 <!-- gestalt:architecture feature=621bb1fd-0965-415a-bf2e-ec2c42b15f04 START -->
 ## Feature: Leave cancellation flow
 
+> Superseded in part by **"Feature: Notify the approver when a leave request is cancelled"** (below): the `notifications` table gains the nullable `related_entity_code` column, and a SUBMITTED/APPROVED cancellation now notifies the approver as well as the affected employee. The `notifications` shape and the cancellation notification contract in this section reflect the original flow only.
+
 ### Stack compliance
 TypeScript 20, Fastify, PostgreSQL via pg, modular monolith. No stack deviations.
 

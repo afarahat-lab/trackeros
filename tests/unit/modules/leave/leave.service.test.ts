@@ -980,14 +980,23 @@ describe('LeaveService', () => {
       expect(record.afterState).toBe(reversal);
     });
 
-    it('sends exactly one cancellation notification for the original', async () => {
+    it('sends exactly two cancellation notifications, one per recipient', async () => {
       await service.cancel(manager, 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(1);
-      expect(notificationService.inputs[0].type).toBe('leave_request');
-      expect(notificationService.inputs[0].title).toBe('Leave request cancelled');
-      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.inputs[0].relatedEntityId).toBe('lr-1');
+      expect(notificationService.inputs).toHaveLength(2);
+
+      const requesterNotification = notificationService.inputs[0];
+      expect(requesterNotification.type).toBe('leave_request');
+      expect(requesterNotification.title).toBe('Leave request cancelled');
+      expect(requesterNotification.recipientId).toBe(REQUESTER_ID);
+      expect(requesterNotification.relatedEntityId).toBe('lr-1');
+
+      const approverNotification = notificationService.inputs[1];
+      expect(approverNotification.type).toBe('leave_request');
+      expect(approverNotification.title).toBe('Leave request cancelled');
+      expect(approverNotification.recipientId).toBe(MANAGER_ID);
+      expect(approverNotification.relatedEntityId).toBe('lr-1');
+      expect(approverNotification.relatedEntityCode).toBe('annual');
     });
 
     it('runs every participating call inside the single transaction with the forwarded client', async () => {
