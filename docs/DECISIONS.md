@@ -149,13 +149,26 @@ moving the registration below `GET /leaves/:id` breaks the endpoint. `PendingDec
 promoted to `src/shared/types/`. The endpoint is not added to `PUBLIC_PATHS`, so it requires a
 valid bearer token.
 
-**Test coverage (added by the feature's test phase).** The ordering constraint is no longer
-protected only by the comment and this ADR: `tests/unit/modules/leave/leave.routes.test.ts` now
+**Test coverage (added by the feature's test phase, then hardened).** The ordering constraint is
+no longer protected only by the comment and this ADR: `tests/unit/modules/leave/leave.routes.test.ts`
 registers `leaveRoutes` and injects `GET /leaves/pending-decisions` through the real Fastify
-router, asserting 200 with the queue, 200 with `[]`, 401 `UNAUTHORIZED` with the service never
-called, the resolved actor forwarded unchanged, and a bare array of exactly the seven
-`PendingDecision` fields. Registering the route after `GET /leaves/:id` would resolve the path as
-`id = 'pending-decisions'` and fail those 200 assertions, so the ordering is now pinned by a test
-rather than by convention. The projection's shape is likewise pinned by the field-set assertion,
-and `LeaveService.listPendingDecisions`'s role scoping and verbatim array return are covered in
+router. The block now holds 11 cases. The original 5 assert 200 with the queue, 200 with `[]`,
+401 `UNAUTHORIZED` with the service never called, the resolved actor forwarded unchanged, and a
+bare array of exactly the seven `PendingDecision` fields. A follow-up hardening pass added 6
+more, of which two bear directly on this ADR:
+
+- **The ordering is now asserted for its own sake.** A case builds an instance whose service
+  carries BOTH `listPendingDecisions` and a `getById` that throws `NotFoundError`; the static
+  path returns 200 and `getById` is asserted `not.toHaveBeenCalled()`. Previously the ordering
+  was pinned only indirectly — the 200 assertions would have failed had the parametric route
+  won, but nothing named the shadowing as the cause. Registering the route after
+  `GET /leaves/:id` now fails a test that says why.
+- **The pass-through is pinned end to end.** A MANAGER case asserts the actor object is
+  forwarded to the service unchanged (so the route does not scope the queue itself); a reversed
+  fixture comes back in the same order, proving no re-sort or cap; dates are asserted as ISO
+  8601 strings on the wire; and a service throw yields 500 `{ error: 'Internal Server Error' }`
+  with the dependency's message absent from the body.
+
+The projection's shape is likewise pinned by the field-set assertion, and
+`LeaveService.listPendingDecisions`'s role scoping and verbatim array return are covered in
 `tests/unit/modules/leave/leave.service.test.ts`.
