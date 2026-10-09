@@ -1620,6 +1620,139 @@ describe('LeaveService', () => {
       ).rejects.toThrow(UnauthorizedError);
       expect(uow.callCount).toBe(0);
     });
+
+    it('passes NO scoping filter for an ADMIN, so the repository decides membership', async () => {
+      await repository.create(
+        makeRequest({ id: 'lr-x', employeeId: 'emp-x', status: LeaveStatus.SUBMITTED })
+      );
+      await repository.create(
+        makeRequest({ id: 'lr-y', employeeId: 'emp-y', status: LeaveStatus.SUBMITTED })
+      );
+
+      const result = await service.listPendingDecisions(admin);
+
+      // Exactly one call, and the scoping argument is absent (not an empty list):
+      // an empty array would be a filter that matches nothing.
+      expect(repository.findPendingCalls).toHaveLength(1);
+      expect(repository.findPendingCalls[0]).toBeUndefined();
+      expect(repository.findPendingCalls[0]).not.toEqual([]);
+      // Every SUBMITTED request is visible regardless of who requested it.
+      expect(result.map((d) => d.employeeId).sort()).toEqual(['emp-x', 'emp-y']);
+    });
+
+    it('scopes a MANAGER to exactly their own id plus their direct reports', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: MANAGER_ID }),
+        makeEmployee('emp-report-2', { managerId: MANAGER_ID }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER, managerId: null }),
+        makeEmployee('emp-other', { managerId: 'mgr-other' }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+
+      await service.listPendingDecisions(manager);
+
+      expect(repository.findPendingCalls).toHaveLength(1);
+      expect(repository.findPendingCalls[0]).toEqual([MANAGER_ID, REQUESTER_ID, 'emp-report-2']);
+      // A non-report's manager is never in scope.
+      expect(repository.findPendingCalls[0]).not.toContain('mgr-other');
+      expect(repository.findPendingCalls[0]).not.toContain('emp-other');
+    });
+
+    it('scopes an EMPLOYEE to only their own id', async () => {
+      const employee = makeActor({ id: REQUESTER_ID, role: EmployeeRole.EMPLOYEE });
+
+      await service.listPendingDecisions(employee);
+
+      expect(repository.findPendingCalls).toEqual([[REQUESTER_ID]]);
+      expect(uow.callCount).toBe(0);
+    });
+
+    it('hands back the repository array deep-equal, order preserved, with no re-sort', async () => {
+      const first: PendingDecision = {
+        requestId: 'lr-first',
+        employeeId: REQUESTER_ID,
+        leaveTypeCode: LeaveTypeCode.ANNUAL,
+        startDate: new Date('2024-09-01T00:00:00Z'),
+        endDate: new Date('2024-09-05T00:00:00Z'),
+        requestedDays: REQUESTED_DAYS,
+        status: LeaveStatus.SUBMITTED,
+      };
+      const second: PendingDecision = {
+        ...first,
+        requestId: 'lr-second',
+        startDate: new Date('2024-07-01T00:00:00Z'),
+        endDate: new Date('2024-07-02T00:00:00Z'),
+      };
+      const third: PendingDecision = {
+        ...first,
+        requestId: 'lr-third',
+        employeeId: 'emp-999',
+        startDate: new Date('2024-08-01T00:00:00Z'),
+        endDate: new Date('2024-08-02T00:00:00Z'),
+      };
+      // startDate order deliberately scrambled: the service must not impose the
+      // start_date ASC ordering the repository owns.
+      repository.pendingOverride = [first, second, third];
+
+      const result = await service.listPendingDecisions(admin);
+
+      expect(result).toEqual([first, second, third]);
+      expect(result.map((d) => d.requestId)).toEqual(['lr-first', 'lr-second', 'lr-third']);
+      expect(result).toBe(repository.pendingOverride);
+    });
+
+    it('returns an empty array — not an error — when the queue is empty', async () => {
+      repository.pendingOverride = [];
+
+      const result = await service.listPendingDecisions(manager);
+
+      await expect(service.listPendingDecisions(admin)).resolves.toEqual([]);
+      expect(result).toEqual([]);
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('opens no unit of work and forwards no client for any role', async () => {
+      employeeService = new FakeEmployeeService([
+        makeEmployee(REQUESTER_ID, { managerId: MANAGER_ID }),
+        makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER, managerId: null }),
+      ]);
+      service = new LeaveService(
+        repository,
+        balanceRepository,
+        auditService,
+        notificationService,
+        validationService,
+        employeeService,
+        policyService,
+        uow
+      );
+      repository.pendingOverride = [];
+
+      await service.listPendingDecisions(admin);
+      await service.listPendingDecisions(manager);
+
+      expect(uow.callCount).toBe(0);
+      // findPendingDecisions accepts only employeeIds — no client is forwarded.
+      expect(repository.findPendingCalls).toEqual([undefined, [MANAGER_ID, REQUESTER_ID]]);
+    });
+
+    it('rejects an absent actor with UnauthorizedError before touching the repository', async () => {
+      await expect(
+        service.listPendingDecisions(undefined as unknown as LeaveActor)
+      ).rejects.toThrow(UnauthorizedError);
+
+      expect(repository.findPendingCalls).toHaveLength(0);
+      expect(uow.callCount).toBe(0);
+    });
   });
 });
 
