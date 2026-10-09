@@ -102,6 +102,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Depth for the base-branch comparison the .gestalt artifact check makes. A depth-1
+          # checkout has no merge base, and the check would then report every file as added.
+          fetch-depth: 200
 
       - uses: actions/setup-node@v4
         with:
@@ -123,6 +127,48 @@ jobs:
           if [ -f web/package.json ]; then
             cd web && npm install --force --legacy-peer-deps
           fi
+
+      # ── 🔴 SECRET SCAN — BLOCKING, and the ONE exception to the non-blocking design below.
+      #
+      # That design exists so an infra finding cannot fail a phase unrecoverably, and it is right
+      # for CORRECTNESS checks: a broken compile is recoverable by a self-heal, a re-run or a
+      # human. Publishing a credential is not. On 2026-10-09 a `git add -A` committed this repo's
+      # `.env` — DATABASE_URL and JWT_SECRET — to a feature branch; rewriting the history within
+      # the hour did not help, because GitHub still served the orphaned commits by SHA, and both
+      # values had to be rotated. A failed phase costs a re-run; a published secret cannot be
+      # taken back.
+      #
+      # It runs BEFORE the build so a push carrying a secret fails fast, and it is deliberately
+      # NOT recorded in ci-results.json: the CI-agent weighs findings by severity, and there is no
+      # severity at which a credential may proceed. The job simply fails.
+      #
+      # The binary is PINNED and fetched from the release rather than run through a third-party
+      # action — a secret gate that resolves a moving tag is the wrong shape.
+      # ── 🔴 NO PER-RUN `.gestalt/` ARTIFACTS ON THE DEFAULT BRANCH. Blocking, and PR-only.
+      #
+      # `.gestalt/` is tracked on purpose (git is the transport between activities' fresh clones)
+      # and the ONLY thing keeping the per-run files off `main` is the purge inside the platform's
+      # `merge_feature_to_main`. A branch merged BY HAND never reaches it — which is how 37 of them
+      # landed on 2026-10-09, from a PR whose stated change was two files.
+      #
+      # PR-only (`if: github.event_name == 'pull_request'`) because the platform's own phase pushes
+      # legitimately add these to feature and phase branches; the rule is about the DEFAULT branch.
+      # Needs the base ref, so the checkout above is deepened for this job.
+      - name: No per-run .gestalt artifacts on the base branch (BLOCKING)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "+${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          ./scripts/check-gestalt-artifacts.sh "origin/${{ github.base_ref }}"
+
+      - name: Secret scan (BLOCKING)
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+          /tmp/gitleaks dir . --config .gitleaks.toml --redact --no-banner --verbose
 
       # ── Every check is NON-BLOCKING (continue-on-error) — the Gestalt CI-agent is the SOLE gate.
       # No individual check's exit code decides "does this phase proceed"; each check RUNS and
