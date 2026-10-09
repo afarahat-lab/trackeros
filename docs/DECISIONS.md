@@ -172,3 +172,39 @@ more, of which two bear directly on this ADR:
 The projection's shape is likewise pinned by the field-set assertion, and
 `LeaveService.listPendingDecisions`'s role scoping and verbatim array return are covered in
 `tests/unit/modules/leave/leave.service.test.ts`.
+
+## ADR-005 — The web approvals module exposes two queue reads: the client-filtered `getQueue()` and the server-scoped `getPendingDecisions()`
+
+Date: 2026-09-15
+Status: Accepted
+
+Decision: `ApprovalsService` gains `getPendingDecisions()`, a verbatim pass-through to
+`leaveService.listPendingDecisions()` (which delegates to `IApiClient.getPendingDecisions()` ->
+`GET /leaves/pending-decisions`). The pre-existing `getQueue()` — which fetches `GET /leaves` and
+filters client-side to `status === SUBMITTED && employeeId !== profile.id` — is kept unchanged,
+and `ApprovalsPage` still consumes it. The module therefore exposes two queue reads with
+different scoping.
+
+Context: the backend endpoint scopes visibility by role and orders by `start_date ASC`, so the
+client must not re-derive either. The layering map forbids `web-approvals -> web-infrastructure-api`,
+so the read had to arrive through `web-leave`; `ILeaveService` had no suitable pass-through, so
+one was added there rather than importing the api-client into approvals.
+
+Alternatives rejected:
+- Replacing `getQueue()` with `getPendingDecisions()` and rewiring `ApprovalsPage`: it would
+  change the page's rendered shape (`ApprovalsQueueItem` carries `employeeName`, always `null`)
+  and its tests in a phase scoped to the service surface, and the two reads are not equivalent —
+  `getQueue()` excludes the viewer's own requests client-side, while the endpoint's role scoping
+  includes them.
+- Importing `ApiClient` into `web-approvals` to call the endpoint directly: it would add the
+  `web-approvals -> web-infrastructure-api` edge the map deliberately omits.
+- Re-sorting or re-filtering the endpoint's array in the service: the backend owns both the
+  SUBMITTED predicate and the ordering; a second copy would be a second place to keep in sync.
+
+Consequences: `PendingDecisionView` (7 fields) is added to `web/src/shared/types/index.ts` as the
+wire projection of the backend's leave-owned `PendingDecision`; it is a client view type, not a
+promotion of the backend model. `getPendingDecisions()` returns the array by identity — no copy,
+no sort, no filter — and an empty queue is a normal `[]`, not an error. Widening `IApiClient` and
+`ILeaveService` forced mechanical fixture completions in twelve existing test files (four module
+service tests, eight presentation tests); no assertion changed. `ApprovalsPage` and the guards
+are unchanged, so the new read currently has no presentation consumer.
