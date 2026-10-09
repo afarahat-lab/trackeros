@@ -28,3 +28,5 @@ node_modules/
 # Local environment — never committed. It carries DATABASE_URL and JWT_SECRET.
 .env
 .env.local
+
+# Reproduction of the 2026-10-09 wrong-base merge. Throwaway.
