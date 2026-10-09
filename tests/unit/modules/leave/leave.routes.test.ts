@@ -630,4 +630,109 @@ describe('leave routes — GET /leaves/pending-decisions', () => {
     expect(body).not.toHaveProperty('data');
     await app.close();
   });
+
+  it('200 with the queue for a MANAGER, forwarding the actor so the service can scope it', async () => {
+    const listPendingDecisions = jest.fn(async (_a: LeaveActor) => queue);
+    const app = buildApp({ id: 'mgr-1', role: EmployeeRole.MANAGER }, listPendingDecisions);
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(queue.length);
+    expect(listPendingDecisions).toHaveBeenCalledWith({ id: 'mgr-1', role: EmployeeRole.MANAGER });
+    await app.close();
+  });
+
+  it('is matched ahead of GET /leaves/:id — the static path is not shadowed by the parametric one', async () => {
+    const listPendingDecisions = jest.fn(async (_a: LeaveActor) => queue);
+    const getById = jest.fn(async () => {
+      throw new NotFoundError('Leave request not found');
+    });
+    const service = { listPendingDecisions, getById } as unknown as ILeaveService;
+
+    const instance = Fastify();
+    (instance as unknown as { leaveService: ILeaveService }).leaveService = service;
+    instance.decorateRequest('user', undefined);
+    instance.addHook('preHandler', async (request) => {
+      (request as unknown as { user: unknown }).user = {
+        id: 'admin-1',
+        role: EmployeeRole.ADMIN,
+      };
+    });
+    await instance.register(leaveRoutes);
+    await instance.ready();
+
+    const response = await instance.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(queue.length);
+    // Had the parametric route won, getById would have produced a 404 (or a 500).
+    expect(getById).not.toHaveBeenCalled();
+    await instance.close();
+  });
+
+  it('401 UNAUTHORIZED when the authenticated user carries an out-of-enum role', async () => {
+    const listPendingDecisions = jest.fn();
+    const app = buildApp(
+      { id: 'emp-1', role: 'SUPERUSER' as unknown as EmployeeRole },
+      listPendingDecisions
+    );
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(listPendingDecisions).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('serializes the queue dates as ISO strings on the wire, preserving the values', async () => {
+    const listPendingDecisions = jest.fn(async (_a: LeaveActor) => queue);
+    const app = buildApp({ id: 'admin-1', role: EmployeeRole.ADMIN }, listPendingDecisions);
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    const [first] = response.json() as Array<Record<string, unknown>>;
+    expect(first.startDate).toBe('2030-03-04T00:00:00.000Z');
+    expect(first.endDate).toBe('2030-03-05T00:00:00.000Z');
+    await app.close();
+  });
+
+  it('returns the service array verbatim — same order, same length, no re-projection', async () => {
+    const reversed = [...queue].reverse();
+    const listPendingDecisions = jest.fn(async (_a: LeaveActor) => reversed);
+    const app = buildApp({ id: 'admin-1', role: EmployeeRole.ADMIN }, listPendingDecisions);
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as PendingDecision[];
+    // Oldest-first is the service/repository's contract; the route must not re-sort or cap.
+    expect(body.map((item) => item.requestId)).toEqual(['lr-2', 'lr-1']);
+    await app.close();
+  });
+
+  it('500 with a generic body when the service fails — the dependency error is not leaked', async () => {
+    const listPendingDecisions = jest.fn(async () => {
+      throw new Error('database exploded');
+    });
+    const app = buildApp({ id: 'admin-1', role: EmployeeRole.ADMIN }, listPendingDecisions);
+    await app.register(leaveRoutes);
+    await app.ready();
+
+    const response = await app.inject({ method: 'GET', url: '/leaves/pending-decisions' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: 'Internal Server Error' });
+    expect(response.body).not.toContain('database exploded');
+    await app.close();
+  });
 });
