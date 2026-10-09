@@ -53,3 +53,5 @@ MSG
 fi
 
 echo "Only deliberate .gestalt/ keeps added. OK."
+
+# repro trigger
