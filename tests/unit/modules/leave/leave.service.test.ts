@@ -739,10 +739,8 @@ describe('LeaveService', () => {
       expect(auditService.records[0].entityId).toBe('lr-1');
       expect(auditService.recordClients[0]).toBe(uow.stubClient);
 
-      expect(notificationService.inputs).toHaveLength(1);
-      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.inputs[0].title).toBe('Leave request cancelled');
-      expect(notificationService.createClients[0]).toBe(uow.stubClient);
+      // Amended rule: the owner is the actor and a DRAFT has no approver, so nobody is notified.
+      expect(notificationService.inputs).toHaveLength(0);
 
       expect(uow.callCount).toBe(1);
     });
@@ -987,23 +985,21 @@ describe('LeaveService', () => {
       expect(record.afterState).toBe(reversal);
     });
 
-    it('sends exactly two cancellation notifications, one per recipient', async () => {
+    it('notifies only the requester when the canceller IS the recorded approver', async () => {
       await service.cancel(manager, 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(2);
-
+      // The canceller (`manager`) IS the recorded approver — APPROVER_ID is MANAGER_ID — so the
+      // amended rule removes them from the recipient set and only the requester hears.
+      expect(notificationService.inputs).toHaveLength(1);
       const requesterNotification = notificationService.inputs[0];
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
+
       expect(requesterNotification.type).toBe('leave_request');
       expect(requesterNotification.title).toBe('Leave request cancelled');
       expect(requesterNotification.recipientId).toBe(REQUESTER_ID);
       expect(requesterNotification.relatedEntityId).toBe('lr-1');
 
-      const approverNotification = notificationService.inputs[1];
-      expect(approverNotification.type).toBe('leave_request');
-      expect(approverNotification.title).toBe('Leave request cancelled');
-      expect(approverNotification.recipientId).toBe(MANAGER_ID);
-      expect(approverNotification.relatedEntityId).toBe('lr-1');
-      expect(approverNotification.relatedEntityCode).toBe('annual');
     });
 
     it('runs every participating call inside the single transaction with the forwarded client', async () => {
@@ -1132,7 +1128,7 @@ describe('LeaveService', () => {
       await balanceRepository.create(makeBalance());
     });
 
-    it('notifies the requester AND the direct manager when the owner cancels a SUBMITTED request', async () => {
+    it('notifies only the direct manager when the owner cancels a SUBMITTED request', async () => {
       await balanceRepository.update('balance-1', { pendingDays: REQUESTED_DAYS });
       await repository.create(
         makeRequest({
@@ -1144,14 +1140,11 @@ describe('LeaveService', () => {
 
       await service.cancel(makeActor(), 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
+      const approverNotification = notificationService.inputs[0];
 
-      const requesterNotification = notificationService.inputs[0];
-      expect(requesterNotification.recipientId).toBe(REQUESTER_ID);
-      expect(requesterNotification.relatedEntityId).toBe('lr-1');
-      expect(requesterNotification.relatedEntityCode).toBeUndefined();
 
-      const approverNotification = notificationService.inputs[1];
       expect(approverNotification.recipientId).toBe(MANAGER_ID);
       expect(approverNotification.relatedEntityId).toBe('lr-1');
       // The canonical lowercase code is carried verbatim, never re-cased.
@@ -1160,7 +1153,6 @@ describe('LeaveService', () => {
       expect(approverNotification.relatedEntityType).toBe('leave_request');
       expect(approverNotification.type).toBe('leave_request');
 
-      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
       expect(uow.callCount).toBe(1);
     });
 
@@ -1235,7 +1227,7 @@ describe('LeaveService', () => {
       expect(auditService.records[0].entityId).toBe('lr-1');
     });
 
-    it('notifies both recipients when the direct manager cancels an APPROVED request', async () => {
+    it('notifies only the requester when the manager who approved it cancels it', async () => {
       await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
       await repository.create(
         makeRequest({
@@ -1248,26 +1240,26 @@ describe('LeaveService', () => {
 
       await service.cancel(manager, 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs).toHaveLength(1);
       expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.inputs[1].recipientId).toBe(MANAGER_ID);
-      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
       expect(uow.callCount).toBe(1);
     });
 
-    it('notifies only the requester when a DRAFT is cancelled', async () => {
+    it('notifies nobody when the owner cancels their own DRAFT', async () => {
       await repository.create(
         makeRequest({ startDate: FUTURE_START, endDate: FUTURE_END })
       );
 
       await service.cancel(makeActor(), 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(1);
-      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.createClients).toEqual([uow.stubClient]);
+      // A DRAFT has no approver and the owner is the only other recipient, so the amended rule
+      // leaves the set EMPTY. The cancellation still succeeds — see the assertions above.
+      expect(notificationService.inputs).toHaveLength(0);
+      expect(notificationService.createClients).toEqual([]);
     });
 
-    it('still cancels and notifies only the requester when a SUBMITTED requester has no manager', async () => {
+    it('still cancels, and notifies nobody, when a SUBMITTED requester has no manager', async () => {
       employeeService = new FakeEmployeeService([
         makeEmployee(REQUESTER_ID, { managerId: null }),
         makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
@@ -1296,8 +1288,7 @@ describe('LeaveService', () => {
       expect(result).toBeDefined();
       expect(result).not.toBeInstanceOf(ConflictError);
       expect(result.status).toBe(LeaveStatus.CANCELLED);
-      expect(notificationService.inputs).toHaveLength(1);
-      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.inputs).toHaveLength(0);
 
       expect(auditService.records).toHaveLength(1);
       const after = auditService.records[0].afterState as Record<string, unknown>;
@@ -1328,7 +1319,55 @@ describe('LeaveService', () => {
       expect(after.approverNotificationSkipped).toBe(true);
     });
 
-    it('still notifies the approver when the actor IS the resolved approver recipient', async () => {
+    it('notifies a requester who is ALSO the recorded approver exactly once', async () => {
+      // The dedupe branch, which no test reached until a mutation showed it was free. The state
+      // is not reachable through `approve` — `assertCanDecide` forbids self-approval — but
+      // `approver_id` is just a column, and a legacy or repaired row can carry the requester's own
+      // id. Written directly into the repository for that reason, which is the only honest way to
+      // exercise it. Without the dedupe this sends two identical notices to one person.
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: REQUESTER_ID,
+        })
+      );
+
+      // Cancelled by a third party, so the actor exclusion does NOT hide the duplicate.
+      await service.cancel(admin, 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+    });
+
+    it('notifies BOTH recipients when a third party (ADMIN) cancels', async () => {
+      // 🔴 THE OTHER HALF OF THE AMENDED RULE, and the suite had no test for it. Every assertion
+      // the amendment touched is about EXCLUDING the actor, so without this the contract would be
+      // satisfied by a method that notified nobody, ever. The ADMIN is neither the requester nor
+      // the recorded approver, so the full set stands.
+      await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
+      await repository.create(
+        makeRequest({
+          status: LeaveStatus.APPROVED,
+          startDate: FUTURE_START,
+          endDate: FUTURE_END,
+          approverId: MANAGER_ID,
+        })
+      );
+
+      await service.cancel(admin, 'lr-1');
+
+      expect(notificationService.inputs).toHaveLength(2);
+      expect(notificationService.inputs.map((n) => n.recipientId)).toEqual([
+        REQUESTER_ID,
+        MANAGER_ID,
+      ]);
+      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+    });
+
+    it('does NOT notify the approver when the actor IS the resolved approver recipient', async () => {
       await balanceRepository.update('balance-1', { usedDays: REQUESTED_DAYS });
       await repository.create(
         makeRequest({
@@ -1341,12 +1380,12 @@ describe('LeaveService', () => {
 
       await service.cancel(manager, 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(2);
-      expect(notificationService.inputs[1].recipientId).toBe(MANAGER_ID);
-      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      expect(notificationService.inputs).toHaveLength(1);
+      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
+      expect(notificationService.createClients).toEqual([uow.stubClient]);
     });
 
-    it('still notifies the owner when they are both canceller and resolved recipient', async () => {
+    it('notifies NOBODY when the only recipients are the actor themselves', async () => {
       employeeService = new FakeEmployeeService([
         makeEmployee(REQUESTER_ID, { managerId: REQUESTER_ID }),
         makeEmployee(MANAGER_ID, { role: EmployeeRole.MANAGER }),
@@ -1372,9 +1411,10 @@ describe('LeaveService', () => {
 
       await service.cancel(makeActor(), 'lr-1');
 
-      expect(notificationService.inputs).toHaveLength(2);
-      expect(notificationService.inputs[1].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.createClients).toEqual([uow.stubClient, uow.stubClient]);
+      // The requester is self-managed, so BOTH resolved recipients are the actor. The set is
+      // empty and the cancellation still succeeds — a notification is never a precondition.
+      expect(notificationService.inputs).toHaveLength(0);
+      expect(notificationService.createClients).toEqual([]);
     });
 
     it('carries the request id and the leave type code in the approver notification message', async () => {
@@ -1389,10 +1429,10 @@ describe('LeaveService', () => {
 
       await service.cancel(makeActor(), 'lr-1');
 
-      const requesterNotification = notificationService.inputs[0];
-      const approverNotification = notificationService.inputs[1];
+      // The owner cancelled, so they are excluded and the APPROVER's notice is the only one.
+      expect(notificationService.inputs).toHaveLength(1);
+      const approverNotification = notificationService.inputs[0];
       // The column is the contract; the message is the human-readable echo of it.
-      expect(requesterNotification.message).toContain('lr-1');
       expect(approverNotification.message).toContain('lr-1');
       expect(approverNotification.message).toContain(LeaveTypeCode.ANNUAL);
     });
@@ -1499,9 +1539,7 @@ describe('LeaveService', () => {
 
       // The skip suppresses only the approver notification — the cancellation and
       // its single requester notification still happen, in one unit of work.
-      expect(notificationService.inputs).toHaveLength(1);
-      expect(notificationService.inputs[0].recipientId).toBe(REQUESTER_ID);
-      expect(notificationService.createClients).toEqual([uow.stubClient]);
+      expect(notificationService.inputs).toHaveLength(0);
       expect(repository.rows.filter((r) => r.reversesRequestId !== null)).toHaveLength(0);
       expect(uow.callCount).toBe(1);
     });
