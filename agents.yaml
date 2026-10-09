@@ -937,7 +937,27 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      max_tokens: 24000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -964,7 +984,27 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      max_tokens: 24000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -994,7 +1034,27 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      max_tokens: 24000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1029,7 +1089,27 @@ agents:
       # the chief model choice once DeepInfra Kimi stability improves.
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 12000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      max_tokens: 24000
     tools:
       builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1068,7 +1148,27 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 3000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      max_tokens: 24000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
