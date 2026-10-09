@@ -48,6 +48,7 @@ function buildApiClient(): TestApiClient {
   const getLeaves: TestApiClient['getLeaves'] = vi.fn().mockResolvedValue(
     [] as LeaveRequestView[],
   );
+  const getPendingDecisions: TestApiClient['getPendingDecisions'] = vi.fn().mockResolvedValue([]);
   const getLeave: TestApiClient['getLeave'] = vi.fn();
   const getBalances: TestApiClient['getBalances'] = vi.fn().mockResolvedValue(
     [] as LeaveBalanceView[],
@@ -62,6 +63,7 @@ function buildApiClient(): TestApiClient {
     login,
     getMe,
     getLeaves,
+    getPendingDecisions,
     getLeave,
     getBalances,
     createLeave,

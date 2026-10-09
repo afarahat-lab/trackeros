@@ -52,6 +52,7 @@ function buildApprovalsService(
 ): IApprovalsService {
   return {
     getQueue: vi.fn(),
+    getPendingDecisions: vi.fn(),
     decide: vi.fn(),
     ...overrides,
   };
