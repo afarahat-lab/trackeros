@@ -102,6 +102,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Depth for the base-branch comparison the .gestalt artifact check makes. A depth-1
+          # checkout has no merge base, and the check would then report every file as added.
+          fetch-depth: 200
 
       - uses: actions/setup-node@v4
         with:
@@ -140,6 +144,23 @@ jobs:
       #
       # The binary is PINNED and fetched from the release rather than run through a third-party
       # action — a secret gate that resolves a moving tag is the wrong shape.
+      # ── 🔴 NO PER-RUN `.gestalt/` ARTIFACTS ON THE DEFAULT BRANCH. Blocking, and PR-only.
+      #
+      # `.gestalt/` is tracked on purpose (git is the transport between activities' fresh clones)
+      # and the ONLY thing keeping the per-run files off `main` is the purge inside the platform's
+      # `merge_feature_to_main`. A branch merged BY HAND never reaches it — which is how 37 of them
+      # landed on 2026-10-09, from a PR whose stated change was two files.
+      #
+      # PR-only (`if: github.event_name == 'pull_request'`) because the platform's own phase pushes
+      # legitimately add these to feature and phase branches; the rule is about the DEFAULT branch.
+      # Needs the base ref, so the checkout above is deepened for this job.
+      - name: No per-run .gestalt artifacts on the base branch (BLOCKING)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=200 origin "+${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          ./scripts/check-gestalt-artifacts.sh "origin/${{ github.base_ref }}"
+
       - name: Secret scan (BLOCKING)
         run: |
           set -euo pipefail
