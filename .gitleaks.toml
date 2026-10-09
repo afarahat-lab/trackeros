@@ -1,0 +1,36 @@
+# Secret-scanning config. The CI step that uses it is BLOCKING — the ONE exception to this
+# workflow's "every check is non-blocking, the Gestalt CI-agent is the sole gate" design.
+#
+# 🔴 WHY IT IS THE EXCEPTION. That design exists so an infra finding cannot fail a phase
+# unrecoverably, and it is right for correctness checks: a broken compile is recoverable by a
+# self-heal, a re-run, or a human. Publishing a credential is not. On 2026-10-09 a `git add -A`
+# committed this repository's `.env` — DATABASE_URL and JWT_SECRET — to a feature branch;
+# rewriting the history within the hour did not help, because GitHub still served the orphaned
+# commits by SHA, and both values had to be rotated. A failed phase costs a re-run; a published
+# secret costs a rotation and cannot be taken back.
+#
+# 🔴 `generic-api-key` IS KEPT even though it produced every false positive in this repository.
+# The obvious fix — disable the noisy entropy rule — is exactly wrong: it is ALSO the rule that
+# detected the `.env` leak. No provider-specific rule fires on `JWT_SECRET=<random>`. So the rule
+# stays and the individual false positives are allowlisted BY MATCHED CONTENT.
+#
+# By CONTENT, never by path. A `.gestalt/**` or `docs/**` path allowlist is the tempting shortcut
+# and it blinds the scanner to a real secret that later lands there — and `.gestalt/` is written by
+# agents, which is precisely where an accidental credential would appear.
+
+[extend]
+useDefault = true
+
+[[rules]]
+  id = "generic-api-key"
+  description = "Generic API key or high-entropy secret"
+  regex = '''(?i)(?:key|api|token|secret|client|passwd|password|auth|access)(?:[0-9a-z\-_\t .]{0,20})(?:[\s|']|[\s|"]){0,3}(?:=|>|:{1,3}=|\|\||:|<=|=>|:=|\?=)(?:'|\"|\s|=|\x60){0,5}([0-9a-z\-_.=]{10,150})(?:['|\"|\n|\r|\s|\x60|;|\\]|$)'''
+  entropy = 3.5
+  [rules.allowlist]
+    regexTarget = "match"
+    regexes = [
+      # Architecture PROSE, not a credential: "Endpoint access: submit/cancel → employee;
+      # approve/reject → manager; …". It appears in docs/ARCHITECTURE.md and, verbatim, inside the
+      # context-agent's own `.gestalt/**` JSON records of writing that document.
+      '''access: submit/cancel''',
+    ]
