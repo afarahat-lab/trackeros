@@ -1,9 +1,0 @@
-[
-  {
-    "path": "docs/ARCHITECTURE.md",
-    "reason": "refusing a section-addressed write of docs/ARCHITECTURE.md: no section titled \"Recommended phases\". Read the file (readFile with section=\u2026) to see its headings.",
-    "agent": "context-agent",
-    "governance": false,
-    "proposed": "1. Migration: `notifications.related_entity_code` + `leave_requests` status/approver_id indexes (1 file). \u2014 DELIVERED, except the `leave_requests` indexes, which were deliberately not added (see *Phase 1 delivered*).\n2. Repositories: `findPendingDecisions` + `related_entity_code` plumbing (2 files). \u2014 DELIVERED (built signature differs from the design; see *Phase 1 delivered*).\n3. `LeaveService.cancel`: notify the approver inside the existing unit of work (1 file). \u2014 DELIVERED (ADR-003).\n4. `LeaveService.listPendingDecisions` (1 file). \u2014 DELIVERED.\n5. `GET /leaves/pending-decisions` route (1 file). \u2014 DELIVERED (see *Phase 5 delivered*).\n6. Tests: approver notification + pending-decisions read (2 files). \u2014 NOT DELIVERED.\n7. (optional) Web approvals queue consumes the new endpoint (2 files). \u2014 NOT DELIVERED."
-  }
-]
