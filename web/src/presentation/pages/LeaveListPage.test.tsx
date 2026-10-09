@@ -11,6 +11,7 @@ function buildLeaveService(
 ): ILeaveService {
   return {
     list: vi.fn(),
+    listPendingDecisions: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     submit: vi.fn(),

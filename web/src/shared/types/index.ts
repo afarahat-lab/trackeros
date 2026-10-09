@@ -76,6 +76,22 @@ export interface LeaveRequestView {
   reversesRequestId: string | null;
 }
 
+/**
+ * Read-only wire projection of a leave request awaiting a decision, as returned
+ * by `GET /leaves/pending-decisions` (oldest `startDate` first). The API scopes
+ * visibility by role and derives membership from status, so consumers render
+ * the list verbatim.
+ */
+export interface PendingDecisionView {
+  requestId: string;
+  employeeId: string;
+  leaveTypeCode: LeaveTypeCode;
+  startDate: Date;
+  endDate: Date;
+  requestedDays: number;
+  status: LeaveStatus;
+}
+
 export interface LoginResponse {
   token: string;
   profile: EmployeeProfile;

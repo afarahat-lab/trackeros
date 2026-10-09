@@ -28,6 +28,7 @@ const createdView = {
 function buildLeaveService(create = vi.fn()): ILeaveService {
   return {
     list: vi.fn(),
+    listPendingDecisions: vi.fn(),
     getById: vi.fn(),
     create,
     submit: vi.fn(),

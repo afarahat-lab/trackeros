@@ -45,6 +45,25 @@ Represents a leave record managed by the `leave` module, including leave request
 - `Employee` — many-to-one
 
 **Reversal provenance (GP-008)** — `reversesRequestId` is `null` for every ordinary request and non-null only on a reversal row, where it equals the id of the original APPROVED request it reverses. It is set at INSERT time only and is never updated. A reversal row is born CANCELLED and is terminal/inert; at most one reversal row may exist per original request (UNIQUE index on `reverses_request_id`). Because a reversal row copies the original's `requestedDays` verbatim, any aggregation summing `requestedDays` MUST filter on `reverses_request_id IS NULL` or it double-counts.
+
+### PendingDecision
+A leave-owned READ PROJECTION of a request awaiting a decision — the approver's queue. It is not an entity, has no id of its own, no table, and no lifecycle of its own: membership is derived from `LeaveRequest.status` on every read, so a request leaves the queue the instant it is cancelled or decided. It lives in `src/modules/leave/leave.model.ts` (exported from the module's `index.ts`) and is deliberately NOT promoted to `src/shared/types/` — it is a leave concept, not a cross-module contract.
+
+| Field | Type | Required |
+|-------|------|----------|
+| requestId | string | true |
+| employeeId | string | true |
+| leaveTypeCode | LeaveTypeCode | true |
+| startDate | Date | true |
+| endDate | Date | true |
+| requestedDays | number | true |
+| status | LeaveStatus | true |
+
+**Membership and ordering** — a request is a member if and only if its status is `SUBMITTED`; `CANCELLED` is never a member state. The queue is ordered `startDate` ASC (oldest first, most urgent), owned by the repository's SQL and never re-sorted by the service or the route. Visibility reuses the module's existing role-scoped rule as BUILT in `LeaveService.listPendingDecisions`, which mirrors `LeaveService.list`'s branch: an ADMIN passes no `employeeIds` filter and sees every SUBMITTED request; a MANAGER passes `[actor.id, ...directReportIds]` — their own requests plus their direct reports' (one level, not transitive); an EMPLOYEE passes `[actor.id]` — their own only. Queue membership and decide authority are separate concerns — the decide guards remain the sole authority on whether a decision may be taken.
+
+**Divergence from the design wording.** The design described the MANAGER scope as their direct reports' requests "and not their own" and the EMPLOYEE scope as "none". The built service includes the actor's own id in both cases (MANAGER: own + direct reports; EMPLOYEE: own only), and `tests/unit/modules/leave/leave.service.test.ts` pins that built scoping (`[MANAGER_ID, REQUESTER_ID, 'emp-report-2']` for a manager, `[[REQUESTER_ID]]` for an employee). The built behaviour is the contract; the same stale wording survives in `docs/ARCHITECTURE.md` → *Business rules (reconciled)* rule 7.
+
+**Web wire projection (`PendingDecisionView`).** The web root mirrors this projection as `PendingDecisionView` in `web/src/shared/types/index.ts` — the same seven fields, with `startDate`/`endDate` as `Date` on the client and ISO 8601 strings on the wire. The asymmetry is deliberate: the backend model stays leave-owned and out of `src/shared/types/`, while the client needs a shared type because `web-infrastructure-api`, `web-leave` and `web-approvals` all name it. It is a view type, not a promotion of the backend model, and it carries no behaviour — `ApprovalsService.getPendingDecisions()` returns the array verbatim.
 ### CreateLeaveRequestDto
 
 | Field | Type | Required |
@@ -74,9 +93,7 @@ Represents a leave record managed by the `leave` module, including leave request
 | endDateFrom | Date | false |
 | endDateTo | Date | false |
 | limit | number | false |
-| offset | number | false |
-
-## balance
+| offset | number | false |## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 

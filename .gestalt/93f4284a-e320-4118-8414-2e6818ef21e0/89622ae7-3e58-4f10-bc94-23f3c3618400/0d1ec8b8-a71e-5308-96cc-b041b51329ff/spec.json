@@ -1,0 +1,245 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "notification",
+      "audit",
+      "employee",
+      "balance"
+    ],
+    "affectedLayers": [
+      "test"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "tests/unit/modules/leave/leave.service.test.ts asserts that cancelling a SUBMITTED request produces EXACTLY TWO notificationService.create calls: one to the requester and one to the requester's direct manager, the latter resolved from employeeService.getEmployeeById(request.employeeId).managerId.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts that cancelling an APPROVED request produces EXACTLY TWO notifications, that the approver recipient is the ORIGINAL row's approverId (not the reversal row's, which is null by construction), and that the approver notification's relatedEntityId is the ORIGINAL request id \u2014 never the reversal row's id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts that a DRAFT cancellation still produces EXACTLY ONE notification (requester only) \u2014 the pre-existing DRAFT assertion is unchanged and no approver notification is added on that path.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts the approver notification's payload: relatedEntityCode equals the request's leaveTypeCode carried verbatim (the canonical lowercase enum value), relatedEntityType === 'leave_request', type === 'leave_request', and relatedEntityId === the original request id.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts a missing recipient never fails the cancellation: a SUBMITTED request whose requester has managerId === null, and an APPROVED request whose approverId === null, both resolve successfully (no throw, no ConflictError), each producing exactly ONE notification (requester only), with the skip recorded in the CANCEL audit entry's afterState.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts self-notification is not suppressed: a manager cancelling a direct report's SUBMITTED request (i.e. the actor IS the resolved recipient) still produces exactly two notifications.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts the CANCEL audit entry's shape is unchanged: exactly one entry per cancellation, action === AuditAction.CANCEL, entityType === LEAVE_REQUEST_ENTITY_TYPE, entityId === the ORIGINAL request id, with beforeState/afterState still populated.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The file asserts transaction containment for the approver notification: uow.callCount === 1 and the FakeUnitOfWork stub PoolClient is forwarded as the trailing client argument to the approver notification's create call (and to the balance read/write and audit record on the same path).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Every pre-existing test case in tests/unit/modules/leave/leave.service.test.ts still passes unmodified \u2014 the file is extended additively only (new cases added; no existing case deleted, renamed, weakened, or reordered in a way that changes its assertions), and the eight fakes plus the fixtures makeRequest/makeActor/makeBalance/makeEmployee/makePolicy are reused rather than redefined.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The suite runs green under the project's Jest runner (npx jest) with no file under src/ modified \u2014 the phase's diff touches only tests/unit/modules/leave/leave.service.test.ts.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Tests only. No file under src/ may be modified \u2014 Phases 1\u20135 (migration, repositories, LeaveService.cancel, LeaveService.listPendingDecisions, the route) are fixed contracts. The phase's entire diff is tests/unit/modules/leave/leave.service.test.ts.",
+    "Additive extension only: every pre-existing test case in tests/unit/modules/leave/leave.service.test.ts must remain byte-for-byte in intent \u2014 no case deleted, renamed, skipped, or weakened to accommodate the new behaviour.",
+    "Reuse the file's existing eight in-memory fakes (FakeLeaveRepository, FakeBalanceRepository, FakeAuditService, FakeNotificationService, FakeValidationService, FakeEmployeeService, FakePolicyService, FakeUnitOfWork), its fixtures (makeRequest, makeActor, makeBalance, makeEmployee, makePolicy), and its recorded-call arrays (notificationService.inputs / createClients, auditService.records / recordClients, repository.createCalls / updateCalls / findReversesCalls, balanceRepository.findByKeyCalls / updateCalls, uow.callCount / stubClient / rolledBack). Do not introduce a new fake, a new fixture, a mocking library, or a second service-construction path.",
+    "Jest is the runner for the API root (HARNESS.json stack.testFramework = Jest); the test file stays under tests/unit/modules/leave/ and imports the service and types through the modules' public entry points (src/modules/leave, src/modules/notification, src/shared/types, src/shared/errors, src/shared/db) exactly as the file already does \u2014 no deep import into a module's internals.",
+    "Strict TypeScript with no implicit any (HARNESS.json constraint no-any): the new cases must type-check under tsc --noEmit without `any`, without non-null assertions that mask a real nullability, and without casting away the fakes' declared interfaces.",
+    "Assertions must be behavioural, not implementation-shaped: assert on the recorded calls and returned values the fakes expose (recipient ids, payload fields, forwarded client, call counts), never on private methods, internal ordering of unrelated steps, or the service's source text.",
+    "The approver-notification assertions must be unconditional where the design is unconditional: \"exactly two for SUBMITTED/APPROVED\" holds regardless of actor identity, so no case may assert suppression on the basis of the actor being the recipient.",
+    "Time-dependent cases must use the file's existing relative-date idiom (a start date strictly in the future, e.g. now + 30 days) rather than a hardcoded absolute date, so the suite does not rot; the already-begun guard is exercised with a start date at or before the current UTC day."
+  ],
+  "outOfScope": [
+    "Sub-phase 2 \u2014 the listPendingDecisions coverage in tests/unit/modules/leave/leave.service.test.ts (ADMIN sees every SUBMITTED request, MANAGER scoping by direct-report ids, verbatim array return, empty array is not an error, no withTransaction and no client forwarded, UnauthorizedError on a missing actor). Owned by a sibling sub-phase; this sub-phase must not be gated on it.",
+    "Sub-phase 3 \u2014 the GET /leaves/pending-decisions route tests in tests/unit/modules/leave/leave.routes.test.ts (200 with the queue, 200 with [], 401 UNAUTHORIZED, actor routed through unchanged, bare-array body shape). Owned by a sibling sub-phase.",
+    "Any change to src/ \u2014 the migration, notification model/repository plumbing, LeaveService.cancel, LeaveService.listPendingDecisions, and the route are delivered and frozen. A test that fails against them is a finding to report, not a licence to edit them.",
+    "Integration or e2e coverage of the cancellation notification (a real PostgreSQL transaction, a real notifications row, smoke.js). This sub-phase is unit-level only, over the in-memory fakes.",
+    "Phase 7 (optional) \u2014 the web approvals queue consuming the endpoint, and any Vitest test under web/. Not part of this feature's committed backend scope.",
+    "Notification delivery: asserting a PENDING -> SENT transition, a BullMQ fanout, or any out-of-band delivery step. The cancellation operation records the notification and never advances its status."
+  ],
+  "ambiguities": [
+    {
+      "description": "The intent says the SUBMITTED case's existing \"exactly one notificationService.create call\" assertion should be updated to \"exactly two, one per recipient\", but the file as it stands already asserts exactly two for the SUBMITTED path (the pre-existing SUBMITTED case asserts notificationService.inputs toHaveLength(1) only in the DRAFT case). It is unclear whether the SUBMITTED case needs a new two-notification assertion added or whether the existing coverage already satisfies the requirement.",
+      "options": [
+        "Add an explicit two-notification assertion to the SUBMITTED cancellation case (and assert the second recipient is the manager), leaving the DRAFT case at one",
+        "Treat the existing SUBMITTED coverage as sufficient and add only the missing cases (missing recipient, self-notification, relatedEntityCode payload)",
+        "Add a dedicated new SUBMITTED two-notification case alongside the existing one rather than editing it"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent requires asserting the skip is \"recorded in the CANCEL audit entry's metadata\", but the built service writes the marker as a top-level key on the afterState object (approverNotificationSkipped: true), not in a nested metadata field. The test must assert whichever shape the built service actually produces, and the intent's wording (\"metadata\") does not match it.",
+      "options": [
+        "Assert the built shape: afterState.approverNotificationSkipped === true on the single CANCEL entry",
+        "Assert a nested afterState.metadata.approverNotificationSkipped (would fail against the built service)",
+        "Assert only that the cancellation succeeds and exactly one notification is written, without pinning the marker's location"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent lists \"APPROVED cancellation (both the in-place legacy path and the GP-008 reversal path)\" as needing two notifications, but the built service has no in-place APPROVED path \u2014 every APPROVED cancellation goes through the GP-008 reversal insert. It is unclear whether a second, non-existent in-place APPROVED case is expected.",
+      "options": [
+        "Cover only the GP-008 reversal path for APPROVED (the only built path) and note the in-place variant does not exist",
+        "Add a case asserting an APPROVED cancellation never mutates the original in place, as the negative form of the same requirement",
+        "Skip APPROVED coverage beyond what already exists"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The intent simultaneously requires \"every pre-existing case must stay unchanged\" and \"update the existing 'exactly one notificationService.create call' assertion for the SUBMITTED case to 'exactly two'\". Those two instructions conflict if the assertion in question lives inside a pre-existing case.",
+      "options": [
+        "Prefer additive: leave every existing case untouched and add new cases that assert the two-notification behaviour",
+        "Prefer the update: amend the existing SUBMITTED case's count assertion in place, treating that as the one sanctioned edit",
+        "Do both: amend the existing case and add a dedicated case for the approver recipient's identity"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The intent does not say whether the approver notification's message text is asserted. The built service composes it inline (naming the request id and the leave type), and the reconciled business rules say the message carries both values, but the intent only pins relatedEntityCode/relatedEntityType/type.",
+      "options": [
+        "Assert only the machine-readable fields (relatedEntityId, relatedEntityType, relatedEntityCode, type, recipientId) and leave message text unpinned",
+        "Also assert the message contains the request id and the leave type code",
+        "Assert the message equals the exact built string"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "LeaveRequest (cancellation lifecycle)",
+      "mustExistOrExtend": true,
+      "invariant": "A DRAFT or SUBMITTED request is cancelled IN PLACE (status -> CANCELLED, cancelledBy/cancelledAt set, reversesRequestId stays null). An APPROVED request is never mutated: the original row stays byte-identical and still reads APPROVED, and a NEW row is inserted with status CANCELLED and reversesRequestId = the original id. CANCELLED is terminal \u2014 a second cancellation of an already-reversed original fails with ConflictError(409) and performs no write. Cancellation is blocked once startDate <= the current UTC day."
+    },
+    {
+      "entity": "Notification",
+      "mustExistOrExtend": true,
+      "invariant": "A cancellation notification is created PENDING and is never advanced to SENT by the cancellation operation. relatedEntityCode carries the related entity's code (for a leave request, the canonical lowercase leaveTypeCode) and is nullable; the cancellation path always supplies it for the approver notification. type stays the existing literal 'leave_request' \u2014 no new discriminator."
+    },
+    {
+      "entity": "AuditLog (CANCEL entry)",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one CANCEL entry per successful cancellation, with entityId = the ORIGINAL request id (never the reversal row's id), entityType = LEAVE_REQUEST_ENTITY_TYPE, and beforeState/afterState populated. The entry's shape is unchanged by this feature; only the afterState payload may carry a marker recording that the approver notification was skipped."
+    },
+    {
+      "entity": "LeaveBalance (cancellation release)",
+      "mustExistOrExtend": true,
+      "invariant": "A DRAFT cancellation performs no balance read and no balance write. A SUBMITTED cancellation decrements pendingDays by the request's requestedDays and leaves usedDays untouched. An APPROVED cancellation decrements usedDays by the original's requestedDays and leaves pendingDays untouched. The released amount is the ORIGINAL request's requestedDays, released exactly once."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel(actor, requestId) \u2014 approver notification emission",
+      "authRule": "Unchanged from the existing contract: assertAuthenticated first (UnauthorizedError on a missing/blank actor id, ForbiddenError on a role outside EmployeeRole), then assertCanCancel (owner for DRAFT/SUBMITTED; direct manager or ADMIN for APPROVED). The notification recipient is resolved server-side from the request row and is never taken from the caller.",
+      "idempotent": false,
+      "errorSemantics": "A missing recipient (null managerId on a SUBMITTED request, null approverId on an APPROVED request) is NOT an error: the cancellation succeeds and only the approver notification is skipped, with the skip recorded in the CANCEL audit entry's afterState. A failure to insert the approver notification throws inside the unit of work, rolls the whole cancellation back, and surfaces the underlying error \u2014 the cancelled request is never left committed without its notification record. A repeat cancellation fails its state guard with ConflictError(409) and emits nothing."
+    },
+    {
+      "operation": "INotificationService.create(input, client?) \u2014 approver cancellation notification",
+      "authRule": "Not applicable \u2014 internal service call, no HTTP boundary.",
+      "idempotent": false,
+      "errorSemantics": "Called exactly once per approver recipient per cancellation, inside the same unit of work as the status change, with the transaction's PoolClient forwarded as the trailing argument. The interface itself is unchanged by this feature \u2014 no new method, no new parameter, no new type value."
+    },
+    {
+      "operation": "ILeaveRepository.findByReversesRequestId(reversesRequestId, client?) \u2014 double-cancel guard",
+      "authRule": "Not applicable \u2014 internal repository call.",
+      "idempotent": true,
+      "errorSemantics": "Returns the existing reversal row or null; a non-null result makes the APPROVED cancellation throw ConflictError(409) before any write. The read is performed inside the transaction with the forwarded client."
+    },
+    {
+      "operation": "IBalanceRepository.findByKey(..., client?, forUpdate?) \u2014 cancellation balance read",
+      "authRule": "Not applicable \u2014 internal repository call.",
+      "idempotent": true,
+      "errorSemantics": "On the SUBMITTED and APPROVED cancellation paths the read is taken with forUpdate = true inside the transaction, because the same transaction goes on to write the row; the DRAFT path takes no read at all. A missing balance row surfaces as NotFoundError(404)."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The new cases must construct the service and drive it through the SAME eight-fake wiring the file's existing beforeEach already uses (LeaveService(repository, balanceRepository, auditService, notificationService, validationService, employeeService, policyService, uow)) \u2014 no second construction path, no partial wiring, no real collaborator.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "Assertions on the approver notification must read the same recorded-call arrays the existing approve/reject/cancel cases read \u2014 notificationService.inputs and notificationService.createClients \u2014 and index them positionally (requester first, approver second) exactly as the existing cases index inputs[0].",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The transaction-containment assertions must use the file's existing idiom: uow.stubClient as the expected forwarded client and uow.callCount === 1, matching how the submit/approve/reject cases already assert client forwarding.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The approver notification's relatedEntityCode must be asserted against the canonical lowercase LeaveTypeCode enum value (LeaveTypeCode.ANNUAL === 'annual'), imported from src/shared/types \u2014 never a hand-written string literal that could drift from the enum.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The audit-shape assertions must use the exported LEAVE_REQUEST_ENTITY_TYPE constant and AuditAction.CANCEL, matching the existing cancel cases, rather than the raw string 'leave_request'.",
+      "referencePath": "src/shared/types/index.ts"
+    },
+    {
+      "requirement": "The missing-recipient cases must be built by overriding the existing makeEmployee fixture's managerId to null (and the existing makeRequest fixture's approverId to null) \u2014 the same override idiom the file already uses \u2014 so the null state is expressed through the fixtures rather than by mutating fake internals.",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The approver-notification payload assertions must match the shape the built service composes inline in src/modules/leave/leave.service.ts (type 'leave_request', relatedEntityType 'leave_request', relatedEntityId = original request id, relatedEntityCode = request.leaveTypeCode) \u2014 the test asserts the built contract, it does not redefine it.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The skip marker asserted on the CANCEL audit entry's afterState must be the exact key the built service writes (approverNotificationSkipped) \u2014 read it off src/modules/leave/leave.service.ts rather than inventing a marker name.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The approver-notification assertions must not contradict the reconciled business rules for this feature (exactly one approver notification per SUBMITTED/APPROVED cancellation; DRAFT notifies no approver; self-notification not suppressed; recipient resolved from the request row, never the caller).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.service.ts \u2014 LeaveService.cancel",
+      "why": "The behaviour under test. The test file must exercise the built cancel paths (DRAFT/SUBMITTED in place, APPROVED reversal) and assert the approver notification the service emits inside its single uow.withTransaction callback."
+    },
+    {
+      "target": "src/modules/notification/notification.model.ts \u2014 CreateNotificationInput.relatedEntityCode",
+      "why": "The optional nullable field the approver notification supplies; the test asserts it is carried verbatim as the leave type code and that the requester notification (which omits it) is unaffected."
+    },
+    {
+      "target": "src/modules/employee \u2014 IEmployeeService.getEmployeeById(...).managerId",
+      "why": "The SUBMITTED recipient resolution path. The test drives it through FakeEmployeeService's seeded rows and asserts the resolved managerId is the second notification's recipient, and that a null managerId skips only that notification."
+    },
+    {
+      "target": "src/shared/db \u2014 IUnitOfWork.withTransaction / FakeUnitOfWork",
+      "why": "The transaction boundary the approver notification must join. The test asserts uow.callCount === 1 and that the stub PoolClient reaches the approver notification's create call."
+    },
+    {
+      "target": "src/modules/audit \u2014 IAuditService.record / AuditAction.CANCEL",
+      "why": "The CANCEL entry whose shape must stay unchanged and whose afterState carries the skip marker when no approver recipient resolves."
+    },
+    {
+      "target": "src/modules/leave/leave.model.ts \u2014 LeaveRequest.reversesRequestId / PendingDecision",
+      "why": "The reversal role the APPROVED path creates; the test asserts the reversal row's id differs from the original, that reversesRequestId points at the original, and that the approver notification is keyed to the original id."
+    }
+  ]
+}

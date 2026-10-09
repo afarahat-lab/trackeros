@@ -24,3 +24,7 @@ node_modules/
 
 # throwaway smoke-check database
 .smoke.sqlite
+
+# Local environment — never committed. It carries DATABASE_URL and JWT_SECRET.
+.env
+.env.local

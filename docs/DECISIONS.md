@@ -35,3 +35,255 @@ Description: Trackeros — a corporate operations web and mobile platform for
   null checks).
 Stack: TypeScript / Node.js / React / PostgreSQL
 Architecture: Modular monolith (corporate-ops-web-mobile template, tier 1)
+
+## ADR-002 — `notifications.related_entity_code` and the entity-correlation index
+
+Date: 2026-09-15
+Status: Accepted
+
+Decision: `notifications` gains a nullable, generic `related_entity_code` text column and the
+`(related_entity_type, related_entity_id)` index, both in ONE new migration
+(`migrations/20260915000000_add_related_entity_code_to_notifications.js`). The column is
+nullable, has no default, and is not backfilled.
+
+Context: the cancellation-notification feature needs the approver to see the leave type without
+a second lookup, and the entity-correlation index was already documented in
+`docs/ARCHITECTURE.md` but was absent from the initial migration (which creates only
+`(recipient_id, status)`).
+
+Alternatives rejected:
+- Editing `20260913000000_initial_schema.js` to add the index: an applied migration is not
+  rewritten; the documented-vs-built drift is fixed forward, in a new migration.
+- A leave-specific column, or a new table: the column is generic — a code for whatever
+  `related_entity_type` names — so `notifications` stays one concept.
+- A NOT NULL column with a backfill: notifications unrelated to a coded entity, and every row
+  written before this migration, legitimately carry no code.
+- Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing
+  `(employee_id, status)` index already serves the pending-decisions predicate, and
+  `approver_id` needs no index for that query.
+
+Consequences: `related_entity_code` is nullable and deliberately unindexed; the repository and
+service never synthesize a non-null value. The column is plumbed end-to-end through
+`notification.model.ts` / `notification.repository.ts` (`Notification.relatedEntityCode`,
+`NotificationRow`, `mapRow`, `COLUMNS`, the `create` INSERT column + `input.relatedEntityCode ?? null`);
+`INotificationService`/`NotificationService` are unchanged. Its first production call site is the
+approver cancellation notification (ADR-003).
+
+## ADR-003 — Approver cancellation notification: recipient resolution before the unit of work, and a boolean skip marker in the audit `afterState`
+
+Date: 2026-09-15
+Status: Accepted
+
+Decision: `LeaveService.cancel` emits a second `notificationService.create` call — to the
+approver — for a SUBMITTED or APPROVED cancellation, inside the existing
+`uow.withTransaction` callback with the same `client`. The recipient is resolved by a private
+`resolveApproverRecipient(request): Promise<string | null>` called ONCE per cancellation,
+BEFORE the transaction opens. When the resolved recipient is `null` and the request was
+SUBMITTED or APPROVED, the CANCEL audit entry's `afterState` is the row spread with a single
+boolean key `approverNotificationSkipped: true`; the cancellation still succeeds.
+
+Context: the approver needs to know a request they would have decided (or did decide) was
+cancelled, and the notification must be atomic with the status change. Two questions the design
+left open had to be settled in code: where recipient resolution happens, and how a missing
+recipient is recorded.
+
+Alternatives rejected:
+- Resolving the recipient inside the `withTransaction` callback: `IEmployeeService.getEmployeeById`
+  takes no `PoolClient`, so the employee read cannot join the transaction; calling it inside the
+  callback would read outside the transaction while appearing to be inside it. Resolution is
+  therefore hoisted above `uow.withTransaction`, and only the notification INSERT joins it.
+- Failing the cancellation when no recipient exists (ConflictError / assert-and-fail): a null
+  `managerId` is a real domain case and a null `approverId` on an APPROVED row is a reachable
+  legacy state; neither is an error, and neither may block a legitimate cancellation.
+- Escalating to an ADMIN, broadcasting, or backfilling a recipient: the notification set is a
+  function of the state change, not of who is available to receive it.
+- A nested metadata object or a free-text suffix for the skip marker: a single boolean key merged
+  into the existing `afterState` keeps the audit entry's shape (action, entityType, entityId,
+  beforeState/afterState) unchanged and is directly assertable.
+- Suppressing self-notification when the cancelling actor IS the resolved recipient: suppression
+  would make the notification count conditional on actor identity; the count stays unconditional
+  at two for SUBMITTED/APPROVED.
+- Reading the recipient or the notification's `relatedEntityId` from the GP-008 reversal row: the
+  reversal row carries `approverId = null` by construction, so that would silently drop every
+  notification on the reversal path. Both are read from the ORIGINAL row.
+
+Consequences: the approver notification is keyed to the ORIGINAL request id and carries
+`relatedEntityCode = request.leaveTypeCode`; `type` stays the literal `'leave_request'` and no new
+discriminator, DTO, enum member, or shared type is introduced. A missing recipient is visible in
+the audit trail rather than silent, and is never repaired. The requester notification and the
+CANCEL audit entry are otherwise byte-identical to before. `resolveApproverRecipient` is private
+and is NOT added to `ILeaveService`. The approver notification is created `PENDING` and is not
+advanced by the cancellation.
+
+## ADR-004 — `GET /leaves/pending-decisions` is registered before `GET /leaves/:id`, and returns the `PendingDecision` projection
+Decision: the new static route `GET /leaves/pending-decisions` is registered inside
+`leaveRoutes(fastify)` BEFORE the existing parametric `GET /leaves/:id`, and its 200 body is a
+bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows.
+
+Context: Fastify matches routes in registration order, so a static path registered after a
+parametric sibling is shadowed by it. Registered after `GET /leaves/:id`, a request to
+`/leaves/pending-decisions` resolves as `id = 'pending-decisions'`, reaches `getById`, and
+returns 404 — a silent, order-dependent failure that no type check or unit test of the handler
+would catch. Separately, the queue renders only what a decision needs, and the design's
+`findPendingDecisions(actorId, actorRole)` signature would have put role scoping in the
+repository.
+
+Alternatives rejected:
+- Registering the route after `GET /leaves/:id` and relying on a path-parameter constraint or a
+  UUID regex on `:id`: it would make the parametric route's contract carry knowledge of every
+  static sibling, and the failure mode (404) is indistinguishable from a genuinely missing
+  request.
+- Returning full `LeaveRequest` rows and letting the client project: it would expose
+  `approverId`, `approvalComment`, `reason` and the cancellation fields to a queue view that
+  renders none of them, and would make the response shape drift with the entity.
+- Passing `actorId`/`actorRole` into the repository and re-expressing the role-scoped visibility
+  rule in SQL: the rule already lives in `LeaveService.list`, and a second copy in the
+  repository would be a second place to keep in sync. The service mirrors `list`'s branch and
+  passes `employeeIds`; the repository applies only the `employeeIds` filter and the
+  `status = 'SUBMITTED'` predicate.
+
+Consequences: the route handler is a thin pass-through (`resolveActor` -> service -> 200) with no
+query parsing, no role branch and no SQL, and the ordering comment in the file is load-bearing —
+moving the registration below `GET /leaves/:id` breaks the endpoint. `PendingDecision` stays in
+`src/modules/leave/leave.model.ts` and is exported from the module's `index.ts`; it is not
+promoted to `src/shared/types/`. The endpoint is not added to `PUBLIC_PATHS`, so it requires a
+valid bearer token.
+
+**Test coverage (added by the feature's test phase, then hardened).** The ordering constraint is
+no longer protected only by the comment and this ADR: `tests/unit/modules/leave/leave.routes.test.ts`
+registers `leaveRoutes` and injects `GET /leaves/pending-decisions` through the real Fastify
+router. The block now holds 11 cases. The original 5 assert 200 with the queue, 200 with `[]`,
+401 `UNAUTHORIZED` with the service never called, the resolved actor forwarded unchanged, and a
+bare array of exactly the seven `PendingDecision` fields. A follow-up hardening pass added 6
+more, of which two bear directly on this ADR:
+
+- **The ordering is now asserted for its own sake.** A case builds an instance whose service
+  carries BOTH `listPendingDecisions` and a `getById` that throws `NotFoundError`; the static
+  path returns 200 and `getById` is asserted `not.toHaveBeenCalled()`. Previously the ordering
+  was pinned only indirectly — the 200 assertions would have failed had the parametric route
+  won, but nothing named the shadowing as the cause. Registering the route after
+  `GET /leaves/:id` now fails a test that says why.
+- **The pass-through is pinned end to end.** A MANAGER case asserts the actor object is
+  forwarded to the service unchanged (so the route does not scope the queue itself); a reversed
+  fixture comes back in the same order, proving no re-sort or cap; dates are asserted as ISO
+  8601 strings on the wire; and a service throw yields 500 `{ error: 'Internal Server Error' }`
+  with the dependency's message absent from the body.
+
+The projection's shape is likewise pinned by the field-set assertion, and
+`LeaveService.listPendingDecisions`'s role scoping and verbatim array return are covered in
+`tests/unit/modules/leave/leave.service.test.ts`.
+
+## ADR-005 — The web approvals module exposes two queue reads: the client-filtered `getQueue()` and the server-scoped `getPendingDecisions()`
+
+Date: 2026-09-15
+Status: Accepted
+
+Decision: `ApprovalsService` gains `getPendingDecisions()`, a verbatim pass-through to
+`leaveService.listPendingDecisions()` (which delegates to `IApiClient.getPendingDecisions()` ->
+`GET /leaves/pending-decisions`). The pre-existing `getQueue()` — which fetches `GET /leaves` and
+filters client-side to `status === SUBMITTED && employeeId !== profile.id` — is kept unchanged,
+and `ApprovalsPage` still consumes it. The module therefore exposes two queue reads with
+different scoping.
+
+Context: the backend endpoint scopes visibility by role and orders by `start_date ASC`, so the
+client must not re-derive either. The layering map forbids `web-approvals -> web-infrastructure-api`,
+so the read had to arrive through `web-leave`; `ILeaveService` had no suitable pass-through, so
+one was added there rather than importing the api-client into approvals.
+
+Alternatives rejected:
+- Replacing `getQueue()` with `getPendingDecisions()` and rewiring `ApprovalsPage`: it would
+  change the page's rendered shape (`ApprovalsQueueItem` carries `employeeName`, always `null`)
+  and its tests in a phase scoped to the service surface, and the two reads are not equivalent —
+  `getQueue()` excludes the viewer's own requests client-side, while the endpoint's role scoping
+  includes them.
+- Importing `ApiClient` into `web-approvals` to call the endpoint directly: it would add the
+  `web-approvals -> web-infrastructure-api` edge the map deliberately omits.
+- Re-sorting or re-filtering the endpoint's array in the service: the backend owns both the
+  SUBMITTED predicate and the ordering; a second copy would be a second place to keep in sync.
+
+Consequences: `PendingDecisionView` (7 fields) is added to `web/src/shared/types/index.ts` as the
+wire projection of the backend's leave-owned `PendingDecision`; it is a client view type, not a
+promotion of the backend model. `getPendingDecisions()` returns the array by identity — no copy,
+no sort, no filter — and an empty queue is a normal `[]`, not an error. Widening `IApiClient` and
+`ILeaveService` forced mechanical fixture completions in twelve existing test files (four module
+service tests, eight presentation tests); no assertion changed. `ApprovalsPage` and the guards
+are unchanged, so the new read currently has no presentation consumer.
+
+---
+
+# Operator clarification decisions
+
+Answers an operator gave to a clarification the platform raised, recorded so the same question is
+not asked again. Each is binding on this project until superseded here.
+
+Numbered `CLARIFY-nnn` rather than `ADR-nnn` on purpose: an ADR records a decision the team reasoned
+to, while these are answers to questions the platform could not resolve from the codebase. They
+carry the same authority and a different provenance, and conflating the two would lose that.
+
+## CLARIFY-001..008 — Cancellation notifications and the pending-decisions queue
+
+Date: 2026-10-09
+Status: Accepted (feature `93f4284a`, confirmed by the platform owner)
+Context: The architecture crew parked feature `93f4284a` on eight foundational questions before any
+phase was built. Twenty questions were asked across the specialist slices; within-run grouping
+presented eight.
+
+**The through-line of all eight: a missing recipient never fails a cancellation, and the
+notification set is a function of the STATE CHANGE and the ACTOR, never of who happens to be
+available.**
+
+1. **A SUBMITTED request cancelled when the requester has no direct manager** (`managerId` is null)
+   notifies nobody, records only the audit entry, and SUCCEEDS (200). No transitive escalation to
+   the manager's manager, no ADMIN broadcast, no `ConflictError`. A cancellation is the requester
+   withdrawing their own request; refusing it because the org chart is incomplete punishes the user
+   for data they do not control.
+
+2. **An APPROVED request cancelled when `approverId` is null** skips the approver notification and
+   succeeds — deliberately the same treatment as (1). No backfill migration in this feature and no
+   assert-and-fail: a legacy null `approverId` is a known, reachable state, and making it fatal
+   turns old data into an outage. The skip is recorded in the audit `afterState` as
+   `approverNotificationSkipped` so the gap is visible rather than inferred.
+
+3. **The approver notification ACCOMPANIES the requester's; it does not replace it.** Subject to
+   (6), a SUBMITTED or APPROVED cancellation produces one notice per recipient and a DRAFT produces
+   only the requester's — matching the existing rule that a DRAFT cancellation touches no balance.
+   No recipient list on the `notifications` table.
+
+4. **The leave type is persisted in a nullable `notifications.related_entity_code` column**, with
+   the request id in `related_entity_id`. Generic rather than leave-specific; one migration, no new
+   table. Free text is not machine-readable and the leave type is not derivable from the request id
+   without the join the requirement forbids. The message may also name the type for humans, but the
+   column is the contract.
+
+5. **`GET /leaves/pending-decisions` returns SUBMITTED requests only**, ordered `start_date ASC`
+   (oldest first). Visibility follows the EXISTING role-scoped rule used by `list` / `getById`: an
+   ADMIN sees every SUBMITTED request, a MANAGER sees their direct reports'. `approver_id` needs no
+   index for this query.
+
+   🔴 **KNOWN GAP, deliberately accepted.** The queue is status-only: it does NOT exclude requests
+   the caller may not decide — a MANAGER's own SUBMITTED request, or one whose requester is not
+   their direct report, still appears. Decide-scoping was deferred so this endpoint would not grow a
+   second copy of the `assertCanDecide` rule, which is owned by `leave`. The consequence is that the
+   queue can list a request its reader cannot act on. Closing it means asking the owning module,
+   not re-deciding here.
+
+6. **Every recipient is notified EXCEPT the actor who performed the cancellation** (amended
+   2026-10-09; the original answer was "always notify, even when actor === recipient"). The
+   overwhelmingly common cancellation is the requester cancelling their own request, so the
+   original rule sent almost every cancellation a notice to someone about their own action. The
+   recipient set is therefore built once, the actor removed, and duplicates collapsed by recipient
+   id — so a requester who is also the recorded approver hears once, and a cancellation whose only
+   recipients are the actor notifies nobody and still succeeds.
+
+7. **On the GP-008 reversal path the notification IS emitted**, with the recipient read from the
+   ORIGINAL row's `approverId` and `related_entity_id` keyed to the ORIGINAL request id — never the
+   reversal row's. The reversal row carries a null `approverId` by construction, so reading the
+   recipient off it would silently drop every notification on that path.
+
+8. **The `(related_entity_type, related_entity_id)` index is added in this feature's migration**,
+   alongside `related_entity_code`. `docs/ARCHITECTURE.md` already claimed the index existed while
+   the initial migration created only `(recipient_id, status)`; this feature is the first whose
+   entity linkage on `notifications` is load-bearing, so the drift becomes reachable here. The rest
+   of the initial migration is NOT audited against the documented schema as part of this feature.
+
+The existing cancellation audit entry is unchanged in shape.

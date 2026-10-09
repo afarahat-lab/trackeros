@@ -18,6 +18,7 @@ import { IUnitOfWork, PgUnitOfWork } from '../../shared/db';
 import { IBalanceRepository, LeaveBalance, PgLeaveBalanceRepository } from '../balance';
 import { IAuditService, AuditLog, AuditService, PgAuditLogRepository } from '../audit';
 import {
+  CreateNotificationInput,
   INotificationService,
   NotificationService,
   PgNotificationRepository,
@@ -26,7 +27,7 @@ import { IValidationService, ValidationService } from '../validation';
 import { IEmployeeService, EmployeeService, PgEmployeeRepository } from '../employee';
 import { IPolicyService, createPolicyService } from '../policy';
 import { ILeaveRepository, PgLeaveRequestRepository } from './leave.repository';
-import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
+import { CreateLeaveRequestInput, LeaveRequest, PendingDecision } from './leave.model';
 import { LEAVE_REQUEST_ENTITY_TYPE } from '../../shared/types';
 import { startOfUtcDay, addMonths, periodContaining } from '../../shared/date';
 
@@ -46,6 +47,7 @@ export interface ILeaveService {
   reject(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   cancel(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   list(actor: LeaveActor, params: LeaveRequestQueryParams): Promise<LeaveRequest[]>;
+  listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]>;
   getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest>;
   getHistory(actor: LeaveActor, requestId: string): Promise<AuditLog[]>;
 }
@@ -303,6 +305,31 @@ export class LeaveService implements ILeaveService {
       throw new ConflictError('Leave that has already begun cannot be cancelled');
     }
 
+    // Recipient resolution reads the employee, not the transaction, so it happens
+    // before the unit of work opens (getEmployeeById takes no client). A null
+    // recipient is never fatal: the notification set is a function of the state
+    // change, and a missing approver only suppresses the second notification.
+    const approverRecipient = await this.resolveApproverRecipient(request);
+    const approverNotificationSkipped =
+      approverRecipient === null &&
+      (request.status === LeaveStatus.SUBMITTED || request.status === LeaveStatus.APPROVED);
+
+    // OWNER DECISION (amended): notify every recipient EXCEPT the actor who performed the
+    // cancellation. The notification set is still a function of the state change — the actor only
+    // removes themselves from it, because telling someone about their own action is noise.
+    //
+    // Expressed as a SET MINUS rather than two conditionals at the two call sites. The set is the
+    // rule; a conditional per site is the rule written twice, and this method already has two
+    // notification sites (the GP-008 reversal path and the in-place update) that must not drift.
+    // Deduplicated by recipient id, so a requester who is also the recorded approver is notified
+    // once, not twice.
+    const cancellationNotices = this.cancellationRecipients(
+      actor,
+      request,
+      requestId,
+      approverRecipient,
+    );
+
     return this.uow.withTransaction(async (client) => {
       const now = new Date();
 
@@ -363,22 +390,19 @@ export class LeaveService implements ILeaveService {
             entityType: LEAVE_REQUEST_ENTITY_TYPE,
             entityId: request.id,
             beforeState: request,
-            afterState: reversal,
+            afterState: approverNotificationSkipped
+              ? { ...reversal, approverNotificationSkipped: true }
+              : reversal,
           },
           client,
         );
 
-        await this.notificationService.create(
-          {
-            recipientId: request.employeeId,
-            type: 'leave_request',
-            title: 'Leave request cancelled',
-            message: `Your leave request ${requestId} was cancelled.`,
-            relatedEntityType: 'leave_request',
-            relatedEntityId: requestId,
-          },
-          client,
-        );
+        // GP-008: the reversal row carries a null approverId by construction, so the approver
+        // recipient was read from the ORIGINAL row and every notice is keyed to the ORIGINAL
+        // request id — never the reversal row's id.
+        for (const notice of cancellationNotices) {
+          await this.notificationService.create(notice, client);
+        }
 
         return reversal;
       }
@@ -419,22 +443,18 @@ export class LeaveService implements ILeaveService {
           entityType: LEAVE_REQUEST_ENTITY_TYPE,
           entityId: requestId,
           beforeState: request,
-          afterState: updated,
+          afterState: approverNotificationSkipped
+            ? { ...updated, approverNotificationSkipped: true }
+            : updated,
         },
         client,
       );
 
-      await this.notificationService.create(
-        {
-          recipientId: request.employeeId,
-          type: 'leave_request',
-          title: 'Leave request cancelled',
-          message: `Your leave request ${requestId} was cancelled.`,
-          relatedEntityType: 'leave_request',
-          relatedEntityId: requestId,
-        },
-        client,
-      );
+      // DRAFT notifies nobody else, matching the rule that a DRAFT cancellation
+      // touches no balance. SUBMITTED notifies the requester's direct manager — minus the actor.
+      for (const notice of cancellationNotices) {
+        await this.notificationService.create(notice, client);
+      }
 
       return updated;
     });
@@ -453,6 +473,24 @@ export class LeaveService implements ILeaveService {
     // ADMIN: no employeeIds filter — sees every request.
 
     return this.repository.findByQuery(query);
+  }
+
+  async listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]> {
+    this.assertAuthenticated(actor);
+
+    // The queue is a status-filtered read of the SAME role-scoped visibility rule
+    // `list` applies, so it mirrors `list`'s branch rather than restating it. The
+    // repository owns the SUBMITTED-only predicate and the start_date ASC order.
+    let employeeIds: string[] | undefined;
+    if (actor.role === EmployeeRole.EMPLOYEE) {
+      employeeIds = [actor.id];
+    } else if (actor.role === EmployeeRole.MANAGER) {
+      const reports = await this.employeeService.getEmployeesByManagerId(actor.id);
+      employeeIds = [actor.id, ...reports.map((e) => e.id)];
+    }
+    // ADMIN: no employeeIds filter — sees every pending decision.
+
+    return this.repository.findPendingDecisions(employeeIds);
   }
 
   async getById(actor: LeaveActor, requestId: string): Promise<LeaveRequest> {
@@ -544,6 +582,84 @@ export class LeaveService implements ILeaveService {
     if (employee.managerId !== actor.id) {
       throw new ForbiddenError('Canceller must be the requester manager');
     }
+  }
+
+  /**
+   * Every cancellation notice to send, one per recipient, EXCLUDING the actor.
+   *
+   * OWNER DECISION (amended 2026-10-09): "notify every recipient except the actor who performed
+   * the cancellation". The previous rule was "always notify, even when actor === recipient", and
+   * the reason it changed is the one the original question raised: a user receiving a notification
+   * about their own action is noise, and the overwhelmingly common cancellation is the requester
+   * cancelling their own request — so under the old rule almost every cancellation sent the
+   * requester a notice about something they had just done themselves.
+   *
+   * PURE, and the set is built ONCE for both write paths (the GP-008 reversal and the in-place
+   * update). Those paths differ in which row they write, never in who hears about it, and a rule
+   * expressed at each site separately is a rule that drifts the first time one site changes.
+   *
+   * Deduplicated by recipient id: a requester who is also the recorded approver hears once.
+   * `null` recipients are dropped here rather than guarded at the call sites — a DRAFT, a
+   * SUBMITTED request whose requester has no direct manager, and an APPROVED request with a null
+   * approverId all mean "nobody to notify", which is a legal outcome and never fatal.
+   */
+  private cancellationRecipients(
+    actor: LeaveActor,
+    request: LeaveRequest,
+    requestId: string,
+    approverRecipient: string | null,
+  ): CreateNotificationInput[] {
+    const notices: CreateNotificationInput[] = [
+      {
+        recipientId: request.employeeId,
+        type: 'leave_request',
+        title: 'Leave request cancelled',
+        message: `Your leave request ${requestId} was cancelled.`,
+        relatedEntityType: 'leave_request',
+        relatedEntityId: requestId,
+      },
+    ];
+    if (approverRecipient !== null) {
+      notices.push({
+        recipientId: approverRecipient,
+        type: 'leave_request',
+        title: 'Leave request cancelled',
+        message: `Leave request ${requestId} (${request.leaveTypeCode}) was cancelled.`,
+        relatedEntityType: 'leave_request',
+        relatedEntityId: requestId,
+        relatedEntityCode: request.leaveTypeCode,
+      });
+    }
+
+    const seen = new Set<string>();
+    return notices.filter((notice) => {
+      if (notice.recipientId === actor.id) {
+        return false;
+      }
+      if (seen.has(notice.recipientId)) {
+        return false;
+      }
+      seen.add(notice.recipientId);
+      return true;
+    });
+  }
+
+  /**
+   * The recipient of the approver-side cancellation notification. Reads the
+   * employee record (never the transaction: getEmployeeById takes no client) and
+   * returns null rather than throwing when there is nobody to notify — a DRAFT,
+   * a SUBMITTED request whose requester has no direct manager, or an APPROVED
+   * request with a null approverId (a known, reachable legacy state).
+   */
+  private async resolveApproverRecipient(request: LeaveRequest): Promise<string | null> {
+    if (request.status === LeaveStatus.APPROVED) {
+      return request.approverId;
+    }
+    if (request.status === LeaveStatus.SUBMITTED) {
+      const employee = await this.employeeService.getEmployeeById(request.employeeId);
+      return employee.managerId;
+    }
+    return null;
   }
 
   /**

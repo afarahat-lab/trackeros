@@ -5,6 +5,7 @@ import type {
   LeaveTypeCode,
   LeaveRequestView,
   EmployeeProfile,
+  PendingDecisionView,
 } from '../../shared/types/index';
 
 export type ApprovalDecision = 'approve' | 'reject';
@@ -29,6 +30,7 @@ export interface ApprovalsQueueItem {
 
 export interface IApprovalsService {
   getQueue(): Promise<ApprovalsQueueItem[]>;
+  getPendingDecisions(): Promise<PendingDecisionView[]>;
   decide(
     requestId: string,
     action: ApprovalDecision,
@@ -73,6 +75,16 @@ export class ApprovalsService implements IApprovalsService {
           status: view.status,
         }),
       );
+  }
+
+  /**
+   * Reads the pending-decision queue straight from the leave module. The API
+   * scopes visibility by role and orders by `start_date ASC`, so the list is
+   * returned exactly as received — no client-side sort, filter, or status
+   * predicate. An empty queue is a normal `[]`, not an error.
+   */
+  getPendingDecisions(): Promise<PendingDecisionView[]> {
+    return this.leaveService.listPendingDecisions();
   }
 
   decide(

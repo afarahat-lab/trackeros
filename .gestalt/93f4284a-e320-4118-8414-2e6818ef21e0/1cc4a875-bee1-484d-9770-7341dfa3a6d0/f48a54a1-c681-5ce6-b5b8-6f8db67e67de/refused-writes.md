@@ -1,0 +1,64 @@
+# Refused writes — awaiting a human decision
+
+_Generated 2026-10-08 22:33:40Z · correlation `f48a54a1-c681-5ce6-b5b8-6f8db67e67de`._
+
+3 write(s) were refused, 0 of them because the target is a GOVERNANCE file. A refusal is not a judgement that the change is wrong — it is the platform declining to let an agent edit the rules it is judged by. The proposed content is reproduced in full below so it can be applied by hand if it is right.
+
+**To ratify one:** apply the content yourself and commit it, or record the decision as an ADR in `docs/DECISIONS.md`. **To reject one:** delete its section from this file. Leaving this file in place is not a decision — it is a queue.
+
+## 1. `docs/ARCHITECTURE.md`
+
+- **Proposed by:** context-agent
+- **Refused because:** refusing a section-addressed write of docs/ARCHITECTURE.md: no section titled "Phase 4 delivered (LeaveService.listPendingDecisions)". Read the file (readFile with section=…) to see its headings.
+
+<details><summary>Proposed content (verbatim)</summary>
+
+```
+Phase 4 of the recommended list is delivered: ONE file, `src/modules/leave/leave.service.ts`. No repository, model, route, `index.ts`, or test file changed; phases 5–7 are not delivered.
+
+- `ILeaveService` gains `listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]>` — no query DTO, no options object, no client — and `LeaveService` implements it.
+- `assertAuthenticated(actor)` runs first, unchanged: `UnauthorizedError` for a missing/blank id, `ForbiddenError` for an out-of-enum role, both raised before any repository or employee-service call.
+- Visibility mirrors `list`'s branch verbatim: EMPLOYEE -> `employeeIds = [actor.id]`; MANAGER -> `employeeIds = [actor.id, ...(await employeeService.getEmployeesByManagerId(actor.id)).map((e) => e.id)]` (one level, not transitive); ADMIN -> `employeeIds` stays `undefined`, so no employee predicate is applied and every SUBMITTED request is returned.
+- The repository's array is returned verbatim: no re-sort, no cap/pagination, no mapping, no re-projection. An empty queue resolves to `[]` — never `null`, never a throw.
+- Read-only: no `uow.withTransaction`, no `PoolClient` accepted or forwarded, no write, no audit entry, no notification. The SUBMITTED-only predicate and the `start_date ASC` ordering stay owned by `PgLeaveRequestRepository.findPendingDecisions`; the service passes no status filter, does not re-sort, and does not call `assertCanDecide`.
+- `PendingDecision` is consumed from `./leave.model` (re-exported by the module index) — not re-declared, not widened to `LeaveRequest`, no field added.
+
+**Divergences from the design worth noting:**
+- *Business rules (reconciled)* rule 7 says a MANAGER sees their direct reports' SUBMITTED requests "and not their own" and that an EMPLOYEE "sees none". The built code mirrors `list` exactly and therefore INCLUDES `actor.id` in the scoping array for both roles, so a manager's own SUBMITTED request is in their queue and an employee's own SUBMITTED request is in theirs. Decide-scoping (excluding the caller's own request, or requests the caller may not decide) is deliberately deferred, so this is the intended shape; rule 7's "and not their own" / "sees none" clauses are unbuilt.
+- The *Repository interfaces* entry above still describes `findPendingDecisions(actorId, actorRole, client?)` returning `LeaveRequest[]`. The built contract (Phase 2) is `findPendingDecisions(employeeIds?: string[], client?: PoolClient): Promise<PendingDecision[]>` — role-to-scoping resolution lives in the service, and the projection is `PendingDecision`. The service consumes the built signature.
+- The *Presentation* bullet (`GET /leaves/pending-decisions`) and the *Errors* contract for that route are unbuilt: no route, no `PUBLIC_PATHS` change, no route test exists yet (phases 5–6).
+- No tests were added or modified in this phase (Phase 6 owns them); the existing `FakeLeaveRepository.findPendingDecisions(employeeIds?)` fake already satisfies the interface unchanged.
+
+```
+
+</details>
+
+## 2. `docs/ARCHITECTURE.md`
+
+- **Proposed by:** context-agent
+- **Refused because:** refusing a section-addressed write of docs/ARCHITECTURE.md: no section titled "Open questions". Read the file (readFile with section=…) to see its headings.
+
+<details><summary>Proposed content (verbatim)</summary>
+
+```
+See the reconciled `openQuestions` list: null `managerId` on a SUBMITTED cancellation; null `approverId` on a legacy APPROVED row; whether the approver notification accompanies or replaces the existing requester notification; confirmation of the `related_entity_code` schema decision; queue membership (SUBMITTED-only vs SUBMITTED+APPROVED); ADMIN queue scope; self-notification suppression; the reversal path's notification keying; and the documented-vs-built `(related_entity_type, related_entity_id)` index drift.
+
+Settled by the delivered phases: the `related_entity_code` schema decision (ADR-002, Phase 1); the approver notification accompanying rather than replacing the requester notification, the null-`managerId` / null-`approverId` skip behaviour, self-notification non-suppression, and the reversal path's keying to the ORIGINAL request id (ADR-003, Phase 3); queue membership as SUBMITTED-only and ADMIN queue scope as unfiltered (Phase 2 SQL + Phase 4 service). Still open: decide-scoping (excluding the caller's own request or requests the caller may not decide) is deliberately deferred, so a manager's own SUBMITTED request appears in their queue; and the `GET /leaves/pending-decisions` route plus its tests (phases 5–6) are unbuilt.
+
+```
+
+</details>
+
+## 3. `docs/ARCHITECTURE.md`
+
+- **Proposed by:** context-agent
+- **Refused because:** refusing a section-addressed write of docs/ARCHITECTURE.md: no section titled "Open questions". Read the file (readFile with section=…) to see its headings.
+
+<details><summary>Proposed content (verbatim)</summary>
+
+```
+Day-count calendar vs business days; accrual model; carry-forward cap; migration mechanism; controller layer; BullMQ for notifications.
+
+```
+
+</details>

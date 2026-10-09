@@ -27,6 +27,7 @@ function makeApiClient(login: IApiClient['login']): IApiClient {
     login,
     getMe: () => Promise.resolve(profile),
     getLeaves: () => Promise.resolve([]),
+    getPendingDecisions: () => Promise.resolve([]),
     getLeave: () => Promise.reject(new ApiError('Not found', 404)),
     getBalances: () => Promise.resolve([]),
     createLeave: () => Promise.reject(new ApiError('unused', 0)),

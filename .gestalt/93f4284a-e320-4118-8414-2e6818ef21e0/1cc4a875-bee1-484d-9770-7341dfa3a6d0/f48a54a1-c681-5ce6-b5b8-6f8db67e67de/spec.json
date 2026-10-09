@@ -1,0 +1,121 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "`ILeaveService` declares `listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]>` and `LeaveService` implements it with no parameter beyond the actor (no query DTO, no options object, no client).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "For an ADMIN actor the repository is invoked with no employee scoping (absent or empty `employeeIds`), so every SUBMITTED request is returned; the service applies no additional status, date, or approver filter of its own.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "For a MANAGER actor the scoping ids passed to the repository are derived from `employeeService.getEmployeesByManagerId(actor.id)` (one level, not transitive), and the method's scoping shape mirrors `list` in the same file rather than re-expressing the rule.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository's returned array is returned verbatim: same order (no re-sort), same length (no cap/pagination), no mapping or re-projection, and an empty result resolves to `[]` rather than throwing or returning null.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The method is read-only: it opens no unit of work (`uow.withTransaction` is never called), accepts and forwards no `PoolClient`, performs no repository write, and records no audit entry or notification.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A missing/blank actor id rejects with `UnauthorizedError` and an out-of-enum role rejects with `ForbiddenError`, both raised before any repository or employee-service call (same `assertAuthenticated` behaviour as `list`/`getById`).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`npm run build` (tsc) and the existing Jest suite pass unchanged: no pre-existing test case is modified, and the existing `FakeLeaveRepository.findPendingDecisions` fake satisfies the interface without edits.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "Only `src/modules/leave/leave.service.ts` may change. `src/modules/leave/leave.repository.ts`, `leave.model.ts`, `leave.routes.ts`, `index.ts`, and every file under `src/shared/` are untouched.",
+    "`PendingDecision` and `ILeaveRepository.findPendingDecisions(employeeIds?, client?)` are fixed Phase 2 contracts: do not re-declare, rename, re-implement, or widen them, and do not add a second status/ordering/projection step in the service.",
+    "The SUBMITTED-only membership predicate and the `start_date ASC` ordering are owned by the repository SQL. The service must not pass a status filter, must not re-sort, and must not include APPROVED requests the approver already decided.",
+    "Decide-scoping is deliberately deferred: the method must not call `assertCanDecide`, must not exclude the actor's own request, and must not otherwise duplicate the decide rule. Queue membership and decide authority stay separate concerns.",
+    "No transaction, no `PoolClient` parameter or forwarding, no writes, no audit entry, no notification \u2014 the method is a pure read, matching `list`/`getById`/`getHistory`. GP-002 does not apply to a read.",
+    "Branching on `EmployeeRole` inside the leave module is permitted and expected (HARNESS.json declares `EmployeeRole` an owned decision of `leave`/`web-leave`); the branch must mirror the existing `list` shape rather than introduce a new formulation.",
+    "No tests are added or modified in this phase (Phase 6 owns tests); no route is added (Phase 5); `cancel` is not modified (Phase 3)."
+  ],
+  "outOfScope": [
+    "The HTTP route/handler exposing the queue (Phase 5) and any route-level role guard or actor resolution.",
+    "Decide-scoping: excluding the caller's own request, or requests the caller may not decide, is deferred to a follow-up.",
+    "Any change to `cancel` and its approver notification (Phase 3), to the repository/model (Phase 2), or to the migration (Phase 1).",
+    "Unit/integration tests for the new method (Phase 6) and the optional web approvals-queue consumer (Phase 7)."
+  ],
+  "ambiguities": [
+    {
+      "description": "The maintained architecture document records a 'Phase N delivered' section for every prior phase of this feature, but this phase is scoped to ONE source file and does not say whether the corresponding 'Phase 4 delivered (LeaveService.listPendingDecisions)' section must be authored as part of the phase. If it is not, the doc's phase ledger silently skips Phase 4 while Phases 1\u20133 are recorded.",
+      "options": [
+        "Code only; the phase-delivered section is written by the architecture-maintenance step",
+        "Code plus the phase-delivered section in the same phase (exceeds the one-file scope)",
+        "Code only, and record the missing ledger entry as a follow-up in the phase output"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "PendingDecision",
+      "mustExistOrExtend": true,
+      "invariant": "A PendingDecision is a read-model projection with no identity and no table: it exists only as the return shape of the queue read, and its membership is derived from the underlying LeaveRequest's current status on every read. There is no queue record, tombstone, or cached membership. Its `status` is always SUBMITTED by construction (the repository's predicate), so a CANCELLED or decided request is never a member."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "Queue membership is a function of the request's current status alone: a request is in the queue if and only if its status is SUBMITTED, and it leaves the queue the instant it is decided or cancelled. This read must not mutate the request, its status, or any related row."
+    },
+    {
+      "entity": "LeaveActor",
+      "mustExistOrExtend": true,
+      "invariant": "An actor is valid only if it carries a non-blank string id and a role that is a member of the EmployeeRole enum; an invalid actor is rejected before any data access. The actor's role alone determines the visibility scope of the read \u2014 the actor's id is never used to filter out their own request in this phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveService.listPendingDecisions(actor: LeaveActor): Promise<PendingDecision[]>",
+      "authRule": "assertAuthenticated(actor) first: UnauthorizedError for a missing/blank id, ForbiddenError for an out-of-enum role. Then role-scoped visibility mirroring `list`: ADMIN -> no employee scoping; MANAGER -> scoped to direct reports resolved via employeeService.getEmployeesByManagerId(actor.id); EMPLOYEE -> scoped to self. No assertCanDecide, no decide-rule duplication, no exclusion of the actor's own request.",
+      "idempotent": true,
+      "errorSemantics": "Read-only and side-effect free: no transaction, no PoolClient, no writes, no audit, no notification. Resolves to an array, possibly empty (an empty queue is a valid success, never an error and never null); never throws for an empty result. Only the authentication/authorization errors above are raised by the method itself; any repository or employee-service failure propagates unchanged."
+    },
+    {
+      "operation": "ILeaveRepository.findPendingDecisions(employeeIds?: string[], client?: PoolClient): Promise<PendingDecision[]>",
+      "authRule": "Not applicable \u2014 the repository performs no authorization; scoping is passed in by the service as an optional employeeIds array.",
+      "idempotent": true,
+      "errorSemantics": "Fixed Phase 2 contract, consumed unchanged: owns the SUBMITTED-only predicate, the start_date ASC ordering, and the PendingDecision projection. Absent or empty employeeIds applies no employee predicate. Returns an array, possibly empty, never null. The service must not re-filter, re-sort, re-project, or pass a client."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The role-scoped visibility branch must mirror the existing `list` implementation's shape (same role branch, same getEmployeesByManagerId call, same scoping-array construction) rather than re-expressing the rule; `list` is the precedent for this read.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "Authentication must reuse the existing private `assertAuthenticated(actor)` helper unchanged (same UnauthorizedError/ForbiddenError semantics), called first, exactly as `list`/`getById` do.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The return type must be the existing `PendingDecision` projection declared in the leave model and re-exported from the module index \u2014 do not re-declare it, do not widen it to `LeaveRequest`, and do not add fields.",
+      "referencePath": "src/modules/leave/leave.model.ts"
+    },
+    {
+      "requirement": "The repository call must use the existing `ILeaveRepository.findPendingDecisions(employeeIds?, client?)` signature and its built semantics (SUBMITTED-only, start_date ASC, PendingDecision projection) \u2014 no new repository method, no SQL in the service, no client argument.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    }
+  ],
+  "integrationPoints": []
+}
