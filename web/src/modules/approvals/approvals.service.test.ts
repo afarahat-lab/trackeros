@@ -13,7 +13,6 @@ import {
 import type {
   LeaveRequestView,
   EmployeeProfile,
-  PendingDecisionView,
 } from '../../shared/types/index';
 
 const profile: EmployeeProfile = {
@@ -54,7 +53,6 @@ function makeLeave(
 
 interface LeaveServiceOverrides {
   list?: ILeaveService['list'];
-  listPendingDecisions?: ILeaveService['listPendingDecisions'];
   getById?: ILeaveService['getById'];
   create?: ILeaveService['create'];
   submit?: ILeaveService['submit'];
@@ -70,7 +68,6 @@ function makeLeaveService(
     Promise.reject(new ApiError('unused', 0));
   return {
     list: overrides.list ?? unused,
-    listPendingDecisions: overrides.listPendingDecisions ?? unused,
     getById: overrides.getById ?? unused,
     create: overrides.create ?? unused,
     submit: overrides.submit ?? unused,
@@ -284,70 +281,5 @@ describe('ApprovalsService', () => {
     );
 
     await expect(service.decide('leave-1', 'reject')).rejects.toBe(error);
-  });
-
-  it('getPendingDecisions returns the queue as-is, preserving backend order', async () => {
-    const oldest: PendingDecisionView = {
-      requestId: 'leave-oldest',
-      employeeId: 'emp-3',
-      leaveTypeCode: LeaveTypeCode.ANNUAL,
-      startDate: new Date('2024-07-01T00:00:00.000Z'),
-      endDate: new Date('2024-07-05T00:00:00.000Z'),
-      requestedDays: 5,
-      status: LeaveStatus.SUBMITTED,
-    };
-    const newest: PendingDecisionView = {
-      requestId: 'leave-newest',
-      employeeId: 'emp-2',
-      leaveTypeCode: LeaveTypeCode.SICK,
-      startDate: new Date('2024-08-01T00:00:00.000Z'),
-      endDate: new Date('2024-08-02T00:00:00.000Z'),
-      requestedDays: 2,
-      status: LeaveStatus.SUBMITTED,
-    };
-    const queue = [oldest, newest];
-    const listPendingDecisions = vi.fn<ILeaveService['listPendingDecisions']>(
-      () => Promise.resolve(queue),
-    );
-    const service = new ApprovalsService(
-      makeLeaveService({ listPendingDecisions }),
-      makeEmployeeService(
-        vi.fn<IEmployeeService['getMe']>(() => Promise.resolve(profile)),
-      ),
-    );
-
-    const result = await service.getPendingDecisions();
-
-    expect(listPendingDecisions).toHaveBeenCalledTimes(1);
-    expect(result).toBe(queue);
-  });
-
-  it('getPendingDecisions resolves an empty queue to an empty array', async () => {
-    const listPendingDecisions = vi.fn<ILeaveService['listPendingDecisions']>(
-      () => Promise.resolve([]),
-    );
-    const service = new ApprovalsService(
-      makeLeaveService({ listPendingDecisions }),
-      makeEmployeeService(
-        vi.fn<IEmployeeService['getMe']>(() => Promise.resolve(profile)),
-      ),
-    );
-
-    await expect(service.getPendingDecisions()).resolves.toEqual([]);
-  });
-
-  it('getPendingDecisions propagates a rejection unchanged', async () => {
-    const error = new ApiError('Forbidden', 403);
-    const listPendingDecisions = vi.fn<ILeaveService['listPendingDecisions']>(
-      () => Promise.reject(error),
-    );
-    const service = new ApprovalsService(
-      makeLeaveService({ listPendingDecisions }),
-      makeEmployeeService(
-        vi.fn<IEmployeeService['getMe']>(() => Promise.resolve(profile)),
-      ),
-    );
-
-    await expect(service.getPendingDecisions()).rejects.toBe(error);
   });
 });

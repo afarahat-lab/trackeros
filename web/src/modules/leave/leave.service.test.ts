@@ -40,7 +40,6 @@ const input: CreateLeaveRequestInput = {
 
 interface ApiClientOverrides {
   getLeaves?: IApiClient['getLeaves'];
-  getPendingDecisions?: IApiClient['getPendingDecisions'];
   getLeave?: IApiClient['getLeave'];
   createLeave?: IApiClient['createLeave'];
   submitLeave?: IApiClient['submitLeave'];
@@ -57,7 +56,6 @@ function makeApiClient(overrides: ApiClientOverrides = {}): IApiClient {
     getMe: () => Promise.reject(new ApiError('unused', 0)),
     getBalances: () => Promise.resolve([]),
     getLeaves: overrides.getLeaves ?? unused,
-    getPendingDecisions: overrides.getPendingDecisions ?? unused,
     getLeave: overrides.getLeave ?? unused,
     createLeave: overrides.createLeave ?? unused,
     submitLeave: overrides.submitLeave ?? unused,

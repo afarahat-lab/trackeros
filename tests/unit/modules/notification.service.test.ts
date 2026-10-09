@@ -22,7 +22,6 @@ class FakeNotificationRepository implements INotificationRepository {
       message: input.message,
       relatedEntityType: input.relatedEntityType,
       relatedEntityId: input.relatedEntityId,
-      relatedEntityCode: input.relatedEntityCode ?? null,
       status: input.status ?? NotificationStatus.PENDING,
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       readAt: null,

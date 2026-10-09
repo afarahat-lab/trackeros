@@ -2,12 +2,10 @@ import type { IApiClient } from '../../infrastructure/api/index';
 import type {
   CreateLeaveRequestInput,
   LeaveRequestView,
-  PendingDecisionView,
 } from '../../shared/types/index';
 
 export interface ILeaveService {
   list(): Promise<LeaveRequestView[]>;
-  listPendingDecisions(): Promise<PendingDecisionView[]>;
   getById(id: string): Promise<LeaveRequestView>;
   create(input: CreateLeaveRequestInput): Promise<LeaveRequestView>;
   submit(id: string): Promise<LeaveRequestView>;
@@ -31,10 +29,6 @@ export class LeaveService implements ILeaveService {
 
   list(): Promise<LeaveRequestView[]> {
     return this.apiClient.getLeaves();
-  }
-
-  listPendingDecisions(): Promise<PendingDecisionView[]> {
-    return this.apiClient.getPendingDecisions();
   }
 
   getById(id: string): Promise<LeaveRequestView> {

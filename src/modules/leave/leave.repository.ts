@@ -8,7 +8,7 @@ import {
   LeaveTypeCode,
   UpdateLeaveRequestDto,
 } from '../../shared/types';
-import { CreateLeaveRequestInput, LeaveRequest, PendingDecision } from './leave.model';
+import { CreateLeaveRequestInput, LeaveRequest } from './leave.model';
 
 export interface ILeaveRepository {
   create(input: CreateLeaveRequestInput, client?: PoolClient): Promise<LeaveRequest>;
@@ -19,15 +19,6 @@ export interface ILeaveRepository {
     reversesRequestId: string,
     client?: PoolClient
   ): Promise<LeaveRequest | null>;
-  /**
-   * The decision queue: every SUBMITTED request, oldest start date first. Scoped to
-   * `employeeIds` exactly as `findByQuery` scopes it, so an absent/empty list applies
-   * no employee filter and the caller (an ADMIN) sees all of them.
-   */
-  findPendingDecisions(
-    employeeIds?: string[],
-    client?: PoolClient
-  ): Promise<PendingDecision[]>;
 }
 
 interface LeaveRequestRow {
@@ -83,19 +74,6 @@ function mapRow(row: LeaveRequestRow): LeaveRequest {
     cancelledBy: row.cancelled_by,
     cancelledAt: row.cancelled_at,
     reversesRequestId: row.reverses_request_id,
-  };
-}
-
-/** Projects a full request down to the fields the pending-decision queue renders. */
-function toPendingDecision(request: LeaveRequest): PendingDecision {
-  return {
-    requestId: request.id,
-    employeeId: request.employeeId,
-    leaveTypeCode: request.leaveTypeCode,
-    startDate: request.startDate,
-    endDate: request.endDate,
-    requestedDays: request.requestedDays,
-    status: request.status,
   };
 }
 
@@ -236,31 +214,5 @@ export class PgLeaveRequestRepository implements ILeaveRepository {
 
     const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, values);
     return result.rows.map(mapRow);
-  }
-
-  /**
-   * SUBMITTED-only: the queue is requests awaiting a decision, not a decision
-   * history, so a CANCELLED (or decided) request is excluded by this single
-   * predicate alone — no second status filter, and no `reverses_request_id`
-   * filter. Oldest start date first: the most urgent request leads.
-   */
-  async findPendingDecisions(
-    employeeIds?: string[],
-    client?: PoolClient
-  ): Promise<PendingDecision[]> {
-    const conditions: string[] = [`status = '${LeaveStatus.SUBMITTED}'`];
-    const values: unknown[] = [];
-
-    if (employeeIds !== undefined && employeeIds.length > 0) {
-      values.push(employeeIds);
-      conditions.push(`employee_id = ANY($${values.length})`);
-    }
-
-    const query =
-      `SELECT ${COLUMNS} FROM leave_requests WHERE ${conditions.join(' AND ')}` +
-      ' ORDER BY start_date ASC';
-
-    const result: QueryResult<LeaveRequestRow> = await this.db(client).query(query, values);
-    return result.rows.map((row) => toPendingDecision(mapRow(row)));
   }
 }

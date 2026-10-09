@@ -13,7 +13,6 @@ interface NotificationRow {
   message: string;
   related_entity_type: string | null;
   related_entity_id: string | null;
-  related_entity_code: string | null;
   status: string;
   created_at: Date;
   read_at: Date | null;
@@ -28,7 +27,6 @@ function mapRow(row: NotificationRow): Notification {
     message: row.message,
     relatedEntityType: row.related_entity_type,
     relatedEntityId: row.related_entity_id,
-    relatedEntityCode: row.related_entity_code,
     status: row.status as NotificationStatus,
     createdAt: row.created_at,
     readAt: row.read_at,
@@ -36,8 +34,7 @@ function mapRow(row: NotificationRow): Notification {
 }
 
 const COLUMNS =
-  'id, recipient_id, type, title, message, related_entity_type, related_entity_id, ' +
-  'related_entity_code, status, created_at, read_at';
+  'id, recipient_id, type, title, message, related_entity_type, related_entity_id, status, created_at, read_at';
 
 export class PgNotificationRepository implements INotificationRepository {
   constructor(private readonly dbPool: Pool = defaultPool) {}
@@ -53,8 +50,8 @@ export class PgNotificationRepository implements INotificationRepository {
     const query = `
       INSERT INTO notifications (
         id, recipient_id, type, title, message, related_entity_type, related_entity_id,
-        related_entity_code, status, created_at, read_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        status, created_at, read_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING ${COLUMNS}
     `;
     const values = [
@@ -65,7 +62,6 @@ export class PgNotificationRepository implements INotificationRepository {
       input.message,
       input.relatedEntityType,
       input.relatedEntityId,
-      input.relatedEntityCode ?? null,
       status,
       createdAt,
       null,

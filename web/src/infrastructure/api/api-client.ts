@@ -4,7 +4,6 @@ import type {
   LeaveBalanceView,
   LeaveRequestView,
   LoginResponse,
-  PendingDecisionView,
 } from '../../shared/types/index';
 import { ApiError } from './api-error';
 import type { ITokenStorage } from './token-storage';
@@ -18,7 +17,6 @@ export interface IApiClient {
   login(email: string, password: string): Promise<LoginResponse>;
   getMe(): Promise<EmployeeProfile>;
   getLeaves(): Promise<LeaveRequestView[]>;
-  getPendingDecisions(): Promise<PendingDecisionView[]>;
   getLeave(id: string): Promise<LeaveRequestView>;
   getBalances(): Promise<LeaveBalanceView[]>;
   createLeave(input: CreateLeaveRequestInput): Promise<LeaveRequestView>;
@@ -52,12 +50,6 @@ export class ApiClient implements IApiClient {
 
   getLeaves(): Promise<LeaveRequestView[]> {
     return this.request<LeaveRequestView[]>('/leaves', {
-      authenticated: true,
-    });
-  }
-
-  getPendingDecisions(): Promise<PendingDecisionView[]> {
-    return this.request<PendingDecisionView[]>('/leaves/pending-decisions', {
       authenticated: true,
     });
   }

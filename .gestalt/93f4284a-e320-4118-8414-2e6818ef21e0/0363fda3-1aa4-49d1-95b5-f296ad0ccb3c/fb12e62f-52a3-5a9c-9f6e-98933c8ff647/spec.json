@@ -1,8 +1,0 @@
-{
-  "scope": {
-    "affectedDomains": [],
-    "affectedLayers": [],
-    "isBreakingChange": false,
-    "estimatedComplexity": "medium"
-  }
-}
