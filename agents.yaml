@@ -761,7 +761,19 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
+    # 🔴 40 -> 80 FOR THE RE-REVIEW (2026-10-11), and it had to be committed HERE.
+    #
+    # The review reads `agents.yaml` from its WORK DIR — a clone of the branch under review
+    # (`project_root=review_dir` in `feature_review_activity`). So the same change on `main` does
+    # NOT reach a review of this branch, and the re-run would have been silently identical to the
+    # first. The park text's "raise it in the PROJECT's agents.yaml, then resume" is true and
+    # incomplete: it must be on the BRANCH being reviewed.
+    #
+    # Why 80: of 11 slices, 4 spent their entire cap without ever calling `complete`, and every
+    # slice that did call it completed — 10/10. `web-presentation-pages` used all 40 AND called
+    # `complete`, finishing on the wire, so 40 is marginal even when it works. The token budget
+    # was not the constraint: `leave` stopped at 725,628 of 1,200,000.
+    max_iterations: 80
     schema:
       models:
         _Item:
