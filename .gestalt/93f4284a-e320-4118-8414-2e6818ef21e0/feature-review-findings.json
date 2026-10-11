@@ -1,0 +1,58 @@
+{
+  "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
+  "attempts": 1,
+  "findings": [
+    {
+      "rule_id": "review/consistency",
+      "file_path": "src/modules/leave/leave.service.ts",
+      "line": 636,
+      "message": "[review/consistency] This actor-exclusion filter contradicts the stated invariant of the phase specs this feature was built against. Spec 1f61f624 (phase 3) constrains: \"The notification set is a function of the STATE CHANGE, not of who performed it: exactly TWO notificationService.create calls for SUBMITTED and APPROVED cancellations, exactly ONE for DRAFT\" and \"Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.\" Spec 9244f013 (phase 6) repeats it: \"no case may assert suppression on the basis of the actor being the recipient\", and its success criterion #3 requires the DRAFT case to assert exactly one notification. With this filter, an owner cancelling their own SUBMITTED request emits ONE notification instead of two, and the DRAFT case now asserts zero (tests/unit/modules/leave/leave.service.test.ts:743, …",
+      "quoted_line": "      if (notice.recipientId === actor.id) {",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    },
+    {
+      "rule_id": "review/test-coverage",
+      "file_path": "tests/unit/modules/leave/leave.service.test.ts",
+      "line": 743,
+      "message": "[review/test-coverage] This assertion inverts a pre-existing case rather than extending it additively. The phase-6 spec (9244f013) constrains \"Additive extension only: every pre-existing test case ... must remain byte-for-byte in intent — no case deleted, renamed, skipped, or weakened\", and its success criterion #3 requires \"a DRAFT cancellation still produces EXACTLY ONE notification (requester only) — the pre-existing DRAFT assertion is unchanged and no approver notification is added on that path.\" The pre-existing DRAFT case previously asserted `toHaveLength(1)` with `recipientId === REQUESTER_ID`; it now asserts zero, and the sibling case at line 988 was renamed from \"sends exactly one cancellation notification for the original\" to \"notifies only the requester when the canceller IS the recorded approver\". Both changes are consistent with the owner amendment in docs/DECISIONS.md CLARIFY-006 (commit c2d19382), but they are the opposite of what these specs pin, so the specs and the …",
+      "quoted_line": "      expect(notificationService.inputs).toHaveLength(0);",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    },
+    {
+      "rule_id": "review/documentation",
+      "file_path": "docs/ARCHITECTURE.md",
+      "line": 1731,
+      "message": "[review/documentation] Reconciled business rule 7 states the queue visibility as \"a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none\". The built service does the opposite for the actor's own requests: `employeeIds = [actor.id]` for EMPLOYEE and `[actor.id, ...reports.map(...)]` for MANAGER (src/modules/leave/leave.service.ts:484-493), and the tests pin that scoping. docs/DOMAIN.md:64 already records this as a known divergence and names this exact rule as the stale copy, so the document is knowingly left contradicting the built behaviour it is the source of truth for.\n  Evidence: \"7. Queue visibility reuses the module's existing role-scoped rule: an ADMIN sees every SUBMITTED request; a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none. Queue membership and decide authority are separate concerns — the existing decide …",
+      "quoted_line": "7. Queue visibility reuses the module's existing role-scoped rule: an ADMIN sees every SUBMITTED request; a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none. Queue membership and decide authority are separate concerns — the existing decide guards remain the sole authority on whether a decision may be taken.",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    },
+    {
+      "rule_id": "review/documentation",
+      "file_path": "docs/DOMAIN.md",
+      "line": 96,
+      "message": "[review/documentation] The `LeaveRequestQueryParams` table's last row and the following `## balance` heading were joined onto one line, so the `balance` section heading is no longer a heading and the table row is malformed. Verified with `cat -A`: the line is `| offset | number | false |## balance$` — the newline that separated the table from the heading is gone, and `## balance` no longer appears in the file's heading list (`grep -n \"^## \" docs/DOMAIN.md` returns base, leave, employee, policy, notification, audit, validation, system, uptime — no balance).\n  Evidence: \"| offset | number | false |## balance\"",
+      "quoted_line": "| offset | number | false |## balance",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 1,
+      "last_seen_attempt": 1,
+      "fixed_at_attempt": null
+    }
+  ]
+}
