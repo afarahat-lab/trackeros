@@ -761,7 +761,21 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
+    # 🔴 RAISED 40 -> 80 (2026-10-11), on measurement, not on principle.
+    #
+    # Feature `93f4284a`'s review: 4 of 11 slices spent their ENTIRE cap without ever calling
+    # `complete` — and every slice that DID call it completed. That is a perfect 10/10 separator,
+    # so truncation is a behaviour, not a property of the slice: `notification` (3 files) finished
+    # where `web-leave` (3 files) did not, and `web-approvals` (2 files) truncated where
+    # `web-presentation-guards` (2 files) finished.
+    #
+    # `web-presentation-pages` used all 40 iterations AND called `complete` — it finished on the
+    # wire. So 40 is marginal even for slices that succeed, which is the argument for raising it
+    # rather than treating three slices as misbehaving.
+    #
+    # Note the token budget was NOT the binding constraint: `leave` stopped at 725,628 of
+    # 1,200,000, leaving 40% unused. Raising the budget would have changed nothing.
+    max_iterations: 80
     schema:
       models:
         _Item:
