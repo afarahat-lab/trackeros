@@ -957,7 +957,13 @@ agents:
       # the cap had only ever reached this repo inside that merge — so reverting the contamination
       # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
       # is BELOW the median observed completion of 7,113.
-      max_tokens: 24000
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1004,7 +1010,13 @@ agents:
       # the cap had only ever reached this repo inside that merge — so reverting the contamination
       # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
       # is BELOW the median observed completion of 7,113.
-      max_tokens: 24000
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1054,7 +1066,13 @@ agents:
       # the cap had only ever reached this repo inside that merge — so reverting the contamination
       # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
       # is BELOW the median observed completion of 7,113.
-      max_tokens: 24000
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1109,7 +1127,13 @@ agents:
       # the cap had only ever reached this repo inside that merge — so reverting the contamination
       # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
       # is BELOW the median observed completion of 7,113.
-      max_tokens: 24000
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1168,7 +1192,13 @@ agents:
       # the cap had only ever reached this repo inside that merge — so reverting the contamination
       # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
       # is BELOW the median observed completion of 7,113.
-      max_tokens: 24000
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
