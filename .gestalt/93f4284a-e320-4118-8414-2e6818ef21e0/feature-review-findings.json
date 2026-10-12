@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 4,
+  "attempts": 5,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -33,28 +33,28 @@
     {
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1684,
-      "message": "[review/documentation] rule_id: review/stale-spec. This line states a repository contract the recorded decision explicitly rejects, and its stated rationale is factually wrong. ADR-004 in `docs/DECISIONS.md` records: \"the repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate\", and lists as a REJECTED alternative \"Passing `actorId`/`actorRole` into the repository and re-expressing the role-scoped visibility rule in SQL\". The built repository matches the decision — `src/modules/leave/leave.repository.ts` declares `findPendingDecisions(employeeIds?: string[], client?: PoolClient)` and builds `conditions: string[] = [\\`status = '${LeaveStatus.SUBMITTED}'\\`]` with no `reverses_request_id` predicate. The doc's claim that \"without that predicate the reversal row is a spurious second queue entry\" is also incorrect: the reversal row is inserted with `status: LeaveStatus.CANCELLED` (`src/modules/leave/leave.service.ts`), so the SUBMITTED predicate already …",
-      "quoted_line": "- `ILeaveRepository.findPendingDecisions(actorId: string, actorRole: EmployeeRole, client?: PoolClient): Promise<LeaveRequest[]>` — NEW. Returns the requests still awaiting this actor's decision: `status = SUBMITTED` AND `reverses_request_id IS NULL`, scoped by role (ADMIN: all; MANAGER: the requester's `employees.manager_id = actorId`; EMPLOYEE: none). `ORDER BY start_date ASC, id ASC`. Read-only: no `forUpdate`, no transaction, returns an array (possibly empty), never null. `CANCELLED` is excluded by construction, which is what makes a cancelled request stop being listed.",
+      "line": 1729,
+      "message": "[review/documentation] This rule asserts an unconditional \"two `Notification` rows\" for a SUBMITTED or APPROVED cancellation, which the recorded decision CLARIFY-006 in docs/DECISIONS.md (amended 2026-10-09) makes conditional: \"Every recipient is notified EXCEPT the actor who performed the cancellation ... so a requester who is also the recorded approver hears once, and a cancellation whose only recipients are the actor notifies nobody and still succeeds.\" The built code implements the amendment (`LeaveService.cancellationRecipients` filters out `notice.recipientId === actor.id`), and the tests pin the zero-notification case. rule_id: review/stale-spec.\n  Evidence: \"5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester …",
+      "quoted_line": "5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 3,
-      "fixed_at_attempt": 4,
+      "last_seen_attempt": 5,
+      "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] This PR's edit to `docs/DOMAIN.md` collapsed the `## balance` heading onto the last row of the `LeaveRequestQueryParams` table, so the heading is no longer a heading and the `balance` section is no longer addressable (heading-based section lookup and any heading index will not find it). The diff replaces `| offset | number | false |` + blank line + `## balance` with this single merged line.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break: `| offset | number | false |`, then a blank line, then `## balance`.",
+      "message": "[review/documentation] This PR's diff merged the `## balance` section heading onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer renders as a heading and the `balance` section is swallowed into the table. The diff hunk shows the previous `| offset | number | false |` + blank line + `## balance` replaced by this single line.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break: end the table row at `| offset | number | false |` and put `## balance` on its own line, separated by a blank line.",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 4,
+      "last_seen_attempt": 5,
       "fixed_at_attempt": null,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
@@ -94,10 +94,10 @@
       "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 4,
       "last_seen_attempt": 4,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 5,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
   ]
