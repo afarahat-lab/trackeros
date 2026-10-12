@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 3,
+  "attempts": 4,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -38,25 +38,25 @@
       "quoted_line": "- `ILeaveRepository.findPendingDecisions(actorId: string, actorRole: EmployeeRole, client?: PoolClient): Promise<LeaveRequest[]>` — NEW. Returns the requests still awaiting this actor's decision: `status = SUBMITTED` AND `reverses_request_id IS NULL`, scoped by role (ADMIN: all; MANAGER: the requester's `employees.manager_id = actorId`; EMPLOYEE: none). `ORDER BY start_date ASC, id ASC`. Read-only: no `forUpdate`, no transaction, returns an array (possibly empty), never null. `CANCELLED` is excluded by construction, which is what makes a cancelled request stop being listed.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 3,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 4,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] The `LeaveRequestQueryParams` table's last row and the following `## balance` heading were joined onto one line, so the `balance` section heading is no longer a heading and the table row is malformed. Verified: `grep -n \"^## \" docs/DOMAIN.md` returns base, leave, employee, policy, notification, audit, validation, system, uptime — no `balance` — and the raw line is `| offset | number | false |## balance`. The `balance` domain section is therefore no longer addressable as a section in the document that is the source of truth for the domain model.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Insert a newline between the table row and the heading so the line reads `| offset | number | false |` followed by a blank line and `## balance`.",
+      "message": "[review/documentation] This PR's edit to `docs/DOMAIN.md` collapsed the `## balance` heading onto the last row of the `LeaveRequestQueryParams` table, so the heading is no longer a heading and the `balance` section is no longer addressable (heading-based section lookup and any heading index will not find it). The diff replaces `| offset | number | false |` + blank line + `## balance` with this single merged line.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break: `| offset | number | false |`, then a blank line, then `## balance`.",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
-      "status": "fixed",
+      "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 2,
-      "fixed_at_attempt": 3,
-      "file_digest": ""
+      "last_seen_attempt": 4,
+      "fixed_at_attempt": null,
+      "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
     {
       "rule_id": "review/configuration",
@@ -80,11 +80,25 @@
       "quoted_line": "      max_tokens: 6000",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 3,
       "last_seen_attempt": 3,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 4,
       "file_digest": "e3169737801513873daa2b907c613f9a"
+    },
+    {
+      "rule_id": "review/review/stale-spec",
+      "file_path": "docs/ARCHITECTURE.md",
+      "line": 1668,
+      "message": "[review/review/stale-spec] Stale schema claim contradicting a recorded decision. `docs/DECISIONS.md` ADR-002 (Accepted) records: \"Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query\" — rejected. CLARIFY-005 likewise states \"`approver_id` needs no index for this query\". This line still asserts \"New indexes: standalone `status` ... and `approver_id`\" and that the queue query \"MUST also exclude `reverses_request_id IS NOT NULL`\", neither of which the delivered migration or repository does.\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and …",
+      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 4,
+      "last_seen_attempt": 4,
+      "fixed_at_attempt": null,
+      "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
   ]
 }
