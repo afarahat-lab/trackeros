@@ -633,7 +633,7 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1200000
+    token_budget: 1600000
     rules:
     - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
     - The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
@@ -679,7 +679,16 @@ agents:
     # 1,200,000 this project declares, so iterations remain the binding bound.
     # 🔴 REVISIT ON ANY CAP HIT — a gate cut at 40 again means a removed cost returned. Get the
     # tool-call breakdown from the platform's scripts/classify_tool_calls.py (cite its version).
-    max_iterations: 40
+    # 🔴 2026-10-12 — the FEATURE review's two biggest slices were cut at 40, twice, and both
+    # reviews ended INCONCLUSIVE without a verdict. `leave`: 64 calls / 827,447 tok COMPLETE in one
+    # run, then 63 calls / 721,751 tok TRUNCATED in the next — nearly identical work, fewer tokens,
+    # opposite outcome, i.e. a marginal bound rather than a cost that came back. `(unscoped)`
+    # truncated at 62. Every other slice ran 10-36 calls and finished.
+    #
+    # 1,600,000 for BOTH gate agents at 80 iterations: they run on the SAME slices of the same
+    # diff, so a difference between them would need its own justification, and ~18,000/iteration
+    # x 80 = ~1,450,000 keeps ITERATIONS the binding bound (binding at ~89, not ~66).
+    max_iterations: 80
     schema:
       models:
         _Finding:
@@ -730,7 +739,7 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1200000
+    token_budget: 1600000
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
