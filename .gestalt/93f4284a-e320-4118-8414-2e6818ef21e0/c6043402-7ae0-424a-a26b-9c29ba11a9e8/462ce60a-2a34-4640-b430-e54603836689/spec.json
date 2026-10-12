@@ -1,0 +1,109 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "documentation"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "In docs/DOMAIN.md, the `LeaveRequestQueryParams` table's final row and the `balance` heading are on separate lines: the row reads exactly `| offset | number | false |`, followed by a blank line, followed by `## balance` on its own line. The string `| offset | number | false |## balance` no longer occurs anywhere in the file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A heading-based section lookup for `balance` against docs/DOMAIN.md resolves and returns the balance section body (the `Balance` and `LeaveBalance` tables plus the `Represents leave balance data managed by the `balance` module...` description) \u2014 the section is addressable again, and the lookup does not fall back to the `leave` section.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The change is confined to docs/DOMAIN.md. No file under src/, web/, tests/, migrations/, seeds/, or scripts/ may be modified, and no test may be added or changed \u2014 this is a documentation-only repair of a line break.",
+    "The repair is whitespace-only: the `LeaveRequestQueryParams` table's eight rows and their cell contents, the `balance` heading text, and every other byte of docs/DOMAIN.md stay exactly as they are. No row, field, type, or description is added, removed, reordered, or reworded.",
+    "The restored heading must be a level-2 ATX heading (`## balance`) matching the file's existing top-level section headings (`## base`, `## leave`, `## employee`, `## policy`, `## notification`, `## audit`, `## validation`, `## system`, `## uptime`) \u2014 not a level-3 heading, not a setext heading, and not a bolded pseudo-heading.",
+    "The heading must be preceded by a blank line so the preceding table terminates; a heading immediately abutting a table row is not parsed as a heading by CommonMark and would leave the defect in place.",
+    "The fix must be made in place in docs/DOMAIN.md \u2014 not by regenerating the file, not by reordering sections, and not by relocating the `balance` content into another section. The `balance` section stays between the `leave` section and the `employee` section, in its current position.",
+    "No other known doc drift in docs/DOMAIN.md is to be corrected by this change. The stale `audit` section (documented as `Audit`/`AuditLog`/`AuditRecord`/`AuditServiceInterface` with `oldValues`/`newValues`/`performedBy`/`performedAt` while the built entity is `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }`) and the stale `leave`/`employee` fields are explicitly recorded as pre-existing drift in docs/ARCHITECTURE.md and are out of scope here."
+  ],
+  "outOfScope": [
+    "Reconciling docs/DOMAIN.md's stale content with the built code \u2014 the `audit` section's `oldValues`/`newValues`/`performedBy`/`performedAt` fields, the `leave` section's `leaveTypeId`/`approvedBy`/`approvedAt`, and `EmploymentStatus.INACTIVE`. These are recorded as pre-existing, deliberately uncorrected drift in docs/ARCHITECTURE.md.",
+    "Adding, removing, or reordering any section, entity, table, or field in docs/DOMAIN.md, including documenting the `uptime`/`system` readiness entities or the `PendingDecision` projection beyond what the file already contains.",
+    "Introducing markdown linting, a heading-index generator, or any new CI check that would have caught this defect. The repair is the line break only; no tooling is added.",
+    "Any change to source, tests, migrations, seeds, or scripts, and any change to the leave pending-decisions / approver-notification feature this document edit accompanied."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether this phase should also add a regression guard (a markdown lint rule, a heading-index assertion, or a test) that fails when a section heading is ever collapsed onto a preceding line again, or whether the repair is the line break alone.",
+      "options": [
+        "Line break only \u2014 no guard added (matches the intent's 'fix them in place' wording and the doc-only scope)",
+        "Add a lightweight guard in the same phase so the defect class cannot recur",
+        "Defer the guard to a separate follow-up phase"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the `balance` section's content should be reconciled with the built balance module while the section is being touched, or left byte-identical. docs/ARCHITECTURE.md records DOMAIN.md as stale relative to the architecture document, so a reader could reasonably expect the repair to also refresh the section.",
+      "options": [
+        "Leave the section content byte-identical \u2014 restore addressability only (the drift is recorded as known and deliberately uncorrected)",
+        "Refresh the balance section's entities/fields to match the built module in the same change"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "docs/DOMAIN.md \u2014 `balance` section heading",
+      "mustExistOrExtend": true,
+      "invariant": "The `balance` section is a top-level, heading-addressable section: its heading occupies its own line, is preceded by a blank line, and is followed by the section's prose and tables. It is never merged into, or terminated by, a preceding table row. The section remains addressable by heading lookup for the lifetime of the file."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2014 `LeaveRequestQueryParams` table",
+      "mustExistOrExtend": true,
+      "invariant": "The table is a well-formed markdown table: every row, including the last (`| offset | number | false |`), is a complete line terminated by a newline, and no row carries trailing content from a following block. The table's row set and cell values are unchanged by this repair."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Heading-based section lookup against docs/DOMAIN.md (the `section` parameter of the readFile tool and any heading index built from the file)",
+      "authRule": "None \u2014 the document is read-only reference material with no access control.",
+      "idempotent": true,
+      "errorSemantics": "A lookup for `balance` must return the balance section body, not an empty result and not the preceding `leave` section. A lookup for any other existing top-level section (`base`, `leave`, `employee`, `policy`, `notification`, `audit`, `validation`, `system`, `uptime`) must keep returning exactly what it returned before this change \u2014 the repair must not shift, merge, or shadow any other section boundary."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The restored heading must follow the same top-level section convention already used throughout docs/DOMAIN.md: a level-2 ATX heading on its own line, preceded by a blank line, with the section's prose beginning on the following line. Match the existing `## leave` / `## employee` / `## policy` boundaries rather than inventing a new heading style.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The `balance` section's content must remain byte-identical to what it is now \u2014 the `Represents leave balance data managed by the `balance` module...` description, the `Balance` table, the `LeaveBalance` table, and the `Employee` / `LeavePolicy` relationship lines. Only the line break before the heading is restored; no content inside the section is touched.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The `LeaveRequestQueryParams` table's eight rows (`status`, `leaveTypeId`, `startDateFrom`, `startDateTo`, `endDateFrom`, `endDateTo`, `limit`, `offset`) and their `Field | Type | Required` values must match the table as it stands now, and must stay consistent with the `LeaveRequestQueryParams` type the leave module consumes \u2014 the repair changes no field, type, or requiredness.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The `balance` section's documented entities must stay consistent with the reconciled architecture's balance module (the `Balance` entity and the `balance` module boundary) \u2014 the repair restores addressability only and must not alter, add, or remove any documented balance entity or field.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    },
+    {
+      "requirement": "The repair must not contradict the drift notes already recorded in docs/ARCHITECTURE.md, which state that docs/DOMAIN.md is stale relative to the architecture document and that the `audit` section drift is known and deliberately uncorrected. Restoring the `balance` heading is a formatting repair, not a reconciliation of DOMAIN.md's content with the architecture document.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/DOMAIN.md heading structure (the `## balance` top-level section boundary)",
+      "why": "The file's top-level headings are the addressing scheme for every downstream consumer: the readFile `section` lookup, the heading index the architecture/context agents build, and the section-update path used to maintain the document. A collapsed heading silently removes the `balance` section from all of them, so the repair restores the addressing contract rather than just cosmetics."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md references to docs/DOMAIN.md",
+      "why": "docs/ARCHITECTURE.md records the known drift between the two documents and points readers at DOMAIN.md sections by name. Those references assume DOMAIN.md's sections are addressable; the repair keeps that assumption true and must not alter the drift notes themselves."
+    }
+  ]
+}
