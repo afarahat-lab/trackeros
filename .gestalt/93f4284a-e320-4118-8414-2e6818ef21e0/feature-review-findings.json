@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 1,
+  "attempts": 2,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -10,10 +10,10 @@
       "quoted_line": "      if (notice.recipientId === actor.id) {",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
-      "fixed_at_attempt": null
+      "fixed_at_attempt": 2
     },
     {
       "rule_id": "review/test-coverage",
@@ -23,35 +23,48 @@
       "quoted_line": "      expect(notificationService.inputs).toHaveLength(0);",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
-      "fixed_at_attempt": null
+      "fixed_at_attempt": 2
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1731,
-      "message": "[review/documentation] Reconciled business rule 7 states the queue visibility as \"a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none\". The built service does the opposite for the actor's own requests: `employeeIds = [actor.id]` for EMPLOYEE and `[actor.id, ...reports.map(...)]` for MANAGER (src/modules/leave/leave.service.ts:484-493), and the tests pin that scoping. docs/DOMAIN.md:64 already records this as a known divergence and names this exact rule as the stale copy, so the document is knowingly left contradicting the built behaviour it is the source of truth for.\n  Evidence: \"7. Queue visibility reuses the module's existing role-scoped rule: an ADMIN sees every SUBMITTED request; a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none. Queue membership and decide authority are separate concerns — the existing decide …",
-      "quoted_line": "7. Queue visibility reuses the module's existing role-scoped rule: an ADMIN sees every SUBMITTED request; a MANAGER sees the SUBMITTED requests of their own direct reports (one level, not transitive) and not their own; an EMPLOYEE sees none. Queue membership and decide authority are separate concerns — the existing decide guards remain the sole authority on whether a decision may be taken.",
+      "line": 1729,
+      "message": "[review/documentation] review/stale-spec — the unconditional \"two `Notification` rows\" count is superseded by the recorded decision CLARIFY-006 (docs/DECISIONS.md) and by the built code. `LeaveService.cancellationRecipients` filters the actor out of the recipient set, so the overwhelmingly common case — the requester cancelling their own SUBMITTED request — writes ONE row, not two, and a cancellation whose only recipients are the actor writes none. The document states a count the implementation deliberately does not produce.\n  Evidence: \"5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL …",
+      "quoted_line": "5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 1,
+      "last_seen_attempt": 2,
       "fixed_at_attempt": null
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] The `LeaveRequestQueryParams` table's last row and the following `## balance` heading were joined onto one line, so the `balance` section heading is no longer a heading and the table row is malformed. Verified with `cat -A`: the line is `| offset | number | false |## balance$` — the newline that separated the table from the heading is gone, and `## balance` no longer appears in the file's heading list (`grep -n \"^## \" docs/DOMAIN.md` returns base, leave, employee, policy, notification, audit, validation, system, uptime — no balance).\n  Evidence: \"| offset | number | false |## balance\"",
+      "message": "[review/documentation] The `LeaveRequestQueryParams` table's last row and the following `## balance` heading were joined onto one line, so the `balance` section heading is no longer a heading and the table row is malformed. Verified: `grep -n \"^## \" docs/DOMAIN.md` returns base, leave, employee, policy, notification, audit, validation, system, uptime — no `balance` — and the raw line is `| offset | number | false |## balance`. The `balance` domain section is therefore no longer addressable as a section in the document that is the source of truth for the domain model.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Insert a newline between the table row and the heading so the line reads `| offset | number | false |` followed by a blank line and `## balance`.",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 1,
+      "last_seen_attempt": 2,
+      "fixed_at_attempt": null
+    },
+    {
+      "rule_id": "review/configuration",
+      "file_path": "agents.yaml",
+      "line": 979,
+      "message": "[review/configuration] This branch's `agents.yaml` drops the consult completion caps that `origin/main` carries, and removes the rationale that derived them. On main all five consultable agents are `max_tokens: 32000`; here `domain-architect-agent` (952), `data-architect-agent` (979) and `app-architect-agent` (1009) are 6000, `chief-architect-agent` is 12000 and `planner-agent` is 24000. The deleted comment block recorded the measured basis for 32000 — \"Per-agent observed maxima before this change (cap -> observed max completion, n): ... data-architect-agent 6,000 -> 9,100 n=12\" and \"1.11x HEADROOM IS NOT HEADROOM ... with no retry a cut-off consult is a FAILED consult, not a slower one\". At 6000 the data-architect-agent cap sits below its own observed maximum (9,100), i.e. it truncates. The diff against `origin/main` for this file is 162 lines removed, 0 added apart from the `max_iterations` comment.\n  Evidence: \"      max_tokens: 6000\"\n  Fix: Restore `max_tokens: 32000` for …",
+      "quoted_line": "      max_tokens: 6000",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 2,
+      "last_seen_attempt": 2,
       "fixed_at_attempt": null
     }
   ]
