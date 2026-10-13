@@ -1,0 +1,154 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "documentation"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "docs/DOMAIN.md contains no line where a markdown table row is immediately followed by a heading on the same line \u2014 i.e. a search for the pattern `|## ` across the file returns zero matches (today it returns exactly one, at line 96).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "docs/DOMAIN.md contains a line whose entire content is `## balance` (a level-2 ATX heading with no leading or trailing text), and the line immediately preceding it is empty.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequestQueryParams` table in docs/DOMAIN.md still ends with its `| offset | number | false |` row intact as a well-formed table row (same field/type/required cells as before the fix), and the table's row count is unchanged \u2014 the fix adds no row and removes none.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `## balance` section is addressable as a heading again: reading docs/DOMAIN.md by section heading `balance` returns the section body (the `### Balance` and `### LeaveBalance` subsections), rather than failing to resolve or resolving to the tail of the `leave` section.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The set of level-2 (`## `) headings in docs/DOMAIN.md is exactly {base, leave, employee, policy, notification, audit, validation, system, uptime, balance} \u2014 `balance` is present and no other heading was added, removed, or renamed by this fix.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The fix is confined to the single defective line: the diff against the pre-fix state of docs/DOMAIN.md touches only line 96 (splitting it into the table row, a blank line, and the heading) and changes no other line, no other file, and no source, test, migration, or config file.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The change is documentation-only: no file under src/, web/src/, tests/, migrations/, seeds/, or scripts/ may be modified, and no runtime behaviour, type, or interface may change. The phase's entire deliverable is the corrected docs/DOMAIN.md.",
+    "The corrected form must match the pre-existing correct form on the mainline branch: the `| offset | number | false |` row, then a blank line, then `## balance` \u2014 three separate lines. Do not reflow, re-wrap, or reorder any surrounding content while fixing it.",
+    "No content may be lost or invented: the `balance` section's prose and its `### Balance` / `### LeaveBalance` subsections must remain byte-identical apart from the restored heading line and the blank line before it.",
+    "Do not opportunistically correct the other known DOMAIN.md drift recorded in docs/ARCHITECTURE.md (the stale `audit` section describing Audit/AuditLog/AuditRecord/AuditServiceInterface with oldValues/newValues/performedBy/performedAt, and the stale `LeaveRequest.leaveTypeId` / `approvedBy` / `approvedAt` / `EmploymentStatus.INACTIVE` records). Those are explicitly recorded as known, uncorrected drift and are out of scope for this fix.",
+    "The fix must not be accompanied by a change to the CI workflow or its path filters: docs/** is already in the workflow's paths-ignore set, so this commit legitimately triggers no CI job. Do not add a docs lint step, a markdownlint config, or a new workflow to \"enforce\" this \u2014 that is a separate decision.",
+    "The heading must remain a level-2 (`## `) ATX heading with the exact lowercase text `balance`, matching the sibling section headings' style (lowercase module name, no trailing punctuation), so existing section-addressed reads and any anchors keep resolving."
+  ],
+  "outOfScope": [
+    "Correcting the other known docs/DOMAIN.md drift (the stale `audit` section's Audit/AuditLog/AuditRecord/AuditServiceInterface shapes, and the stale `LeaveRequest.leaveTypeId`/`approvedBy`/`approvedAt` and `EmploymentStatus.INACTIVE` records) \u2014 recorded as known, uncorrected drift in docs/ARCHITECTURE.md.",
+    "Adding any markdown linting, heading-structure validation, or CI enforcement that would have caught this defect mechanically \u2014 no new tooling, config, or workflow step.",
+    "Any change to the pending-decisions feature's delivered code or contracts (leave service/repository/routes, notification `related_entity_code` plumbing, the web approvals queue) \u2014 this phase fixes a documentation defect only.",
+    "Reformatting, reordering, or otherwise normalising the rest of docs/DOMAIN.md (heading levels, table alignment, section ordering, the `system`/`uptime` blocks) beyond the single defective line."
+  ],
+  "ambiguities": [
+    {
+      "description": "The review note references a prior fix on branch `fix/93f4284a-.../9/2` and a `gestalt-fix-ci.yml` workflow whose header comment describes this same one-line defect. Neither that workflow file nor any `gestalt-fix-ci` reference exists in this tree (`.github/workflows/` contains only `gestalt.yml`), so the referenced prior fix cannot be inspected to confirm the exact target form.",
+      "options": [
+        "Treat `git show origin/main:docs/DOMAIN.md` as the authoritative target form (the review note states it is correct there) and restore exactly that",
+        "Locate the referenced fix branch/workflow out-of-band before editing, and match its form",
+        "Restore the three-line form from first principles (row, blank line, `## balance`) without consulting either source"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The discovery pass for this phase was terminated by its iteration cap and supplied no findings, so the phase's original scope beyond the single review finding is unverified. The intent text states the feature-level review found exactly 1 issue in files this phase wrote, and the prescriptions name only the DOMAIN.md line-96 defect \u2014 but whether the phase was also meant to carry other work is not established by any evidence in the tree.",
+      "options": [
+        "Scope the phase to the single DOMAIN.md line-96 fix, as the prescriptions state",
+        "Re-run discovery with a higher iteration cap before scoping, to confirm no second issue exists",
+        "Scope to the DOMAIN.md fix and treat any further finding as a new phase"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "The review note says the fix \"is not present on this branch\" and that the same defect was already fixed on another branch. If that other branch is merged or merges later, this fix could conflict or duplicate. No evidence in the tree establishes the branch's state.",
+      "options": [
+        "Apply the fix on this branch regardless; a duplicate/conflicting fix is resolved at merge",
+        "Check whether the referenced fix branch is already merged before editing",
+        "Defer the fix to the branch that already carries it"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "docs/DOMAIN.md \u2014 section heading structure",
+      "mustExistOrExtend": true,
+      "invariant": "Every module section heading is a standalone line: a level-2 ATX heading (`## <module>`) that begins at column 0, is preceded by a blank line, and is never concatenated onto the end of a preceding table row or paragraph. A heading that shares a line with other content is not a heading \u2014 it renders as table-cell text and the section loses its anchor."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2014 `LeaveRequestQueryParams` table",
+      "mustExistOrExtend": true,
+      "invariant": "The table remains a well-formed markdown table: every row is a single line beginning and ending with `|`, the header/separator/body row structure is intact, and the final `offset` row is terminated by its closing `|` with nothing appended after it."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2014 `balance` section",
+      "mustExistOrExtend": true,
+      "invariant": "The `balance` section exists as a top-level module section with the same lifecycle as its siblings: it owns the `### Balance` and `### LeaveBalance` subsections, and its body is unchanged in content \u2014 only the heading line and the blank line preceding it are restored."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Read docs/DOMAIN.md by section heading `balance`",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must resolve to the `balance` section body (the `### Balance` and `### LeaveBalance` subsections). It must not fail to resolve, and must not resolve to the tail of the `leave` section \u2014 which is what happens today because the heading is absorbed into the `LeaveRequestQueryParams` table row."
+    },
+    {
+      "operation": "Read docs/DOMAIN.md as a whole (rendered or parsed)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "Must parse without a malformed-table or orphaned-heading artifact: no table row may contain heading text, and no level-2 heading may be missing from the document's heading outline. The `leave` section must end at its last table row, not swallow the `balance` heading."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The corrected three-line form must match the mainline branch's version of this region exactly: the `| offset | number | false |` row, a blank line, then `## balance`. Reuse that form verbatim rather than inventing a new layout.",
+      "referencePath": "docs/DOMAIN.md (line 96; compare against `git show origin/main:docs/DOMAIN.md`)"
+    },
+    {
+      "requirement": "The restored heading must follow the same style as the document's other module section headings \u2014 lowercase module name, level-2 ATX, no trailing punctuation \u2014 as used by `## base`, `## leave`, `## employee`, `## policy`, `## notification`, `## audit`, `## validation`, `## system`, `## uptime`.",
+      "referencePath": "docs/DOMAIN.md (existing `## ` headings, e.g. lines 1, 13, 138, 160, 207, 226, 283, 294, 304)"
+    },
+    {
+      "requirement": "The `balance` section's content must stay consistent with the reconciled architecture's balance entity description \u2014 the `### Balance` table's fields and the `Employee` / `LeavePolicy` relationships must not be altered by this fix.",
+      "referencePath": "docs/ARCHITECTURE.md \u2192 \"Phase 4 delivered (balance module)\""
+    },
+    {
+      "requirement": "The `leave` section's `LeaveRequestQueryParams` table must stay consistent with the leave module's query-parameter contract as recorded in the reconciled architecture \u2014 the fix restores formatting only and must not add, remove, or retype a query parameter.",
+      "referencePath": "docs/ARCHITECTURE.md \u2192 \"Leave Management Module \u2014 Reconciled Architecture\""
+    },
+    {
+      "requirement": "The known, deliberately-uncorrected DOMAIN.md drift must remain recorded as such in the architecture document \u2014 this fix must not silently resolve or contradict those recorded drift notes.",
+      "referencePath": "docs/ARCHITECTURE.md (the \"Known doc drift, not corrected here\" notes on the `audit` section and the stale `LeaveRequest`/`EmploymentStatus` records)"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/DOMAIN.md",
+      "why": "The single file this phase edits; the defect and its fix both live on line 96."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md",
+      "why": "The maintained source of truth for existing decisions. It records the DOMAIN.md drift that is deliberately left uncorrected, so the fix must not contradict it; it also owns the balance-module and leave-module descriptions the restored section must stay consistent with."
+    },
+    {
+      "target": ".github/workflows/gestalt.yml",
+      "why": "docs/** is in the workflow's paths-ignore set for both push and pull_request, so this documentation-only commit triggers no CI job. The fix must not be paired with a workflow change to force one."
+    }
+  ]
+}
