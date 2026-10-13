@@ -1,0 +1,154 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "documentation"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The `leave_requests` conceptual-table entry in the approver-notification feature section of docs/ARCHITECTURE.md no longer requires any new `leave_requests` index and no longer requires a `reverses_request_id IS NOT NULL` exclusion in the queue query; it states the queue predicate is the SUBMITTED status alone, served by the pre-existing `(employee_id, status)` index, and that no `leave_requests` DDL was delivered.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repository-interface entry for the pending-decisions read in docs/ARCHITECTURE.md documents the signature as taking an optional `employeeIds` scoping parameter plus the optional trailing `PoolClient`, returning the leave-owned `PendingDecision` projection array (never `LeaveRequest[]`), with no `actorId`/`actorRole` parameters, no `reverses_request_id` predicate, and no `id ASC` tie-break \u2014 matching the built `PgLeaveRequestRepository.findPendingDecisions`.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The error/response contract entry for the pending-decisions read in docs/ARCHITECTURE.md documents the success body as a bare array of the 7-field `PendingDecision` projection (possibly empty, `[]` is a valid 200 and not a 404), not an array of `LeaveRequest` rows.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The queue-visibility business rule in docs/ARCHITECTURE.md states the built scoping: ADMIN passes no employee filter and sees every SUBMITTED request; MANAGER passes the actor's own id plus their direct reports' ids (one level, not transitive); EMPLOYEE passes the actor's own id only \u2014 with no \"and not their own\" / \"sees none\" wording remaining anywhere in the file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "A repo-wide search of docs/ARCHITECTURE.md for the stale phrases (`reverses_request_id IS NULL` in the queue context, `findPendingDecisions(actorId`, `array of LeaveRequest rows` for the pending-decisions 200, `and not their own`, `EMPLOYEE: none`) returns no remaining occurrence, and the corrected wording is consistent with docs/DOMAIN.md's `PendingDecision` section and ADR-002/ADR-004.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Documentation-only phase: no file under `src/`, `web/src/`, `migrations/`, or `tests/` may be modified. The built code is the contract; editing it would revert a recorded decision.",
+    "The recorded decisions win: ADR-002 (no `leave_requests` status/approver_id indexes; the existing `(employee_id, status)` index serves the predicate) and ADR-004 (repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate; the 200 body is the 7-field `PendingDecision` projection; the service mirrors `list`'s branch and passes `employeeIds`) are authoritative and must not be re-litigated or softened.",
+    "Phase specs and PLAN.md are historical records and must NOT be edited; only living documents (docs/ARCHITECTURE.md, docs/DOMAIN.md, docs/DECISIONS.md) are corrected.",
+    "The correction must be made at every stale site in one change so the document does not end up internally contradictory (e.g. a corrected repository signature next to an uncorrected business rule).",
+    "Do not introduce new architectural claims beyond what the built code and the ADRs already establish \u2014 no new index, no new predicate, no new type, no new module edge, no new endpoint behaviour may be documented as if delivered.",
+    "The corrected text must keep the section's existing structure and heading names (the section is addressable by heading and other sections cross-reference it), and must preserve the surrounding delivered-phase narrative."
+  ],
+  "outOfScope": [
+    "Any change to `src/modules/leave/leave.repository.ts`, `leave.service.ts`, `leave.routes.ts`, `leave.model.ts`, or the leave module's `index.ts` \u2014 including \"fixing\" the signature, predicate, ordering, or return type to match the stale prose.",
+    "Any change to `tests/unit/modules/leave/leave.routes.test.ts` or `leave.service.test.ts` \u2014 the 11 route cases and the service scoping assertions already pin the built behaviour.",
+    "Adding the rejected `leave_requests` indexes or the `reverses_request_id IS NOT NULL` predicate to the delivered migration `migrations/20260915000000_add_related_entity_code_to_notifications.js`.",
+    "Rewriting the historical phase-delivered blocks or the recommended-phases list to retro-fit the corrected wording; only the stale statements themselves are corrected.",
+    "Promoting `PendingDecision` to `src/shared/types/` or otherwise changing where the projection lives \u2014 ADR-004 keeps it leave-owned and exported from the leave module's `index.ts`."
+  ],
+  "ambiguities": [
+    {
+      "description": "The same section's recommended-phases list still names \"leave_requests status/approver_id indexes\" as phase 1, and the conceptual-tables entry carries a \"NOT delivered as of Phase 1\" note. It is unclear whether these count as stale sites to correct or as historical plan record to leave alone.",
+      "options": [
+        "Correct them too, so no line in the section still asserts the rejected indexes",
+        "Leave the recommended-phases list as historical plan record and correct only the four named statements"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "docs/DOMAIN.md's `PendingDecision` entry contains a \"Divergence from the design wording\" paragraph that names the ARCHITECTURE.md business-rule line as stale. Once that line is corrected, it is unclear whether the divergence paragraph should be removed or retained as historical context.",
+      "options": [
+        "Retain it as a record of the resolved divergence",
+        "Remove it, since the divergence no longer exists"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "PendingDecision",
+      "mustExistOrExtend": true,
+      "invariant": "A read projection of LeaveRequest with no id of its own, no table, and no lifecycle beyond queue membership: a request is a member if and only if its current status is SUBMITTED, so CANCELLED is never a member state and membership is re-derived on every read. It is leave-owned (declared in the leave module's model, exported from the module's index) and is deliberately not promoted to shared types."
+    },
+    {
+      "entity": "LeaveRequest",
+      "mustExistOrExtend": true,
+      "invariant": "The queue read is a status-filtered read of the same table with no additional exclusion: a reversal row (non-null `reversesRequestId`) is born CANCELLED and is therefore already excluded by the SUBMITTED-only predicate, so no `reverses_request_id` filter is needed or documented for the queue. The `reverses_request_id IS NULL` rule remains a rule for aggregations that sum `requestedDays`, not for queue membership."
+    },
+    {
+      "entity": "leave_requests (conceptual table)",
+      "mustExistOrExtend": true,
+      "invariant": "Unchanged by this feature: no new column and no new index. The queue predicate is served by the pre-existing `(employee_id, status)` index; `approver_id` needs no index for recipient resolution. The delivered migration adds no `leave_requests` DDL."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "ILeaveRepository.findPendingDecisions \u2014 the pending-decisions queue read",
+      "authRule": "No authorization in the repository: it applies only the SUBMITTED predicate plus the optional employee-id scoping it is handed. Role scoping is the service's, never re-expressed in SQL.",
+      "idempotent": true,
+      "errorSemantics": "Read-only and total: returns an array (possibly empty), never null, never throws for an empty queue; opens no transaction, takes no row lock, and forwards no client unless one is supplied."
+    },
+    {
+      "operation": "ILeaveService.listPendingDecisions \u2014 the queue read the route delegates to",
+      "authRule": "Requires an authenticated actor (missing/invalid identity -> UnauthorizedError; invalid role -> ForbiddenError). Visibility mirrors the module's existing list branch: ADMIN passes no employee filter, MANAGER passes the actor's own id plus direct-report ids, EMPLOYEE passes the actor's own id only. Queue membership and decide authority stay separate \u2014 the decide guards remain the sole authority on taking a decision.",
+      "idempotent": true,
+      "errorSemantics": "Read-only: no unit of work, no client forwarding, no writes, no audit entry, no notification. Returns the projection array verbatim \u2014 no re-sort, no re-filter, no cap."
+    },
+    {
+      "operation": "GET /leaves/pending-decisions \u2014 the queue read endpoint",
+      "authRule": "Requires a valid bearer token; the path is NOT in PUBLIC_PATHS. The route resolves the actor at the API boundary and forwards it unchanged \u2014 it performs no role branch and no scoping of its own.",
+      "idempotent": true,
+      "errorSemantics": "401 with code UNAUTHORIZED for a missing or invalid actor; 200 with a bare array of the 7-field PendingDecision projection on success, where an empty queue is a valid 200 with [] and not a 404; any other throw maps to 500 with a generic body that does not leak the dependency's message."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The corrected repository-interface wording must match the built signature and body of `PgLeaveRequestRepository.findPendingDecisions` (optional `employeeIds`, optional trailing `PoolClient`, SUBMITTED-only predicate, `ORDER BY start_date ASC`, returns the projection array) rather than the superseded design signature.",
+      "referencePath": "src/modules/leave/leave.repository.ts"
+    },
+    {
+      "requirement": "The corrected visibility rule must match the built role branch in `LeaveService.listPendingDecisions` (EMPLOYEE -> own id; MANAGER -> own id plus direct reports; ADMIN -> no filter), which mirrors `LeaveService.list`.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The corrected 200-body wording must match the `PendingDecision` projection as already documented in the domain reference (7 fields, membership SUBMITTED-only, ordering owned by the repository, built scoping named as the contract) \u2014 the two documents must not disagree.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The corrected index/predicate wording must match ADR-002 (no `leave_requests` status/approver_id indexes; the existing `(employee_id, status)` index serves the predicate) and ADR-004 (repository applies only the employee-id filter and the SUBMITTED predicate; the body is the projection, not `LeaveRequest` rows).",
+      "referencePath": "docs/DECISIONS.md"
+    },
+    {
+      "requirement": "The corrected route/error wording must match the built handler's pass-through shape and error mapping (actor resolved at the boundary, service called directly, `sendError` mapping, generic 500 body).",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The corrected wording must not contradict the reconciled architecture's `PendingDecision` entity entry (projection, no table, membership derived from status on every read) or its module ownership of the queue read by the leave module.",
+      "referencePath": ".gestalt/architecture/reconciled.json"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/ARCHITECTURE.md \u2014 section \"Feature: Notify the approver when a leave request is cancelled\"",
+      "why": "All four stale statements live in this one section (conceptual tables, repository interfaces, cross-cutting error contract, business rules); the correction is a single section update so the section cannot end up internally contradictory."
+    },
+    {
+      "target": "docs/DOMAIN.md \u2014 `PendingDecision` entry",
+      "why": "Already states the built behaviour and explicitly names the stale ARCHITECTURE.md business-rule line; the corrected ARCHITECTURE.md wording must agree with it, and the divergence note there becomes redundant once the stale line is fixed."
+    },
+    {
+      "target": "docs/DECISIONS.md \u2014 ADR-002 and ADR-004",
+      "why": "The authoritative recorded decisions the corrected documentation must restate; they are the reason the code is not to be touched."
+    },
+    {
+      "target": "src/modules/leave/leave.repository.ts, leave.service.ts, leave.routes.ts",
+      "why": "The built behaviour the corrected prose must describe; read-only reference for the doc edit, never modified by this phase."
+    }
+  ]
+}
