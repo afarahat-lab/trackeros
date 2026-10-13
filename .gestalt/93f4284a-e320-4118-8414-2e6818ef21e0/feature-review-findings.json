@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 11,
+  "attempts": 12,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -38,23 +38,23 @@
       "quoted_line": "9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 11,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 12,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] The `## balance` section heading has been joined onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer parses as a heading and the whole `balance` section is swallowed into the leave table. This is a regression introduced on this branch: `origin/main` has `| offset | number | false |` followed by a blank line and `## balance` on its own line. It is also the exact defect a prior review raised and that commit 14f1acff claimed to correct (\"superseded -> open docs/DOMAIN.md:96 ... line 96 still reads `| offset | number | false |## balance`\") — that commit touched no file under docs/, so the fix was never applied and the line is still broken here.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Split the line: end the table row at `| offset | number | false |`, then a blank line, then `## balance` on its own line (as on origin/main).",
+      "message": "[review/documentation] The `## balance` section heading has been joined onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer renders and the `balance` section is swallowed into the leave section. This is the exact defect `.github/workflows/gestalt-fix-ci.yml` was added to make fixable (\"the code agent made the correct one-line fix to `docs/DOMAIN.md` (`## balance` moved back onto its own line)\"), and this PR re-introduces it. Restore the newline so `## balance` starts its own line.\n  Evidence: \"| offset | number | false |## balance\"",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 11,
+      "last_seen_attempt": 12,
       "fixed_at_attempt": null,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
@@ -103,15 +103,15 @@
     {
       "rule_id": "review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1668,
-      "message": "[review/stale-spec] This line still requires two `leave_requests` indexes and a `reverses_request_id IS NOT NULL` exclusion in the queue query. ADR-002 records the decision rejecting both indexes (\"the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query\"), and ADR-004 records that the repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate. The built code matches the ADRs: the delivered migration `migrations/20260915000000_add_related_entity_code_to_notifications.js` adds no `leave_requests` DDL, and `PgLeaveRequestRepository.findPendingDecisions` builds `conditions` from `status = 'SUBMITTED'` plus the optional `employee_id = ANY($n)` only. The code is correct; this living document is stale.\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: …",
-      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
+      "line": 1719,
+      "message": "[review/stale-spec] Stale placement of recipient resolution. `docs/DECISIONS.md` → ADR-003 records the opposite and gives the reason: \"Resolving the recipient inside the `withTransaction` callback: `IEmployeeService.getEmployeeById` takes no `PoolClient`, so the employee read cannot join the transaction ... Resolution is therefore hoisted above `uow.withTransaction`, and only the notification INSERT joins it.\" The built code matches ADR-003 — `const approverRecipient = await this.resolveApproverRecipient(request);` sits above `return this.uow.withTransaction(...)`. Change \"and inside the same callback\" to \"before the unit of work opens\".\n  Evidence: \"**Transaction.** Cancelling a SUBMITTED or APPROVED request performs, in ONE unit of work: (a) the status change — an in-place `update` to CANCELLED for SUBMITTED, or the GP-008 insert of a NEW CANCELLED reversal row for APPROVED; (b) the balance release — `pendingDays -= requestedDays` for SUBMITTED, `usedDays -= requestedDays` for …",
+      "quoted_line": "**Transaction.** Cancelling a SUBMITTED or APPROVED request performs, in ONE unit of work: (a) the status change — an in-place `update` to CANCELLED for SUBMITTED, or the GP-008 insert of a NEW CANCELLED reversal row for APPROVED; (b) the balance release — `pendingDays -= requestedDays` for SUBMITTED, `usedDays -= requestedDays` for APPROVED; (c) the CANCEL audit entry (unchanged in shape); (d) the approver notification insert. Repository and service methods that must join a caller's transaction take an OPTIONAL trailing `client?: PoolClient` defaulting to the shared pool. `LeaveService.cancel` calls `this.uow.withTransaction(async (client) => { ... })`; `PgUnitOfWork` acquires a client, issues BEGIN, runs the callback, COMMITs on resolve / ROLLBACKs on throw, and always releases the client. Inside the callback the SAME `client` is threaded to every participating call. `BEGIN`/`COMMIT`/`ROLLBACK` appear ONLY in `PgUnitOfWork`. The approver is resolved before the notification insert and inside the same callback: for an APPROVED request, `request.approverId` read from the ORIGINAL row (the reversal row's `approverId` is null by construction); for a SUBMITTED request, `employeeService.getEmployeeById(request.employeeId).managerId`.",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 6,
-      "last_seen_attempt": 10,
-      "fixed_at_attempt": 11,
+      "last_seen_attempt": 12,
+      "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
@@ -122,10 +122,10 @@
       "quoted_line": "- Suppressing self-notification when the cancelling actor IS the resolved recipient: suppression",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 11,
       "last_seen_attempt": 11,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 12,
       "file_digest": "b869e1546cc556444772ae530e8cdf01"
     }
   ]
