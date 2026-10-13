@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 9,
+  "attempts": 10,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -34,13 +34,13 @@
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
       "line": 1774,
-      "message": "[review/documentation] The \"Phase 7 delivered\" section is emitted twice, byte-identical: lines 1762–1773 and 1774–1785 (verified with `diff` — the two ranges are identical). Both copies are added by this phase's diff. The duplicated block also swallows the blank line before it, so the second copy's heading is glued to the previous bullet. A reader (and the context/drift agents that consume this file) now sees two conflicting-looking records of the same phase. Fix: delete the second copy (lines 1774–1785) and keep the first.\n  Evidence: \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\"",
+      "message": "[review/documentation] The `### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)` section is duplicated verbatim: lines 1762–1773 and 1774–1785 are byte-identical (verified with `diff`), and the heading occurs twice in the file while it occurs zero times on `origin/main`. The duplication was introduced by this diff. Two copies of the same \"delivered\" record will drift apart on the next edit, and the second copy is unreachable by anchor.\n  Evidence: \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\"\n  Fix: Delete the second copy of the block (the heading at line 1774 through the `- **Stale text left in place:**` bullet that ends it), keeping the first.",
       "quoted_line": "### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 9,
+      "last_seen_attempt": 10,
       "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
@@ -48,13 +48,13 @@
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] This diff concatenated the `## balance` heading onto the last row of the `LeaveRequestQueryParams` table (the diff shows `-| offset | number | false |` / `-` / `-## balance` replaced by `+| offset | number | false |## balance`). The heading no longer starts a line, so the `balance` section is no longer a heading and renders as table-row text — the markdown structure of the file is broken by this phase's change. Fix: restore the line break so the row and the heading are separate lines.\n  Evidence: \"| offset | number | false |## balance\"",
+      "message": "[review/documentation] This diff joined the `## balance` section heading onto the last row of the `LeaveRequestQueryParams` table, so the heading is no longer a heading (it renders as table-cell text) and the `balance` section loses its anchor. `git show origin/main:docs/DOMAIN.md` has the correct form — `| offset | number | false |`, a blank line, then `## balance` — and the diff hunk shows this PR replaced exactly that with the joined line. This is the same one-line defect `gestalt-fix-ci.yml`'s header comment describes being fixed on `fix/93f4284a-.../9/2`; the fix is not present on this branch.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Split the line back into three: `| offset | number | false |`, an empty line, then `## balance` (matching `origin/main`).",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 9,
+      "last_seen_attempt": 10,
       "fixed_at_attempt": null,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
@@ -103,14 +103,14 @@
     {
       "rule_id": "review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1733,
-      "message": "[review/stale-spec] Stale rule contradicting the recorded decision and the built code. This line, added by this phase's diff, asserts \"Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written.\" The built `LeaveService.cancellationRecipients` does the opposite — it drops any notice whose recipient is the actor (`if (notice.recipientId === actor.id) { return false; }`, src/modules/leave/leave.service.ts:636) — and `docs/DECISIONS.md` CLARIFY-006 (amended 2026-10-09) records that amendment as binding. The document states the inverse of the implemented behaviour.\n  Evidence: \"9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.\"",
-      "quoted_line": "9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.",
+      "line": 1668,
+      "message": "[review/stale-spec] This line still requires two `leave_requests` indexes and a `reverses_request_id IS NOT NULL` exclusion in the queue query. ADR-002 records the decision rejecting both indexes (\"the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query\"), and ADR-004 records that the repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate. The built code matches the ADRs: the delivered migration `migrations/20260915000000_add_related_entity_code_to_notifications.js` adds no `leave_requests` DDL, and `PgLeaveRequestRepository.findPendingDecisions` builds `conditions` from `status = 'SUBMITTED'` plus the optional `employee_id = ANY($n)` only. The code is correct; this living document is stale.\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: …",
+      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 6,
-      "last_seen_attempt": 9,
+      "last_seen_attempt": 10,
       "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
