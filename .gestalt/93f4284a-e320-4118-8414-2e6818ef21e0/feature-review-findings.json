@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 6,
+  "attempts": 7,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -38,24 +38,24 @@
       "quoted_line": "### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 6,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 7,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] This PR's diff merged the `## balance` section heading onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer renders as a heading and the `balance` section is swallowed into the table. The diff hunk shows the previous `| offset | number | false |` + blank line + `## balance` replaced by this single line.\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break: end the table row at `| offset | number | false |` and put `## balance` on its own line, separated by a blank line.",
+      "message": "[review/documentation] Markdown structure broken by this diff. The `## balance` heading was concatenated onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer starts a line and the `balance` section is no longer a heading — it renders as table-row text. The diff shows the blank line between the row and the heading was removed (`-| offset | number | false |` / `-` / `-## balance` → `+| offset | number | false |## balance`).\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break so the row and the heading are separate lines: `| offset | number | false |` followed by a blank line and then `## balance`.",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 5,
-      "fixed_at_attempt": 6,
+      "last_seen_attempt": 7,
+      "fixed_at_attempt": null,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
     {
@@ -103,14 +103,14 @@
     {
       "rule_id": "review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1721,
-      "message": "[review/stale-spec] \"200 with an array of `LeaveRequest` rows\" contradicts the recorded decision ADR-004: \"its 200 body is a bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows\", with the rejected alternative \"Returning full `LeaveRequest` rows and letting the client project: it would expose `approverId`, `approvalComment`, `reason` and the cancellation fields\". The built repository returns `PendingDecision[]` (`toPendingDecision(mapRow(row))` in `src/modules/leave/leave.repository.ts`). The code is correct; this response contract is stale.\n  Evidence: \"**Errors.** Errors return `{ error: string; code: string }` via the existing `sendError` helper (`AppError` -> its `statusCode` + `code`; any other throw -> 500 `{ error: 'Internal Server Error' }`). For `GET /leaves/pending-decisions`: 401 (`UnauthorizedError`, code `UNAUTHORIZED`) for a missing or invalid actor; 200 with an array of `LeaveRequest` rows (possibly empty) on success — an empty …",
-      "quoted_line": "**Errors.** Errors return `{ error: string; code: string }` via the existing `sendError` helper (`AppError` -> its `statusCode` + `code`; any other throw -> 500 `{ error: 'Internal Server Error' }`). For `GET /leaves/pending-decisions`: 401 (`UnauthorizedError`, code `UNAUTHORIZED`) for a missing or invalid actor; 200 with an array of `LeaveRequest` rows (possibly empty) on success — an empty queue is a valid 200 with `[]`, not a 404. For `POST /leaves/:id/cancel` the existing contract is unchanged: 400 validation, 401 missing/invalid actor, 403 `ForbiddenError` from `assertCanCancel`, 404 `NotFoundError` for an unknown id, 409 `ConflictError` for an already-begun leave or an already-reversed APPROVED request, 200 with the cancelled (or reversal) row on success. A failure to insert the approver notification is not mapped to a new status: it throws inside the unit of work, the transaction rolls back, and the caller receives the underlying error (500) — the cancelled request is never left committed without its notification record.",
+      "line": 1668,
+      "message": "[review/stale-spec] Stale requirement contradicting a recorded decision. This line asserts two `leave_requests` indexes are required (\"New indexes: standalone `status` ... and `approver_id`\"), but `docs/DECISIONS.md` ADR-002 (Accepted, 2026-09-15) rejects exactly that: \"Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query.\" The delivered migration correctly adds no `leave_requests` DDL, so the code implements the decision and this living document is stale. The same stale claim is repeated in the *Recommended phases* list at line 1745 (\"Migration: `notifications.related_entity_code` + `leave_requests` status/approver_id indexes (1 file)\").\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: …",
+      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 6,
-      "last_seen_attempt": 6,
+      "last_seen_attempt": 7,
       "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
