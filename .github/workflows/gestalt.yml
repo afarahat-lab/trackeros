@@ -65,6 +65,11 @@ on:
       - 'docs/**'
       - 'AGENTS.md'
 
+  # Callable, so `gestalt-fix-ci.yml` can run this EXACT job for a fix whose content is
+  # documentation. One definition, two triggers — a second copy of the quality job would drift
+  # from this one, and the whole point is that a fix is gated by the SAME checks as any change.
+  workflow_call:
+
   workflow_dispatch:
     inputs:
       environment:
