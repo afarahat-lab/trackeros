@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 7,
+  "attempts": 8,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -52,10 +52,10 @@
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 7,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 8,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
     {
@@ -103,14 +103,14 @@
     {
       "rule_id": "review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1668,
-      "message": "[review/stale-spec] Stale requirement contradicting a recorded decision. This line asserts two `leave_requests` indexes are required (\"New indexes: standalone `status` ... and `approver_id`\"), but `docs/DECISIONS.md` ADR-002 (Accepted, 2026-09-15) rejects exactly that: \"Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query.\" The delivered migration correctly adds no `leave_requests` DDL, so the code implements the decision and this living document is stale. The same stale claim is repeated in the *Recommended phases* list at line 1745 (\"Migration: `notifications.related_entity_code` + `leave_requests` status/approver_id indexes (1 file)\").\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: …",
-      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
+      "line": 1729,
+      "message": "[review/stale-spec] Stale notification count, same root cause as rule 9. Rule 5 states a SUBMITTED or APPROVED cancellation writes \"two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new)\". `docs/DECISIONS.md` → CLARIFY-006 (amended 2026-10-09) removes the cancelling actor from the recipient set, so the overwhelmingly common case — the requester cancelling their own SUBMITTED request — writes ONE row, not two. The built code and its test agree: `tests/unit/modules/leave/leave.service.test.ts` asserts `expect(notificationService.inputs).toHaveLength(1)` for \"notifies only the direct manager when the owner cancels a SUBMITTED request\".\n  Evidence: \"5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, …",
+      "quoted_line": "5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 6,
-      "last_seen_attempt": 7,
+      "last_seen_attempt": 8,
       "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
