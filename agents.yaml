@@ -273,7 +273,15 @@ agents:
       # high-impact spec agent was running on a weaker/different model than the rest of the pipeline.
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.15
-      max_tokens: 5000
+      # 🔴 2026-10-13 — 5000 -> 12000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 5000 it
+      # would have truncated ordinary work. Sized from 3,107 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 3,498 · largest legitimate 6,930 · 0 call(s) at the 65,536 ceiling
+      # 12,000 is 1.73x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 12000
     tools:
       builtin: [readFile, listDirectory, searchFiles]
     prompt_extensions:
@@ -431,7 +439,15 @@ agents:
       # explicitly to bypass the env-fallthrough.
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 8000
+      # 🔴 2026-10-13 — 8000 -> 40000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 8000 it
+      # would have truncated ordinary work. Sized from 2,426 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 19,276 · largest legitimate 30,913 · 0 call(s) at the 65,536 ceiling
+      # 40,000 is 1.29x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 40000
     tools:
       builtin:
         - readFile          # read existing context files before updating
@@ -644,7 +660,17 @@ agents:
     verificationGuidance:
     - Before evaluating any finding, read ARCHITECTURE.md to understand this project's specific layer names, boundaries, and directory structure. Use this to determine what constitutes the data access layer, business logic layer, and routing layer for this project.
     - A finding is only valid if it violates a rule given the actual structure of this project as described in ARCHITECTURE.md.
-    - "Scope your evaluation to the files changed in this phase only; files outside that set were passing before this phase, so do not re-evaluate them. When the 'Phase scope' block LISTS the changed files, those are authoritative — evaluate exactly them and do NOT re-derive the list, because a second derivation can disagree with the one the platform already resolved. Only when the block gives a defaultBranch but no file list should you derive it yourself: run `git diff origin/<defaultBranch>..HEAD --name-only` (TWO dots — the clone is shallow, so three-dot/merge-base diffs do not resolve) via executeScript. If that fails or returns empty, fall through to evaluating the artifact files inlined above."
+    - 'Scope your evaluation to the files changed in this phase only; files outside that set were passing
+      before this phase, so do not re-evaluate them. When the ''Phase scope'' block LISTS the changed files,
+      those are authoritative — evaluate exactly them and do NOT re-derive the list, because a second derivation
+      can disagree with the one the platform already resolved. Only when the block gives a defaultBranch but
+      no file list should you derive it yourself, and then use the gitDiff TOOL with baseRef `origin/<defaultBranch>`
+      — never a shell `git diff`. gitDiff compares from the MERGE BASE; a shell `git diff origin/<defaultBranch>..HEAD`
+      is two-dot and attributes the default branch''s OWN later changes to this branch as deletions. That
+      produced a fully-reasoned false finding on 2026-10-12: a reviewer reported that a branch had removed
+      147 lines of configuration that the default branch had ADDED after the branch was cut (the branch''s
+      real change to that file was +14/-2). You cannot tell the difference from inside the output, so use
+      the tool. If gitDiff fails or returns empty, fall through to evaluating the artifact files inlined above.'
     - 'The repository pattern is sanctioned data-access delegation. A business-logic-layer service that depends on a repository INTERFACE — via constructor injection or by importing the interface type — is correctly delegating data access to the data access layer; this is NOT a data-access-layer violation. Only flag a data-access violation when a non-data-access-layer file performs data access DIRECTLY: inline SQL, connection management, query execution, or direct datastore calls.'
     - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's git diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
     - Consult the dependency-direction graph in ARCHITECTURE.md. A cross-module dependency that follows a documented allowed direction is sanctioned — do not flag it as a circular or bidirectional-dependency risk unless you find an ACTUAL reverse import that creates a cycle. Speculative risk is not a violation.
@@ -663,7 +689,15 @@ agents:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       reasoning_effort: low
       temperature: 0.0
-      max_tokens: 4000
+      # 🔴 2026-10-13 — 4000 -> 40000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 4000 it
+      # would have truncated ordinary work. Sized from 2,953 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 15,724 · largest legitimate 28,260 · 7 call(s) at the 65,536 ceiling
+      # 40,000 is 1.42x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 40000
     tools:
       builtin: [executeScript, readFile, searchFiles, getFileTree, gitDiff]
     prompt_extensions: []
@@ -679,15 +713,18 @@ agents:
     # 1,200,000 this project declares, so iterations remain the binding bound.
     # 🔴 REVISIT ON ANY CAP HIT — a gate cut at 40 again means a removed cost returned. Get the
     # tool-call breakdown from the platform's scripts/classify_tool_calls.py (cite its version).
-    # 🔴 2026-10-12 — the FEATURE review's two biggest slices were cut at 40, twice, and both
-    # reviews ended INCONCLUSIVE without a verdict. `leave`: 64 calls / 827,447 tok COMPLETE in one
-    # run, then 63 calls / 721,751 tok TRUNCATED in the next — nearly identical work, fewer tokens,
-    # opposite outcome, i.e. a marginal bound rather than a cost that came back. `(unscoped)`
-    # truncated at 62. Every other slice ran 10-36 calls and finished.
+    # 🔴 2026-10-12 — 40 -> 80 iterations, 1,200,000 -> 1,600,000 tokens. The cap was HIT on the
+    # FEATURE review's two biggest slices, twice, and both reviews ended INCONCLUSIVE without
+    # reaching a verdict (~$2.5 each):
     #
-    # 1,600,000 for BOTH gate agents at 80 iterations: they run on the SAME slices of the same
-    # diff, so a difference between them would need its own justification, and ~18,000/iteration
-    # x 80 = ~1,450,000 keeps ITERATIONS the binding bound (binding at ~89, not ~66).
+    #   slice        run 1 (18:30)                     run 2 (22:52)
+    #   leave        64 calls, 827,447 tok, COMPLETE   63 calls, 721,751 tok, TRUNCATED
+    #   (unscoped)   never reached                     62 calls, 566,988 tok, TRUNCATED
+    #   all others   16-36 calls, complete             10-34 calls, complete
+    #
+    # Nearly identical work, FEWER tokens, opposite outcome — a marginal bound, not a cost that
+    # came back. 1,600,000 matches review-agent at the same 80 iterations (the two run on the SAME
+    # slices) and keeps ITERATIONS binding: ~18,000/iteration x 80 = ~1,450,000, binding at ~89.
     max_iterations: 80
     schema:
       models:
@@ -739,7 +776,7 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1600000
+    token_budget: 1200000
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
@@ -754,7 +791,15 @@ agents:
       # not supported by DeepInfra).
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.0
-      max_tokens: 4000
+      # 🔴 2026-10-13 — 4000 -> 32000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 4000 it
+      # would have truncated ordinary work. Sized from 4,020 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 12,092 · largest legitimate 23,364 · 0 call(s) at the 65,536 ceiling
+      # 32,000 is 1.37x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 32000
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
       # to verify import resolution before flagging "Import cannot be
@@ -770,18 +815,20 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    # 🔴 40 -> 80 FOR THE RE-REVIEW (2026-10-11), and it had to be committed HERE.
+    # 🔴 RAISED 40 -> 80 (2026-10-11), on measurement, not on principle.
     #
-    # The review reads `agents.yaml` from its WORK DIR — a clone of the branch under review
-    # (`project_root=review_dir` in `feature_review_activity`). So the same change on `main` does
-    # NOT reach a review of this branch, and the re-run would have been silently identical to the
-    # first. The park text's "raise it in the PROJECT's agents.yaml, then resume" is true and
-    # incomplete: it must be on the BRANCH being reviewed.
+    # Feature `93f4284a`'s review: 4 of 11 slices spent their ENTIRE cap without ever calling
+    # `complete` — and every slice that DID call it completed. That is a perfect 10/10 separator,
+    # so truncation is a behaviour, not a property of the slice: `notification` (3 files) finished
+    # where `web-leave` (3 files) did not, and `web-approvals` (2 files) truncated where
+    # `web-presentation-guards` (2 files) finished.
     #
-    # Why 80: of 11 slices, 4 spent their entire cap without ever calling `complete`, and every
-    # slice that did call it completed — 10/10. `web-presentation-pages` used all 40 AND called
-    # `complete`, finishing on the wire, so 40 is marginal even when it works. The token budget
-    # was not the constraint: `leave` stopped at 725,628 of 1,200,000.
+    # `web-presentation-pages` used all 40 iterations AND called `complete` — it finished on the
+    # wire. So 40 is marginal even for slices that succeed, which is the argument for raising it
+    # rather than treating three slices as misbehaving.
+    #
+    # Note the token budget was NOT the binding constraint: `leave` stopped at 725,628 of
+    # 1,200,000, leaving 40% unused. Raising the budget would have changed nothing.
     max_iterations: 80
     schema:
       models:
@@ -958,7 +1005,33 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -985,7 +1058,33 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1015,7 +1114,33 @@ agents:
     llm:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1050,7 +1175,33 @@ agents:
       # the chief model choice once DeepInfra Kimi stability improves.
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 12000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: []   # §config-migration — explicit platform grant
     prompt_extensions:
@@ -1089,7 +1240,33 @@ agents:
       # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort).
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.1
-      max_tokens: 24000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # Derived from 106 non-saturated consults in the platform's trace store: max answer 935, max
+      # reasoning 21,162, max completion 21,610. 24,000 clears that with 1.11x headroom and turns a
+      # runaway into a BOUNDED failure (`finish_reason: length` -> `UnexpectedModelBehavior` ->
+      # `CONSULT_BUDGET_FAILURE`, which stops the consult chain instead of recursing).
+      #
+      # Per-agent observed maxima before this change (cap -> observed max completion, n):
+      #   planner-agent          24,000 -> 21,610  n=42      data-architect-agent  6,000 -> 9,100  n=12
+      #   chief-architect-agent  12,000 ->  3,715  n=28      domain-architect-agent 6,000 -> 1,755  n=18
+      #   app-architect-agent     6,000 ->  1,133  n=6
+      # `data-architect-agent` was TRUNCATING at 0.66x. One value rather than five because these
+      # agents do the same job, the question is routed by topology not difficulty, and maxima
+      # differing 19x on samples of 6-42 is mostly sampling noise.
+      #
+      # 🔴 THE 24,000 FOR planner-agent WAS HERE AND WAS REVERTED BY ACCIDENT. gestalt #275 applied
+      # it to this file; trackeros #685 then reverted the premature merge of feature 93f4284a, and
+      # the cap had only ever reached this repo inside that merge — so reverting the contamination
+      # correctly took the legitimate config change with it, silently. It sat at 3,000 again, which
+      # is BELOW the median observed completion of 7,113.
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11): 1.11x HEADROOM IS NOT HEADROOM. 24,000 sat just
+      # above the largest of 106 observed consults, so the next slightly-longer one would be cut
+      # off — and with no retry a cut-off consult is a FAILED consult, not a slower one. 32,000 is
+      # 1.48x the pooled maximum and still under HALF the 65,536 runaway ceiling. It costs nothing
+      # on an ordinary call: a completion cap is a ceiling, not an allocation, and the p50 consult
+      # spends ~210 completion tokens.
+      max_tokens: 32000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
     prompt_extensions:

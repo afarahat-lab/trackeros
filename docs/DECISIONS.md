@@ -211,6 +211,20 @@ are unchanged, so the new read currently has no presentation consumer.
 
 ---
 
+> 🔴 **RESTORED 2026-10-11.** This section was removed by #685, the revert of feature
+> `93f4284a`'s premature merge. The revert itself was correct — the feature was not accepted — but
+> these answers had only ever reached this repo INSIDE that merge, so reverting the contamination
+> took them with it. They are an INPUT to the feature, not documentation of its code: a re-run must
+> implement the same answers, and answer 6 in particular was amended by the owner after the fact.
+>
+> The feature's own `ADR-002`..`ADR-005` were removed by the same revert and are deliberately NOT
+> restored — they document code that no longer exists and belong with the feature when it returns.
+>
+> Found by auditing every hunk the revert removed, after the consult caps turned out to be a second
+> casualty of the same commit. `gestalt template upgrade --dry-run` CANNOT find these: it reports
+> what the template wants to change, and the revert did not touch the template.
+---
+
 # Operator clarification decisions
 
 Answers an operator gave to a clarification the platform raised, recorded so the same question is
