@@ -6,11 +6,11 @@
       "rule_id": "review/consistency",
       "file_path": "src/modules/leave/leave.service.ts",
       "line": 636,
-      "message": "[review/consistency] This actor-exclusion filter contradicts the stated invariant of the phase specs this feature was built against. Spec 1f61f624 (phase 3) constrains: \"The notification set is a function of the STATE CHANGE, not of who performed it: exactly TWO notificationService.create calls for SUBMITTED and APPROVED cancellations, exactly ONE for DRAFT\" and \"Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.\" Spec 9244f013 (phase 6) repeats it: \"no case may assert suppression on the basis of the actor being the recipient\", and its success criterion #3 requires the DRAFT case to assert exactly one notification. With this filter, an owner cancelling their own SUBMITTED request emits ONE notification instead of two, and the DRAFT case now asserts zero (tests/unit/modules/leave/leave.service.test.ts:743, …",
+      "message": "[review/consistency] This actor-exclusion filter contradicts the stated invariant of the phase specs this feature was built against. Spec 1f61f624 (phase 3) constrains: \"The notification set is a function of the STATE CHANGE, not of who performed it: exactly TWO notificationService.create calls for SUBMITTED and APPROVED cancellations, exactly ONE for DRAFT\" and \"Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.\" Spec 9244f013 (phase 6) repeats it: \"no case may assert suppression on the basis of the actor being the recipient\", and its success criterion #3 requires the DRAFT case to assert exactly one notification. With this filter, an owner cancelling their own SUBMITTED request emits ONE notification instead of two, and the DRAFT case now asserts zero (tests/unit/modules/leave/leave.service.test.ts:743, \u2026",
       "quoted_line": "      if (notice.recipientId === actor.id) {",
       "severity": "",
       "agent_role": "",
-      "status": "fixed",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
       "fixed_at_attempt": 2,
@@ -20,11 +20,11 @@
       "rule_id": "review/test-coverage",
       "file_path": "tests/unit/modules/leave/leave.service.test.ts",
       "line": 743,
-      "message": "[review/test-coverage] This assertion inverts a pre-existing case rather than extending it additively. The phase-6 spec (9244f013) constrains \"Additive extension only: every pre-existing test case ... must remain byte-for-byte in intent — no case deleted, renamed, skipped, or weakened\", and its success criterion #3 requires \"a DRAFT cancellation still produces EXACTLY ONE notification (requester only) — the pre-existing DRAFT assertion is unchanged and no approver notification is added on that path.\" The pre-existing DRAFT case previously asserted `toHaveLength(1)` with `recipientId === REQUESTER_ID`; it now asserts zero, and the sibling case at line 988 was renamed from \"sends exactly one cancellation notification for the original\" to \"notifies only the requester when the canceller IS the recorded approver\". Both changes are consistent with the owner amendment in docs/DECISIONS.md CLARIFY-006 (commit c2d19382), but they are the opposite of what these specs pin, so the specs and the …",
+      "message": "[review/test-coverage] This assertion inverts a pre-existing case rather than extending it additively. The phase-6 spec (9244f013) constrains \"Additive extension only: every pre-existing test case ... must remain byte-for-byte in intent \u2014 no case deleted, renamed, skipped, or weakened\", and its success criterion #3 requires \"a DRAFT cancellation still produces EXACTLY ONE notification (requester only) \u2014 the pre-existing DRAFT assertion is unchanged and no approver notification is added on that path.\" The pre-existing DRAFT case previously asserted `toHaveLength(1)` with `recipientId === REQUESTER_ID`; it now asserts zero, and the sibling case at line 988 was renamed from \"sends exactly one cancellation notification for the original\" to \"notifies only the requester when the canceller IS the recorded approver\". Both changes are consistent with the owner amendment in docs/DECISIONS.md CLARIFY-006 (commit c2d19382), but they are the opposite of what these specs pin, so the specs and the \u2026",
       "quoted_line": "      expect(notificationService.inputs).toHaveLength(0);",
       "severity": "",
       "agent_role": "",
-      "status": "fixed",
+      "status": "superseded",
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
       "fixed_at_attempt": 2,
@@ -34,39 +34,39 @@
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
       "line": 1774,
-      "message": "[review/documentation] The \"Phase 7 delivered\" section is emitted twice, byte-identical: lines 1762–1773 and 1774–1785 (verified with `diff` — the two ranges are identical). Both copies are added by this PR's diff. The duplicated block also swallows the blank line before it, so the second copy's heading is glued to the previous bullet. A reader (and the context/drift agents that consume this file) now sees two conflicting-looking records of the same phase.\n  Evidence: \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\"\n  Fix: Delete the second copy (lines 1774–1785) and keep the first (1762–1773); they are byte-identical, so no content is lost.",
+      "message": "[review/documentation] The \"Phase 7 delivered\" section is emitted twice, byte-identical: lines 1762\u20131773 and 1774\u20131785 (verified with `diff` \u2014 the two ranges are identical). Both copies are added by this PR's diff. The duplicated block also swallows the blank line before it, so the second copy's heading is glued to the previous bullet. A reader (and the context/drift agents that consume this file) now sees two conflicting-looking records of the same phase.\n  Evidence: \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\"\n  Fix: Delete the second copy (lines 1774\u20131785) and keep the first (1762\u20131773); they are byte-identical, so no content is lost.",
       "quoted_line": "### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 1,
       "last_seen_attempt": 6,
-      "fixed_at_attempt": 7,
+      "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DOMAIN.md",
       "line": 96,
-      "message": "[review/documentation] Markdown structure broken by this diff. The `## balance` heading was concatenated onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer starts a line and the `balance` section is no longer a heading — it renders as table-row text. The diff shows the blank line between the row and the heading was removed (`-| offset | number | false |` / `-` / `-## balance` → `+| offset | number | false |## balance`).\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break so the row and the heading are separate lines: `| offset | number | false |` followed by a blank line and then `## balance`.",
+      "message": "[review/documentation] Markdown structure broken by this diff. The `## balance` heading was concatenated onto the last row of the `LeaveRequestQueryParams` table, so the heading no longer starts a line and the `balance` section is no longer a heading \u2014 it renders as table-row text. The diff shows the blank line between the row and the heading was removed (`-| offset | number | false |` / `-` / `-## balance` \u2192 `+| offset | number | false |## balance`).\n  Evidence: \"| offset | number | false |## balance\"\n  Fix: Restore the line break so the row and the heading are separate lines: `| offset | number | false |` followed by a blank line and then `## balance`.",
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 1,
       "last_seen_attempt": 7,
-      "fixed_at_attempt": 8,
+      "fixed_at_attempt": null,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
     {
       "rule_id": "review/configuration",
       "file_path": "agents.yaml",
       "line": 979,
-      "message": "[review/configuration] This branch's `agents.yaml` drops the consult completion caps that `origin/main` carries, and removes the rationale that derived them. On main all five consultable agents are `max_tokens: 32000`; here `domain-architect-agent` (952), `data-architect-agent` (979) and `app-architect-agent` (1009) are 6000, `chief-architect-agent` is 12000 and `planner-agent` is 24000. The deleted comment block recorded the measured basis for 32000 — \"Per-agent observed maxima before this change (cap -> observed max completion, n): ... data-architect-agent 6,000 -> 9,100 n=12\" and \"1.11x HEADROOM IS NOT HEADROOM ... with no retry a cut-off consult is a FAILED consult, not a slower one\". At 6000 the data-architect-agent cap sits below its own observed maximum (9,100), i.e. it truncates. The diff against `origin/main` for this file is 162 lines removed, 0 added apart from the `max_iterations` comment.\n  Evidence: \"      max_tokens: 6000\"\n  Fix: Restore `max_tokens: 32000` for …",
+      "message": "[review/configuration] This branch's `agents.yaml` drops the consult completion caps that `origin/main` carries, and removes the rationale that derived them. On main all five consultable agents are `max_tokens: 32000`; here `domain-architect-agent` (952), `data-architect-agent` (979) and `app-architect-agent` (1009) are 6000, `chief-architect-agent` is 12000 and `planner-agent` is 24000. The deleted comment block recorded the measured basis for 32000 \u2014 \"Per-agent observed maxima before this change (cap -> observed max completion, n): ... data-architect-agent 6,000 -> 9,100 n=12\" and \"1.11x HEADROOM IS NOT HEADROOM ... with no retry a cut-off consult is a FAILED consult, not a slower one\". At 6000 the data-architect-agent cap sits below its own observed maximum (9,100), i.e. it truncates. The diff against `origin/main` for this file is 162 lines removed, 0 added apart from the `max_iterations` comment.\n  Evidence: \"      max_tokens: 6000\"\n  Fix: Restore `max_tokens: 32000` for \u2026",
       "quoted_line": "      max_tokens: 6000",
       "severity": "",
       "agent_role": "",
-      "status": "fixed",
+      "status": "superseded",
       "first_seen_attempt": 2,
       "last_seen_attempt": 2,
       "fixed_at_attempt": 3,
@@ -76,7 +76,7 @@
       "rule_id": "review/architecture",
       "file_path": "agents.yaml",
       "line": 961,
-      "message": "[review/architecture] This branch's `agents.yaml` reverts the consult completion cap that `origin/main` established. Verified with `git show origin/main:agents.yaml`: main sets `max_tokens: 32000` for all five consultable agents (domain-architect-agent, data-architect-agent, app-architect-agent, chief-architect-agent, planner-agent), with the rationale recorded in main's own comments (\"1.11x HEADROOM IS NOT HEADROOM … 32,000 is 1.48x the pooled maximum\"; \"`data-architect-agent` was TRUNCATING at 0.66x\"). On this branch those five are 6000 / 6000 / 6000 / 12000 / 24000 — i.e. the branch reintroduces the exact cap main documented as truncating. Because the merge is a squash, merging this branch silently undoes that decision. The same class of staleness applies to `review-agent`'s `token_budget: 1600000` (main: 1200000) and to `docs/DECISIONS.md`, where main's \"🔴 RESTORED 2026-10-11\" provenance note for CLARIFY-001..008 is absent on this branch.\n  Evidence: \"      max_tokens: 6000\" …",
+      "message": "[review/architecture] This branch's `agents.yaml` reverts the consult completion cap that `origin/main` established. Verified with `git show origin/main:agents.yaml`: main sets `max_tokens: 32000` for all five consultable agents (domain-architect-agent, data-architect-agent, app-architect-agent, chief-architect-agent, planner-agent), with the rationale recorded in main's own comments (\"1.11x HEADROOM IS NOT HEADROOM \u2026 32,000 is 1.48x the pooled maximum\"; \"`data-architect-agent` was TRUNCATING at 0.66x\"). On this branch those five are 6000 / 6000 / 6000 / 12000 / 24000 \u2014 i.e. the branch reintroduces the exact cap main documented as truncating. Because the merge is a squash, merging this branch silently undoes that decision. The same class of staleness applies to `review-agent`'s `token_budget: 1600000` (main: 1200000) and to `docs/DECISIONS.md`, where main's \"\ud83d\udd34 RESTORED 2026-10-11\" provenance note for CLARIFY-001..008 is absent on this branch.\n  Evidence: \"      max_tokens: 6000\" \u2026",
       "quoted_line": "      max_tokens: 6000",
       "severity": "",
       "agent_role": "",
@@ -90,8 +90,8 @@
       "rule_id": "review/review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
       "line": 1668,
-      "message": "[review/review/stale-spec] Stale schema claim contradicting a recorded decision. `docs/DECISIONS.md` ADR-002 (Accepted) records: \"Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query\" — rejected. CLARIFY-005 likewise states \"`approver_id` needs no index for this query\". This line still asserts \"New indexes: standalone `status` ... and `approver_id`\" and that the queue query \"MUST also exclude `reverses_request_id IS NOT NULL`\", neither of which the delivered migration or repository does.\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and …",
-      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) — already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate — this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** — the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
+      "message": "[review/review/stale-spec] Stale schema claim contradicting a recorded decision. `docs/DECISIONS.md` ADR-002 (Accepted) records: \"Adding `leave_requests` `status` / `approver_id` indexes in the same migration: the existing `(employee_id, status)` index already serves the pending-decisions predicate, and `approver_id` needs no index for that query\" \u2014 rejected. CLARIFY-005 likewise states \"`approver_id` needs no index for this query\". This line still asserts \"New indexes: standalone `status` ... and `approver_id`\" and that the queue query \"MUST also exclude `reverses_request_id IS NOT NULL`\", neither of which the delivered migration or repository does.\n  Evidence: \"- **`leave_requests`** (UNCHANGED, referenced by name) \u2014 already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate \u2014 this is the first status-only access path in the codebase) and \u2026",
+      "quoted_line": "- **`leave_requests`** (UNCHANGED, referenced by name) \u2014 already carries `status`, `approver_id`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. New indexes: standalone `status` (the existing `(employee_id, status)` cannot serve a status-only predicate \u2014 this is the first status-only access path in the codebase) and `approver_id` (recipient resolution for a cancelled APPROVED request). The queue query MUST also exclude `reverses_request_id IS NOT NULL`: a cancelled-after-approval request is TWO rows, so without that predicate the reversal row is a spurious second queue entry. **NOT delivered as of Phase 1** \u2014 the delivered migration adds no `leave_requests` DDL at all; see *Phase 1 delivered* below.",
       "severity": "",
       "agent_role": "",
       "status": "superseded",
@@ -104,8 +104,8 @@
       "rule_id": "review/stale-spec",
       "file_path": "docs/ARCHITECTURE.md",
       "line": 1729,
-      "message": "[review/stale-spec] Stale notification count, same root cause as rule 9. Rule 5 states a SUBMITTED or APPROVED cancellation writes \"two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new)\". `docs/DECISIONS.md` → CLARIFY-006 (amended 2026-10-09) removes the cancelling actor from the recipient set, so the overwhelmingly common case — the requester cancelling their own SUBMITTED request — writes ONE row, not two. The built code and its test agree: `tests/unit/modules/leave/leave.service.test.ts` asserts `expect(notificationService.inputs).toHaveLength(1)` for \"notifies only the direct manager when the owner cancels a SUBMITTED request\".\n  Evidence: \"5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, …",
-      "quoted_line": "5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL — it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).",
+      "message": "[review/stale-spec] Stale notification count, same root cause as rule 9. Rule 5 states a SUBMITTED or APPROVED cancellation writes \"two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new)\". `docs/DECISIONS.md` \u2192 CLARIFY-006 (amended 2026-10-09) removes the cancelling actor from the recipient set, so the overwhelmingly common case \u2014 the requester cancelling their own SUBMITTED request \u2014 writes ONE row, not two. The built code and its test agree: `tests/unit/modules/leave/leave.service.test.ts` asserts `expect(notificationService.inputs).toHaveLength(1)` for \"notifies only the direct manager when the owner cancels a SUBMITTED request\".\n  Evidence: \"5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL \u2014 it does not replace, merge with, \u2026",
+      "quoted_line": "5. A cancellation writes exactly one CANCEL `AuditLog` entry and, for a SUBMITTED or APPROVED cancellation, two `Notification` rows: one to the requester (existing behaviour, unchanged) and one to the approver (new). The approver notification is ADDITIONAL \u2014 it does not replace, merge with, or alter the requester notification, and it does not alter the audit entry (same action CANCEL, same entityType `'leave_request'`, same entityId = the ORIGINAL request id, same before/after state).",
       "severity": "",
       "agent_role": "",
       "status": "open",
@@ -114,5 +114,83 @@
       "fixed_at_attempt": null,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     }
-  ]
+  ],
+  "corrections": {
+    "corrected_at": "2026-10-13",
+    "corrected_by": "operator (via Claude Code), on the owner's instruction",
+    "defect": "An INCONCLUSIVE review closed findings it never examined. The ledger closes a finding that was open, is absent now and whose file did not change; a truncated review makes every finding it did not reach absent, and the ledger was written BEFORE this tier checked for truncation (activities.py: write at 5123, check at 5137). gestalt #309 moves the check ahead of the write, so this cannot recur.",
+    "method": "Each entry below was verified against the FILES on this branch \u2014 the concatenated heading, the duplicated section, and the two blob hashes \u2014 not inferred from the ledger.",
+    "entries": [
+      {
+        "rule_id": "review/consistency",
+        "file_path": "src/modules/leave/leave.service.ts",
+        "line": 636,
+        "was": {
+          "status": "fixed",
+          "fixed_at_attempt": 2
+        },
+        "now": {
+          "status": "superseded",
+          "fixed_at_attempt": 2
+        },
+        "why": "STATUS CORRECTED from `fixed` to `superseded`: the file's blob is byte-identical to its pre-run state (77d19238), so no fix fixed it. It stopped being reported because #295 made a recorded decision outrank a phase spec, so the reviewer now reports the stale DOCUMENT rather than demanding this code change. `fixed` asserted a change that never happened, to a file the operator had ruled off-limits."
+      },
+      {
+        "rule_id": "review/test-coverage",
+        "file_path": "tests/unit/modules/leave/leave.service.test.ts",
+        "line": 743,
+        "was": {
+          "status": "fixed",
+          "fixed_at_attempt": 2
+        },
+        "now": {
+          "status": "superseded",
+          "fixed_at_attempt": 2
+        },
+        "why": "STATUS CORRECTED from `fixed` to `superseded`: blob byte-identical (16564cff); nothing fixed it. Same reclassification as the finding above."
+      },
+      {
+        "rule_id": "review/documentation",
+        "file_path": "docs/ARCHITECTURE.md",
+        "line": 1774,
+        "was": {
+          "status": "superseded",
+          "fixed_at_attempt": 7
+        },
+        "now": {
+          "status": "open",
+          "fixed_at_attempt": null
+        },
+        "why": "REOPENED: the condition is still present \u2014 the '### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)' heading still appears TWICE on this branch. Closed as `superseded` at attempt 7 by an inconclusive review."
+      },
+      {
+        "rule_id": "review/documentation",
+        "file_path": "docs/DOMAIN.md",
+        "line": 96,
+        "was": {
+          "status": "superseded",
+          "fixed_at_attempt": 8
+        },
+        "now": {
+          "status": "open",
+          "fixed_at_attempt": null
+        },
+        "why": "REOPENED: the condition is still present \u2014 line 96 still reads '| offset | number | false |## balance'. Closed as `superseded` at attempt 8 by an INCONCLUSIVE review, which stopped reporting it because it did not finish, not because it was gone. Run 5's attempt 2 did produce the correct fix, on fix/.../9/2, which never merged (a docs-only change gets no CI under trackeros's paths-ignore, so the pipeline poll raised pipeline-failed)."
+      },
+      {
+        "rule_id": "review/configuration",
+        "file_path": "agents.yaml",
+        "line": 979,
+        "was": {
+          "status": "fixed",
+          "fixed_at_attempt": 3
+        },
+        "now": {
+          "status": "superseded",
+          "fixed_at_attempt": 3
+        },
+        "why": "STATUS CORRECTED from `fixed` to `superseded`: the branch's agents.yaml was never edited by any fix (it still carries review-agent max_tokens: 4000 where main carries 32000). The finding was a FALSE POSITIVE from a two-dot diff and stopped being reported when the review moved to the merge base \u2014 a legitimate reason to close it, but not a fix."
+      }
+    ]
+  }
 }
