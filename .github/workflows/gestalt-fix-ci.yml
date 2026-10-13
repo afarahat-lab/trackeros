@@ -1,0 +1,43 @@
+# 🔴 WHY THIS FILE EXISTS — a documentation fix could never merge.
+#
+# `gestalt.yml`'s `push` trigger carries `paths-ignore: ['.gestalt/**','PLAN.md','docs/**',
+# 'AGENTS.md']`, because Gestalt writes bookkeeping commits on its own branches and those need
+# no CI. GitHub runs a job only when the branch matches AND at least one changed file is NOT
+# ignored — so a commit touching only those paths triggers nothing at all.
+#
+# That is right for a phase or feature branch. It is WRONG for a `fix/**` branch, because the
+# platform's quality gate raises findings against `docs/**`, and the fix for such a finding is a
+# documentation change. Measured on run 5 of feature 93f4284a (2026-10-13): the code agent made
+# the correct one-line fix to `docs/DOMAIN.md` (`## balance` moved back onto its own line),
+# committed it to `fix/93f4284a-.../9/2`, and the attempt then failed with
+#
+#     GitHub Actions: no push-triggered run appeared on branch fix/93f4284a-.../9/2 within 360s
+#
+# because every file it changed was ignored. The platform treats zero checks as a refusal, not a
+# pass — deliberately, after three human PRs were merged on zero checks in 2026-09 — so a
+# documentation finding was unfixable by construction: the fix landed correctly and could not be
+# verified, round after round.
+#
+# This workflow closes that gap WITHOUT weakening the zero-checks rule and without a second copy
+# of the quality job: it reuses `gestalt.yml` via `workflow_call`.
+#
+# `paths` is the INVERSE of the other trigger's `paths-ignore`, so the two do not both fire for
+# an ordinary source fix: a src-only fix runs `gestalt.yml` alone, a docs-only fix runs this one
+# alone, and only a fix touching both runs both. That overlap is accepted — it costs a duplicate
+# run on a rare mixed fix, and the alternative (expressing "only if the other trigger did not
+# fire") is not something GitHub can state.
+name: gestalt fix CI
+
+on:
+  push:
+    branches: ['fix/**']
+    paths:
+      - '.gestalt/**'
+      - 'PLAN.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+
+jobs:
+  quality:
+    uses: ./.github/workflows/gestalt.yml
+    secrets: inherit
