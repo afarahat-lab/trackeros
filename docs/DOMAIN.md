@@ -93,7 +93,9 @@ A leave-owned READ PROJECTION of a request awaiting a decision — the approver'
 | endDateFrom | Date | false |
 | endDateTo | Date | false |
 | limit | number | false |
-| offset | number | false |## balance
+| offset | number | false |
+
+## balance
 
 Represents leave balance data managed by the `balance` module, including tracked entitlement, accrual, and remaining leave amounts.
 
