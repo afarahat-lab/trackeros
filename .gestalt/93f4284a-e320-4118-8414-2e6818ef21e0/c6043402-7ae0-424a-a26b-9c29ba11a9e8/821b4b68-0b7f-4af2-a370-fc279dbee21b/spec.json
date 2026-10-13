@@ -1,0 +1,121 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "documentation"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "docs/DOMAIN.md contains a line that is exactly `## balance` starting at column 0 (a level-2 ATX heading), and no line in the file contains a table row immediately followed by `##` on the same line (i.e. the pattern `|## ` no longer matches anywhere in the file).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequestQueryParams` table in docs/DOMAIN.md is intact: its header row, separator row, and all eight data rows (status, leaveTypeId, startDateFrom, startDateTo, endDateFrom, endDateTo, limit, offset) each occupy their own line, and the `offset` row is the last row of that table.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `balance` section renders as a heading again: the `## balance` heading line is followed by a blank line and then the existing description paragraph (\"Represents leave balance data managed by the `balance` module...\"), and the `### Balance` / `### LeaveBalance` subsections remain nested under it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The repair is content-preserving: no prose, table row, field, type, or heading text in docs/DOMAIN.md is added, removed, reworded, or reordered \u2014 the only change is the line break between the `offset` row and `## balance`. The file's set of level-2 headings is unchanged apart from `balance` becoming a heading again.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "The edit is confined to docs/DOMAIN.md. No file under src/, web/, tests/, migrations/, or scripts/ may be modified, and no source, test, or migration behaviour may change \u2014 this phase is a documentation-structure repair with zero runtime effect.",
+    "The fix must restore the line break only: the `offset` row line ends after its final `|`, then a blank line, then `## balance` at column 0. Do not reflow, re-indent, or reformat any other line, and do not introduce trailing whitespace on the row line.",
+    "The `balance` section's body must be left byte-identical to its current content (description paragraph, `### Balance` table, `### LeaveBalance` table, and their Relationships lists). The heading text stays `## balance` \u2014 lowercase, matching the sibling section headings (`## leave`, `## employee`, `## policy`, `## notification`, `## audit`, `## validation`, `## system`, `## uptime`).",
+    "Do not use this phase to correct the known, separately-recorded DOMAIN.md drift (stale `LeaveRequest.leaveTypeId` / `approvedBy` / `approvedAt`, `EmploymentStatus.INACTIVE`, and the stale `audit` section shapes). Those are documented as pre-existing drift in docs/ARCHITECTURE.md and are out of scope here."
+  ],
+  "outOfScope": [
+    "Correcting the pre-existing DOMAIN.md drift recorded in docs/ARCHITECTURE.md (stale `LeaveRequest.leaveTypeId`/`approvedBy`/`approvedAt`, `EmploymentStatus.INACTIVE`, and the `audit` section's `oldValues`/`newValues`/`performedBy`/`performedAt` shapes).",
+    "Any change to the `balance` section's documented entities, fields, or relationships \u2014 including reconciling `Balance` and `LeaveBalance` (which currently carry identical field lists) or the `status: string` field against the built balance model.",
+    "Adding, removing, or reordering any section of docs/DOMAIN.md, and any change to docs/ARCHITECTURE.md, .gestalt/architecture/reconciled.json, or other documentation files.",
+    "Adding a lint/CI check, script, or test that validates markdown structure in docs/ \u2014 the phase is the one-line repair, not new tooling."
+  ],
+  "ambiguities": [
+    {
+      "description": "Scope of the repair: whether the phase fixes only the one reported line break, or also scans docs/DOMAIN.md for any other heading glued to a preceding line and repairs those too.",
+      "options": [
+        "Fix only the reported `offset` row / `## balance` line break (minimal, matches the prescription)",
+        "Fix the reported break AND repair any other heading-glued-to-content occurrences found in the same file",
+        "Fix the reported break and add a structural check that would catch future occurrences"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the phase should also record the repair in docs/ARCHITECTURE.md (e.g. as a delivered-phase note), given ARCHITECTURE.md is the maintained source of truth and already tracks DOMAIN.md drift.",
+      "options": [
+        "Do not touch docs/ARCHITECTURE.md \u2014 the repair is self-evident in DOMAIN.md",
+        "Add a short delivered-phase note to docs/ARCHITECTURE.md recording the DOMAIN.md structure repair"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the `balance` section's pre-existing content drift (identical `Balance`/`LeaveBalance` field lists, `status: string`) should be flagged in the phase output as a follow-up, or left entirely unmentioned.",
+      "options": [
+        "Leave unmentioned \u2014 out of scope, already covered by ARCHITECTURE.md's drift notes",
+        "Note it in the phase output as a follow-up without editing the section"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "docs/DOMAIN.md \u2014 `balance` section heading",
+      "mustExistOrExtend": true,
+      "invariant": "The `balance` section is a level-2 ATX heading that begins its own line at column 0 (`## balance`), is preceded by a blank line, and is followed by a blank line before its description paragraph. It is never a continuation of a preceding table row. Its body (description, `### Balance`, `### LeaveBalance`, Relationships lists) is unchanged."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2014 `LeaveRequestQueryParams` table",
+      "mustExistOrExtend": true,
+      "invariant": "The table remains a well-formed markdown table: header row, separator row, and exactly the eight existing data rows, one per line, each terminated by `|` with nothing appended after it. The `offset` row is the table's final row and is immediately followed by a blank line."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "In-place repair of the docs/DOMAIN.md `balance` heading line break (a file-level documentation contract, not an API operation \u2014 no route, verb, or payload is involved)",
+      "authRule": "None \u2014 documentation only; no authentication, authorization, or RBAC surface is touched.",
+      "idempotent": true,
+      "errorSemantics": "No runtime error semantics. The only failure mode is a malformed result: if the row and heading remain on one line, or if any other line of the file changes, the repair has failed. The file must remain valid UTF-8 markdown with no trailing whitespace introduced."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The repaired heading must match the formatting convention of the sibling level-2 section headings in the same file \u2014 `## leave`, `## employee`, `## policy`, `## notification`, `## audit`, `## validation`, `## system`, `## uptime` \u2014 i.e. `## ` + lowercase section name at column 0, with a blank line before and after. Do not introduce a different heading level or casing for `balance`.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The `balance` section's documented content must stay consistent with what docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json record for the balance module \u2014 this phase changes only the heading's line placement, so the section body must not be edited to \"fix\" any perceived mismatch. Any such mismatch is pre-existing drift and must be flagged, not silently corrected here.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The `LeaveRequestQueryParams` table's rows must continue to describe the same type that `src/shared/types/index.ts` declares as `LeaveRequestQueryParams` (the canonical shared type consumed by leave.repository.ts, leave.service.ts and leave.routes.ts). The repair must not alter any row's field name, type, or required flag.",
+      "referencePath": "src/shared/types/index.ts"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/DOMAIN.md",
+      "why": "The single file this phase edits; the `## balance` heading at line 96 must be restored to its own line so the section renders as a heading again."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md",
+      "why": "The maintained architecture document that already records DOMAIN.md's known drift; the repair must not contradict it and must not be used to resolve that drift."
+    },
+    {
+      "target": ".gestalt/architecture/reconciled.json",
+      "why": "Authoritative reconciled entity shapes; the balance section's documented entities must not be edited to diverge from it in this phase."
+    }
+  ]
+}
