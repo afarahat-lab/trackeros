@@ -1,0 +1,151 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "documentation",
+      "domain-model"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "No line in docs/DOMAIN.md contains a heading marker preceded by other non-whitespace content on the same line: the evidence string `| offset | number | false |## balance` no longer occurs anywhere in the file, and no line matches the pattern `<non-whitespace>## `.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "`## balance` occurs exactly once in docs/DOMAIN.md, as a standalone line starting at column 0, immediately preceded by a blank line (the line before it is empty).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `LeaveRequestQueryParams` table's final row is preserved byte-for-byte in content (`| offset | number | false |`) and remains the last row of that table, terminated by its own newline.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `balance` section's body is unchanged in content and now sits under the restored `## balance` heading: the heading is followed by a blank line, then the existing description paragraph, then the existing `### Balance` and `### LeaveBalance` subsections in their original order.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The change is confined to the single defect: the diff against the pre-fix file touches only the line(s) at the `LeaveRequestQueryParams`/`balance` boundary \u2014 no other heading, table, row, entity description, or prose in docs/DOMAIN.md is added, removed, reordered, or reworded.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The `review/documentation` finding at docs/DOMAIN.md:96 recorded in .gestalt/93f4284a-e320-4118-8414-2e6818ef21e0/feature-review-findings.md no longer reproduces: its quoted evidence line is absent from the file.",
+      "testable": true,
+      "layer": "integration"
+    }
+  ],
+  "constraints": [
+    "The fix is a whitespace/newline-only edit to docs/DOMAIN.md. No word, table cell, field name, type, or description text may change \u2014 the only permitted difference is the insertion of a line break (and the blank line that follows it) between the end of the `LeaveRequestQueryParams` table and the `## balance` heading.",
+    "No file under src/, web/, tests/, migrations/, seeds/, or scripts/ may be modified, and no source, test, migration, or configuration file may be added or deleted. This phase changes documentation only.",
+    "The heading level and exact heading text must be preserved as `## balance` (two hashes, lowercase `balance`, no trailing punctuation or whitespace). Do not renumber, rename, or re-level it, and do not merge it into the `leave` section.",
+    "The file must remain valid, well-formed Markdown with LF line endings and no trailing whitespace introduced on the repaired lines; the surrounding sections must keep their existing blank-line separation convention (blank line before a `##` heading, blank line after it).",
+    "Do NOT opportunistically correct the other known drift in docs/DOMAIN.md (the stale `LeaveRequest.leaveTypeId` / `approvedBy` / `approvedAt` fields, `EmploymentStatus.INACTIVE`, and the `audit` section's `oldValues`/`newValues`/`performedBy`/`performedAt` shapes). docs/ARCHITECTURE.md records that drift as deliberate and uncorrected; fixing it here would exceed the finding and invalidate the review's evidence.",
+    "The change must land on the fix branch so that a push-triggered CI run occurs: the touched path must remain under `docs/**` (the path set .github/workflows/gestalt-fix-ci.yml triggers on). Do not add a source-file change to force CI, and do not modify the workflow.",
+    "No new tooling, dependency, lint rule, or CI job may be introduced to enforce this fix (no markdown linter added to package.json, no new workflow). The repository has no markdown-lint step today and this phase does not add one."
+  ],
+  "outOfScope": [
+    "Correcting the other documented drift in docs/DOMAIN.md (stale LeaveRequest fields, EmploymentStatus values, and the audit section's entity shapes) \u2014 recorded in docs/ARCHITECTURE.md as known and deliberately uncorrected.",
+    "Adding, removing, or restructuring any section, entity, table, or field in docs/DOMAIN.md beyond restoring the `## balance` heading to its own line.",
+    "Any change to the leave cancellation / approver-notification / pending-decisions feature (src/modules/leave, src/modules/notification, migrations, tests) \u2014 this phase is a documentation repair only.",
+    "The other open finding in the same feature review (`review/stale-spec` at docs/ARCHITECTURE.md:1719, the recipient-resolution placement wording) \u2014 a separate finding with its own file and its own fix.",
+    "Introducing a markdown-formatting check, generator, or CI gate that would prevent this class of defect recurring \u2014 not requested by the finding and not part of this phase."
+  ],
+  "ambiguities": [
+    {
+      "description": "Whether the repaired heading must be preceded by a blank line (i.e. the table row line, then an empty line, then `## balance`) or merely start its own line directly after the table row. The intent states \"preceded by a blank line\"; the finding's own wording only says \"Restore the newline so `## balance` starts its own line\".",
+      "options": [
+        "Insert a blank line between the table row and `## balance` (matches the intent and the file's convention for every other `##` heading)",
+        "Only break the line so `## balance` starts its own line, with no blank line inserted"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the phase should also edit the finding record in .gestalt/93f4284a-e320-4118-8414-2e6818ef21e0/feature-review-findings.md to mark the `review/documentation` finding resolved.",
+      "options": [
+        "Leave the findings file untouched \u2014 the platform marks a finding fixed when it stops being reported and its file changed",
+        "Update the findings file's status column as part of this phase"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "docs/DOMAIN.md (the domain-model document)",
+      "mustExistOrExtend": true,
+      "invariant": "Every top-level module section is a `## <module-name>` heading that begins its own line at column 0, is preceded by a blank line, and is followed by a blank line then its description paragraph. The `balance` section must satisfy this exactly as `leave`, `employee`, `policy`, `notification`, `audit`, and `validation` already do."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2192 `balance` section",
+      "mustExistOrExtend": true,
+      "invariant": "The section is a sibling of `leave`, not a child of it: it is terminated only by the next `##` heading (`## employee`) and owns exactly the content it owned before the defect \u2014 the description paragraph plus the `### Balance` and `### LeaveBalance` subsections. No content moves between the `leave` and `balance` sections."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2192 `LeaveRequestQueryParams` table",
+      "mustExistOrExtend": true,
+      "invariant": "The table remains a complete, well-formed Markdown table: header row, separator row, and all eight data rows including the final `| offset | number | false |` row, each on its own line. The table's last row is not truncated, merged, or absorbed into the following heading."
+    },
+    {
+      "entity": "docs/DOMAIN.md \u2192 `leave` section",
+      "mustExistOrExtend": true,
+      "invariant": "The `leave` section's content is unchanged: it still ends at the `LeaveRequestQueryParams` table and does not gain the `balance` description, `### Balance`, or `### LeaveBalance` as its own subsections."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Read docs/DOMAIN.md as a Markdown document and resolve its heading structure",
+      "authRule": "None \u2014 the file is a repository document with no access control.",
+      "idempotent": true,
+      "errorSemantics": "After the fix, parsing the document yields `balance` as a distinct top-level section; before the fix it does not. No parse error is expected in either state \u2014 the defect is silent (the heading renders as literal text inside a table row), which is why the check must be structural rather than a parse-failure check."
+    },
+    {
+      "operation": "Apply the fix repeatedly (re-run / re-apply on an already-fixed file)",
+      "authRule": "None.",
+      "idempotent": true,
+      "errorSemantics": "Applying the fix to an already-correct file must be a no-op: it must not insert a second blank line, duplicate the heading, or otherwise alter the file. The result of applying it twice equals the result of applying it once."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "Match the exact heading form and blank-line separation used by the file's other top-level module sections \u2014 `## leave`, `## employee`, `## policy`, `## notification`, `## audit`, `## validation` \u2014 rather than inventing a new heading style or level.",
+      "referencePath": "docs/DOMAIN.md"
+    },
+    {
+      "requirement": "The repaired line must be the inverse of the recorded defect: the finding's quoted evidence `| offset | number | false |## balance` must no longer match, and the finding's own prescribed fix (\"Restore the newline so `## balance` starts its own line\") must be satisfied verbatim.",
+      "referencePath": ".gestalt/93f4284a-e320-4118-8414-2e6818ef21e0/feature-review-findings.md"
+    },
+    {
+      "requirement": "The fix must be the same one-line repair the workflow file documents as the canonical fix for this defect (\"`## balance` moved back onto its own line\"), so the workflow's stated rationale stays true and the docs-only fix path it exists to enable actually fires.",
+      "referencePath": ".github/workflows/gestalt-fix-ci.yml"
+    },
+    {
+      "requirement": "Do not contradict the maintained architecture's recorded position on docs/DOMAIN.md: docs/ARCHITECTURE.md states the file is stale relative to it and that the drift is known and not corrected. This phase repairs formatting only and must leave every recorded entity-shape drift in place.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/DOMAIN.md",
+      "why": "The single file this phase modifies; the defect and its repair both live at the `LeaveRequestQueryParams` / `balance` boundary."
+    },
+    {
+      "target": ".gestalt/93f4284a-e320-4118-8414-2e6818ef21e0/feature-review-findings.md",
+      "why": "Holds the open `review/documentation` finding at docs/DOMAIN.md:96 whose quoted evidence is the acceptance signal for this phase."
+    },
+    {
+      "target": ".github/workflows/gestalt-fix-ci.yml",
+      "why": "The docs-only fix path: a `fix/**` push touching `docs/**` is what produces the CI run that verifies this change. The fix must stay within that path set."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md",
+      "why": "Records the known, deliberately uncorrected drift in docs/DOMAIN.md; the boundary of what this phase may touch is defined there."
+    }
+  ]
+}
