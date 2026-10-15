@@ -1,0 +1,135 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "notification",
+      "audit",
+      "documentation"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "In docs/ARCHITECTURE.md, section \"Feature: Notify the approver when a leave request is cancelled\" \u2192 \"Business rules (reconciled)\", rule 9 states that the actor who performed the cancellation is REMOVED from the recipient set (per CLARIFY-006), and the section no longer contains any statement that self-notification is not suppressed or that the notification is written even when the actor is the resolved recipient.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Rule 5 in the same list states the recipient set as the requester plus the resolved approver MINUS the actor, deduplicated by recipient id \u2014 so a SUBMITTED or APPROVED cancellation writes at most two Notification rows and may write fewer (including none when the actor is the only recipient) \u2014 instead of asserting an unconditional count of two.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The rewritten rules cite CLARIFY-006 (amended 2026-10-09) in docs/DECISIONS.md as the binding decision, so a reader can trace the rule to its owner rather than to the superseded phase spec.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No file under src/, web/src/, tests/, or migrations/ is modified, and no phase spec or PLAN.md is edited \u2014 the diff is confined to the two rule statements in docs/ARCHITECTURE.md.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Documentation-only phase: the ONLY file that may change is docs/ARCHITECTURE.md, and within it only the two rule statements (rule 5 and rule 9) of the \"Business rules (reconciled)\" list under \"Feature: Notify the approver when a leave request is cancelled\". Change nothing else in the file.",
+    "DO NOT change any code or test for this finding. The built code (src/modules/leave/leave.service.ts, LeaveService.cancellationRecipients) already implements CLARIFY-006; editing it would revert a decision the owner made.",
+    "Never edit a phase spec or PLAN.md: they are a historical record of what was decided then. The correction lands in the living documentation only.",
+    "docs/DECISIONS.md CLARIFY-006 (amended 2026-10-09) is the binding answer and wins over the phase spec: \"Every recipient is notified EXCEPT the actor who performed the cancellation\", with the recipient set built once, the actor removed, and duplicates collapsed by recipient id. Do not restate it differently and do not re-open it.",
+    "The rewritten rules must describe the built behaviour, not a new design: the recipient set is the requester plus the resolved approver, minus the actor, deduplicated by recipient id; a cancellation whose only recipients are the actor notifies nobody and still succeeds; the requester notification and the CANCEL audit entry keep their existing shape.",
+    "Do not introduce new rules, new entities, new fields, or new open questions while rewriting. The edit is a correction of two statements, not an expansion of the section."
+  ],
+  "outOfScope": [
+    "Any change to src/modules/leave/leave.service.ts, including LeaveService.cancellationRecipients, resolveApproverRecipient, the notification call sites, or the audit afterState skip marker.",
+    "Any change to tests/unit/modules/leave/leave.service.test.ts or any other test file \u2014 the existing assertions already pin the built behaviour.",
+    "Editing the phase spec that carried the superseded rule, or PLAN.md Phase 3 rule 4 (\"Always notify, even when the cancelling actor IS the resolved recipient\") \u2014 historical records are left as written.",
+    "Rewriting docs/DECISIONS.md ADR-003's \"Alternatives rejected\" entry that records the self-notification suppression as rejected \u2014 it documents the reasoning at the time and is not the binding rule; CLARIFY-006 is.",
+    "Fixing the other stale text already noted in the same section (the \"Dependency map\" line listing web-infrastructure-api as a web-approvals dependency, and rule 7's MANAGER/EMPLOYEE queue-scope wording) \u2014 separate findings, not this one.",
+    "Any change to the notification delivery lifecycle (PENDING -> SENT), the pending-decisions queue, the related_entity_code column, or the migration."
+  ],
+  "ambiguities": [
+    {
+      "description": "Rule 5 currently asserts an unconditional count (\"two Notification rows\") for a SUBMITTED/APPROVED cancellation. Under CLARIFY-006 the count is conditional on actor identity, so the count must be restated \u2014 but the prescription only says to change \"the count in rule 5\".",
+      "options": [
+        "State the recipient set (requester + resolved approver, minus the actor, deduplicated) and derive the count from it, so the rule reads as a set operation rather than a number",
+        "Keep a numeric statement but qualify it as 'at most two', noting zero is possible when the actor is the only recipient",
+        "State the count as 'one per recipient in the set' and cross-reference rule 9 for the set definition"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Rule 9's trailing sentence \"The exactly-one rule holds regardless of actor identity\" is itself superseded (it is the old unconditional-count claim). The prescription names rule 9 for rewrite but does not say whether that sentence is part of the rewrite or a separate statement to leave alone.",
+      "options": [
+        "Treat the whole of rule 9 as superseded and replace it with the actor-removal rule, dropping the 'exactly-one rule' sentence",
+        "Rewrite only the first sentence and leave the trailing sentence, since it is not the count in rule 5",
+        "Replace rule 9 with the actor-removal rule and move the deduplication-by-recipient-id statement into it"
+      ],
+      "impactIfWrong": "medium"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification (cancellation recipient set)",
+      "mustExistOrExtend": true,
+      "invariant": "For a SUBMITTED or APPROVED cancellation the recipient set is the requester plus the resolved approver, with the cancelling actor removed and duplicates collapsed by recipient id; the set may therefore be empty, and an empty set notifies nobody while the cancellation still succeeds. A DRAFT cancellation notifies the requester only, subject to the same actor removal. The documented rule must state this set, not an unconditional count."
+    },
+    {
+      "entity": "AuditLog (CANCEL entry)",
+      "mustExistOrExtend": true,
+      "invariant": "The CANCEL audit entry's shape is unchanged by this correction: exactly one entry per cancellation, action CANCEL, entityType 'leave_request', entityId = the ORIGINAL request id, with the skip marker (if any) carried inside afterState. The documentation rewrite must not alter this statement."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "LeaveService.cancel \u2014 cancellation notification emission (documented contract only; no code change)",
+      "authRule": "Unchanged: owner may cancel their own DRAFT/SUBMITTED; only the requester's direct manager or an ADMIN may cancel an APPROVED request; blocked once startDate <= today (UTC) with ConflictError. The recipient set is resolved server-side and never taken from the caller.",
+      "idempotent": false,
+      "errorSemantics": "A missing recipient (null managerId on SUBMITTED, null approverId on APPROVED) never fails the cancellation; the skip is recorded in the audit afterState. A rejected cancellation emits no notification of any kind. Unchanged by this phase."
+    },
+    {
+      "operation": "Documentation edit to docs/ARCHITECTURE.md \"Business rules (reconciled)\" rules 5 and 9",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "The edit must leave every other rule, the section's other subsections, and all other sections of the file byte-identical; only the two rule statements change."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The rewritten rules must match CLARIFY-006 (amended 2026-10-09) verbatim in substance: \"Every recipient is notified EXCEPT the actor who performed the cancellation\"; the recipient set is built once, the actor removed, and duplicates collapsed by recipient id \u2014 so a requester who is also the recorded approver hears once, and a cancellation whose only recipients are the actor notifies nobody and still succeeds.",
+      "referencePath": "docs/DECISIONS.md"
+    },
+    {
+      "requirement": "The rewritten rules must describe the built behaviour in LeaveService.cancellationRecipients, which filters `if (notice.recipientId === actor.id) { return false; }` and dedupes by recipient id \u2014 the documentation follows the code, not the reverse.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The rewritten rules must stay consistent with the section's own \"Cross-cutting contracts\" and \"Lifecycle states\" text, which already describe the approver notification as one more step inside the existing unit of work with the same client threaded through \u2014 the correction changes only who is in the recipient set, not the transaction or the notification's PENDING state.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The rewritten rules must not contradict the section's \"Phase 1 delivered\" / \"Phase 7 delivered\" blocks or ADR-002/ADR-003/ADR-004/ADR-005, which record the delivered migration, repository plumbing, and web consumer unchanged by this correction.",
+      "referencePath": "docs/DECISIONS.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/ARCHITECTURE.md \u2192 \"Feature: Notify the approver when a leave request is cancelled\" \u2192 \"Business rules (reconciled)\"",
+      "why": "The two stale statements (rule 5's count, rule 9's self-notification rule) live here; this is the only edit site."
+    },
+    {
+      "target": "docs/DECISIONS.md \u2192 CLARIFY-006",
+      "why": "The binding decision the rewritten rules must cite and match; it is the source of truth that supersedes the phase spec."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts \u2192 LeaveService.cancellationRecipients",
+      "why": "The built implementation the documentation must describe; read-only reference, never edited by this phase."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts",
+      "why": "Already pins the built recipient-set behaviour (actor removal, dedup, skip marker); confirms the documentation correction needs no test change."
+    }
+  ]
+}
