@@ -1,0 +1,9 @@
+[
+  {
+    "path": "docs/ARCHITECTURE.md",
+    "reason": "refusing a section-addressed write of docs/ARCHITECTURE.md: no section titled \"Open questions\". Read the file (readFile with section=\u2026) to see its headings.",
+    "agent": "context-agent",
+    "governance": false,
+    "proposed": "See the reconciled `openQuestions` list: null `managerId` on a SUBMITTED cancellation; null `approverId` on a legacy APPROVED row; whether the approver notification accompanies or replaces the existing requester notification; confirmation of the `related_entity_code` schema decision; queue membership (SUBMITTED-only vs SUBMITTED+APPROVED); ADMIN queue scope; the reversal path's notification keying; and the documented-vs-built `(related_entity_type, related_entity_id)` index drift.\n\n**Resolved since this list was written:** self-notification suppression is no longer open \u2014 CLARIFY-006 (amended 2026-10-09) settled it as \"notify every recipient EXCEPT the actor who performed the cancellation\", and the *Business rules (reconciled)* list above (rules 5, 8, 9, 10, 13) now states the built behaviour. The remaining items above are unchanged."
+  }
+]
