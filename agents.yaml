@@ -776,7 +776,7 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1200000
+    token_budget: 1600000
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
@@ -1497,7 +1497,7 @@ agents:
     # 🔴 TEMPORARY (2026-09-28) — 60 -> 120, purely to keep this whole-tree tier above the
     # per-phase one raised to 85 above. Not evidence about this agent: it has never capped.
     max_iterations: 120
-    token_budget: 1200000
+    token_budget: 2000000
     schema:
       models:
         _Finding:
