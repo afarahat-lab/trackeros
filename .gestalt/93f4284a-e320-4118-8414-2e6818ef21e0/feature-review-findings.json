@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 12,
+  "attempts": 13,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -33,16 +33,16 @@
     {
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1733,
-      "message": "[review/documentation] Rule 9 (and rule 5 on line 1729, \"for a SUBMITTED or APPROVED cancellation, two `Notification` rows\") states the pre-amendment rule, which the recorded decision supersedes. CLARIFY-006 in `docs/DECISIONS.md` (2026-10-09, \"amended; the original answer was 'always notify, even when actor === recipient'\"): \"Every recipient is notified EXCEPT the actor who performed the cancellation ... The recipient set is therefore built once, the actor removed, and duplicates collapsed by recipient id.\" The built code implements the amendment — `cancellationRecipients` filters `notice.recipientId === actor.id` out — and the tests pin it (`notifies only the requester when the manager who approved it cancels it` asserts `toHaveLength(1)`). The code is correct; this living doc still states the superseded rule.\n  Evidence: \"9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds …",
-      "quoted_line": "9. Self-notification is not suppressed: when the cancelling actor is the resolved recipient, the notification is still written. The exactly-one rule holds regardless of actor identity.",
+      "line": 1772,
+      "message": "[review/documentation] The \"Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" block is duplicated verbatim: lines 1760–1771 and 1772–1783 are byte-identical (verified with `diff` on the two ranges — no differences), so the section renders the same twelve-line delivery record twice, including the same \"Stale text left in place\" bullet. `origin/main` contains zero occurrences of this heading; the branch contains two. This is a documentation defect in the file this phase edits, and it is the kind of duplication that makes the next reader distrust the delivery record (which copy is authoritative?).\n  Evidence: \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\"",
+      "quoted_line": "### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 11,
-      "fixed_at_attempt": 12,
-      "file_digest": "9363a0c16159739ff82b619ff1feb51b"
+      "last_seen_attempt": 13,
+      "fixed_at_attempt": null,
+      "file_digest": "b43ee1332c74bee60d7a89d120c1455f"
     },
     {
       "rule_id": "review/documentation",
@@ -52,10 +52,10 @@
       "quoted_line": "| offset | number | false |## balance",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 1,
       "last_seen_attempt": 12,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 13,
       "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
     },
     {
@@ -108,24 +108,24 @@
       "quoted_line": "**Transaction.** Cancelling a SUBMITTED or APPROVED request performs, in ONE unit of work: (a) the status change — an in-place `update` to CANCELLED for SUBMITTED, or the GP-008 insert of a NEW CANCELLED reversal row for APPROVED; (b) the balance release — `pendingDays -= requestedDays` for SUBMITTED, `usedDays -= requestedDays` for APPROVED; (c) the CANCEL audit entry (unchanged in shape); (d) the approver notification insert. Repository and service methods that must join a caller's transaction take an OPTIONAL trailing `client?: PoolClient` defaulting to the shared pool. `LeaveService.cancel` calls `this.uow.withTransaction(async (client) => { ... })`; `PgUnitOfWork` acquires a client, issues BEGIN, runs the callback, COMMITs on resolve / ROLLBACKs on throw, and always releases the client. Inside the callback the SAME `client` is threaded to every participating call. `BEGIN`/`COMMIT`/`ROLLBACK` appear ONLY in `PgUnitOfWork`. The approver is resolved before the notification insert and inside the same callback: for an APPROVED request, `request.approverId` read from the ORIGINAL row (the reversal row's `approverId` is null by construction); for a SUBMITTED request, `employeeService.getEmployeeById(request.employeeId).managerId`.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "fixed",
       "first_seen_attempt": 6,
       "last_seen_attempt": 12,
-      "fixed_at_attempt": null,
+      "fixed_at_attempt": 13,
       "file_digest": "9363a0c16159739ff82b619ff1feb51b"
     },
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DECISIONS.md",
-      "line": 103,
-      "message": "[review/documentation] ADR-003 (added by this branch, dated 2026-09-15) records as a rejected alternative exactly what the later binding decision CLARIFY-006 (2026-10-09, same file) mandates: \"the count stays unconditional at two for SUBMITTED/APPROVED\" (lines 103-105) versus CLARIFY-006's \"Every recipient is notified EXCEPT the actor who performed the cancellation (amended 2026-10-09; the original answer was 'always notify, even when actor === recipient')\". The built code follows CLARIFY-006, so this ADR bullet is stale and, read on its own, would send the next implementer to re-add the self-notification the owner removed.\n  Evidence: \"- Suppressing self-notification when the cancelling actor IS the resolved recipient: suppression\"\n  Fix: Mark the bullet superseded by CLARIFY-006 (2026-10-09) — e.g. note that self-notification IS suppressed for the cancelling actor, per the amended answer.",
-      "quoted_line": "- Suppressing self-notification when the cancelling actor IS the resolved recipient: suppression",
+      "line": 123,
+      "message": "[review/documentation] ADR-004's central premise is factually wrong, and it is the premise the whole ADR (and its \"load-bearing comment\" consequence) rests on. Fastify 4.29.1 — the version pinned in package-lock.json — uses find-my-way 8.2.2, which matches static nodes ahead of parametric ones irrespective of registration order; its README states \"static routes are always inserted before parametric and wildcard\" and lists the match order as \"1. static 2. parametric node with static ending ...\". Verified by execution against the pinned versions: registering `GET /leaves/:id` FIRST and `GET /leaves/pending-decisions` SECOND, then injecting `GET /leaves/pending-decisions`, returns 200 from the static handler — not the 404 via `getById` this ADR claims. The same holds when the routes are registered inside a `leaveRoutes(fastify)` plugin. So \"a static path registered after a parametric sibling is shadowed by it\" and \"resolves as `id = 'pending-decisions'`, reaches `getById`, and returns …",
+      "quoted_line": "Context: Fastify matches routes in registration order, so a static path registered after a",
       "severity": "",
       "agent_role": "",
-      "status": "superseded",
+      "status": "open",
       "first_seen_attempt": 11,
-      "last_seen_attempt": 11,
-      "fixed_at_attempt": 12,
+      "last_seen_attempt": 13,
+      "fixed_at_attempt": null,
       "file_digest": "b869e1546cc556444772ae530e8cdf01"
     }
   ]
