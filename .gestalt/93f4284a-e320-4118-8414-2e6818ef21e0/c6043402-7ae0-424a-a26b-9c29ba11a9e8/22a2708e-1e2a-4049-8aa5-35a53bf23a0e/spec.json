@@ -1,0 +1,157 @@
+{
+  "scope": {
+    "affectedDomains": [],
+    "affectedLayers": [],
+    "isBreakingChange": false,
+    "estimatedComplexity": "medium"
+  },
+  "successCriteria": [
+    {
+      "description": "docs/ARCHITECTURE.md contains exactly ONE occurrence of the heading \"### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" (it currently contains two, at lines 1760 and 1772).",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The surviving \"Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" block is byte-identical to the removed duplicate (pure de-duplication, no content loss), and the \"Stale text left in place\" bullet appears exactly once in the file.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Business rule 2 in the \"Feature: Notify the approver when a leave request is cancelled\" section no longer asserts an unconditional approver-notification count: it states the approver notification is emitted only when the resolved approver is not the cancelling actor, and that when the actor IS the resolved approver zero approver notifications are written.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "Rule 2 is consistent with rule 5 (recipient set = requester + resolved approver, actor removed, duplicates collapsed, at most two, may be empty) and rule 9 (self-notification suppressed) in the same section: no rule in the section states a notification count that contradicts another rule in the section.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The corrected rule 2 matches the built behaviour and the pinned test: src/modules/leave/leave.service.ts cancellationRecipients drops any notice whose recipientId === actor.id, and tests/unit/modules/leave/leave.service.test.ts \"notifies only the requester when the manager who approved it cancels it\" asserts exactly one notification with recipientId === REQUESTER_ID.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No other section of docs/ARCHITECTURE.md is altered: the \"Phase 1 delivered (notifications.related_entity_code migration)\" block, the Domain entities / Lifecycle states / Conceptual tables / Repository interfaces / Module boundaries / Dependency map / Cross-cutting contracts / Recommended phases / Open questions / Stack compliance subsections of the cancellation feature, and every other feature section are unchanged.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Documentation-only phase: the ONLY file that may change is docs/ARCHITECTURE.md. No file under src/, web/src/, tests/, migrations/, or scripts/ may be modified, and no new file may be created.",
+    "The built code is the source of truth for the corrected rule 2, not the reverse: the fix must NOT change src/modules/leave/leave.service.ts (cancellationRecipients / resolveApproverRecipient) or tests/unit/modules/leave/leave.service.test.ts to match the stale prose.",
+    "The corrected rule 2 must cite the same authority the rest of the section already cites \u2014 CLARIFY-006 in docs/DECISIONS.md, amended 2026-10-09 (\"Every recipient is notified EXCEPT the actor who performed the cancellation\") \u2014 and must not introduce a new decision, ADR, or CLARIFY number.",
+    "The de-duplication must remove exactly one of the two byte-identical \"Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" blocks (lines 1760-1771 and 1772-1783) and keep the other verbatim; the block's content must not be rewritten, merged, or reworded while removing it.",
+    "The corrected rule 2 must keep the parts of the rule that are still true and load-bearing: the notification is not duplicated per approver candidate, is not sent to both the recorded approver and the current manager, and is not re-sent on a retry (a repeat cancel fails its state guard and emits nothing).",
+    "The corrected rule 2 must not contradict the section's own \"Lifecycle states\" named transitions (cancelInPlace / reverseApproved both \"emit the approver notification\") or the \"Transaction\" contract (the approver notification insert is step (d) of the single unit of work) \u2014 those statements describe the emission path, not the recipient count, and must remain true as written.",
+    "The edit must not touch the \"Stale text left in place\" bullet's substance (the web-approvals dependency-map line is still stale) \u2014 only the duplicate copy of it is removed."
+  ],
+  "outOfScope": [
+    "Fixing the stale \"Dependency map\" line that still lists web-infrastructure-api as a web-approvals dependency (the \"Stale text left in place\" bullet documents it deliberately; correcting the map itself is a separate change).",
+    "Reconciling the other documented-vs-built drifts in the same feature section (e.g. the leave_requests status/approver_id indexes and the reverses_request_id IS NOT NULL queue predicate described in \"Conceptual tables\" and \"Repository interfaces\" but not built) \u2014 only the two review findings are in scope.",
+    "Any change to the \"Open questions\" subsection of the cancellation feature, including removing the now-settled \"self-notification suppression\" item from that list.",
+    "Editing docs/DECISIONS.md (CLARIFY-006 and ADR-002..ADR-005 are already correct and are the authority the corrected rule cites).",
+    "Adding, changing, or re-running any test; the phase is documentation-only and the existing pinned tests already encode the correct behaviour."
+  ],
+  "ambiguities": [
+    {
+      "description": "Which of the two byte-identical \"Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" blocks is authoritative and should survive (the first, at line 1760, immediately after the \"Phase 1 delivered\" block; or the second, at line 1772, immediately before \"### Open questions\").",
+      "options": [
+        "Keep the first occurrence (line 1760) and delete the second",
+        "Keep the second occurrence (line 1772) and delete the first",
+        "Keep whichever, since the two ranges are byte-identical and the resulting file is the same"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "Whether the corrected rule 2 should state the count conditionally (\"at most one approver notification, and zero when the cancelling actor is the resolved approver\") or restate the recipient-set rule and defer the count to rule 5, given rule 5 already owns the set semantics.",
+      "options": [
+        "State the conditional count explicitly in rule 2 and cross-reference rule 5",
+        "State only the emission condition in rule 2 and leave the count entirely to rule 5",
+        "Restate the full recipient-set rule in rule 2 (duplicating rule 5)"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the corrected rule 2 must also cover the DRAFT case explicitly (DRAFT notifies no approver) or whether that is already fully owned by rule 5's \"may be empty\" and the Lifecycle states section.",
+      "options": [
+        "Keep the DRAFT clause in rule 2 (it is currently there and still true)",
+        "Drop the DRAFT clause from rule 2 as redundant with rule 5"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "Notification (cancellation recipient set)",
+      "mustExistOrExtend": true,
+      "invariant": "A cancellation writes one Notification row per recipient in the set {requester, resolved approver} minus the cancelling actor, de-duplicated by recipient id; the set holds at most two recipients and may be empty, and an empty set notifies nobody while the cancellation still succeeds. The approver notification is emitted only when the resolved approver is not the cancelling actor."
+    },
+    {
+      "entity": "Notification (approver cancellation notice)",
+      "mustExistOrExtend": true,
+      "invariant": "Created PENDING inside the same unit of work as the status change, keyed to the ORIGINAL request id (never the GP-008 reversal row's id), carrying relatedEntityType 'leave_request', relatedEntityCode = the request's canonical lowercase leaveTypeCode, and the existing type literal 'leave_request'; it is never advanced to SENT by the cancellation."
+    },
+    {
+      "entity": "AuditLog (CANCEL entry)",
+      "mustExistOrExtend": true,
+      "invariant": "Exactly one CANCEL entry per cancellation, with unchanged shape: action AuditAction.CANCEL, entityType LEAVE_REQUEST_ENTITY_TYPE, entityId = the ORIGINAL request id, beforeState/afterState present; a skipped approver notification is recorded as a boolean approverNotificationSkipped key merged into afterState, never as a new field or nested object."
+    },
+    {
+      "entity": "docs/ARCHITECTURE.md \u2014 \"Feature: Notify the approver when a leave request is cancelled\" section",
+      "mustExistOrExtend": true,
+      "invariant": "The section's business rules are mutually consistent: no rule states a notification count or recipient condition that another rule in the same section contradicts, and every rule matches the built behaviour in src/modules/leave/leave.service.ts and the pinned assertions in tests/unit/modules/leave/leave.service.test.ts."
+    },
+    {
+      "entity": "docs/ARCHITECTURE.md \u2014 delivery-record headings",
+      "mustExistOrExtend": true,
+      "invariant": "Each \"### Phase N delivered (...)\" heading appears at most once in the file; a delivery record is never duplicated, so there is exactly one authoritative copy per phase."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Read the cancellation feature's business-rule list in docs/ARCHITECTURE.md (section \"Feature: Notify the approver when a leave request is cancelled\")",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "N/A \u2014 documentation. The corrected rule 2 must be readable as a single unambiguous statement of when an approver notification is emitted and how many are written, with no residual unconditional count."
+    },
+    {
+      "operation": "Read the delivery-record sequence in docs/ARCHITECTURE.md (the \"### Phase N delivered\" headings under the cancellation feature)",
+      "authRule": "",
+      "idempotent": true,
+      "errorSemantics": "N/A \u2014 documentation. After the fix, a reader resolving the heading \"Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)\" gets exactly one block, so no reader has to decide which copy is authoritative."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The corrected rule 2 must agree with rule 5 of the same section (recipient set = requester + resolved approver, actor removed, duplicates collapsed by recipient id, at most two, may be empty) and with rule 9 (self-notification suppressed; LeaveService.cancellationRecipients drops any notice whose recipientId === actor.id before de-duplicating).",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The corrected rule 2 must match the built behaviour: the recipient set is built once and the actor removed, so when the cancelling actor IS the resolved approver zero approver notifications are written.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The corrected rule 2 must match the pinned test \"notifies only the requester when the manager who approved it cancels it\", which asserts notificationService.inputs has length 1 with recipientId === REQUESTER_ID (no approver notice).",
+      "referencePath": "tests/unit/modules/leave/leave.service.test.ts"
+    },
+    {
+      "requirement": "The corrected rule 2 must cite the same authority the section already cites for the actor-exclusion rule: CLARIFY-006, amended 2026-10-09 (\"Every recipient is notified EXCEPT the actor who performed the cancellation\").",
+      "referencePath": "docs/DECISIONS.md"
+    },
+    {
+      "requirement": "The surviving Phase 7 delivered block must be byte-identical to the duplicate being removed (verified by diffing the two ranges before deletion), so the de-duplication is provably content-preserving.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The corrected rule 2 must not contradict the section's \"Lifecycle states\" named transitions (cancelInPlace and reverseApproved both \"emit the approver notification\") or the \"Transaction\" contract's step (d) (the approver notification insert inside the single unit of work) \u2014 those describe the emission path, not the recipient count.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/ARCHITECTURE.md \u2014 \"Feature: Notify the approver when a leave request is cancelled\" \u2192 \"Business rules (reconciled)\" rule 2",
+      "why": "The stale unconditional count lives here; the corrected text must sit in the same numbered list and keep the rule's remaining true clauses."
+    }
+  ]
+}
