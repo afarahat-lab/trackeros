@@ -1,0 +1,161 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "documentation",
+      "leave",
+      "notification",
+      "web-approvals"
+    ],
+    "affectedLayers": [
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "docs/ARCHITECTURE.md contains no assertion that every `### Phase N delivered (...)` heading in the file appears exactly once, unless that assertion is true of the file at commit time. Verified by extracting every heading matching `^### Phase \\d+ delivered` and confirming no two share identical heading text.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The de-duplication bullet in the Phase 7 delivered section states its claim about the heading it actually de-duplicated (the Phase 7 heading) and is verifiable by counting occurrences of that exact heading string in the file \u2014 the claim is scoped to that heading, not generalised to all Phase N headings.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The Phase 7 delivered section's repair record remains accurate about what the repair phase did: the Phase 7 heading occurs exactly once, the kept body is byte-identical to the removed one, and no content was rewritten, merged, or reworded. Verified by counting the Phase 7 heading and diffing the surviving body against the pre-repair copy.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The duplicate `### Phase 4 delivered (audit entity-query + history endpoint unit tests)` pair (docs/ARCHITECTURE.md lines 1588 and 1601, byte-identical bodies) is either removed so the heading occurs once, or is explicitly named in the repair record as a still-open instance of the duplicate-delivery-record class. Verified by counting occurrences of that heading string and by searching the repair record for a reference to it.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "No file under src/, web/, tests/, migrations/, seeds/, or scripts/ is modified by this phase, and no test is added, changed, or re-run. Verified by inspecting the phase diff: it touches docs/ARCHITECTURE.md only.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The corrected text does not contradict the built code: the pinned test `notifies only the requester when the manager who approved it cancels it` (tests/unit/modules/leave/leave.service.test.ts:1230) and `LeaveService.cancellationRecipients` (src/modules/leave/leave.service.ts:606) still match what the section's business rules assert. Verified by reading both and comparing against the section's rule text.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Documentation-only phase: the entire diff is docs/ARCHITECTURE.md. No source, test, migration, seed, or script file may be created or modified, and no test may be added, changed, or re-run.",
+    "Every factual claim written into the repair record must be verifiable against the file at commit time. A claim that generalises beyond what was checked (e.g. \"each Phase N heading appears exactly once\") is forbidden; scope each claim to the specific heading, line, or file it was verified against.",
+    "The repair record must not introduce a new decision, ADR, or CLARIFY number. It cites the existing authorities already used in the section \u2014 CLARIFY-006 in docs/DECISIONS.md (amended 2026-10-09) and ADR-005 \u2014 and adds none.",
+    "The repair record must not silently widen its own scope: the items the section already lists as \"Deliberately left unchanged by that repair\" (the stale `web-approvals -> web-infrastructure-api` line in the section's Dependency map, the documented-vs-built leave_requests index and queue-predicate drifts, and the Open questions list) stay out of this phase unless the phase explicitly takes one on.",
+    "The section's existing business-rule text (rules 1\u201313, including rule 2's \"at most one approver notification\" wording and rule 9's self-notification suppression) and the \"Stale text left in place\" bullet are not to be re-edited by this phase; only the over-broad claim is in scope.",
+    "If the Phase 4 duplicate pair is removed rather than documented, the removal must be pure de-duplication: the kept copy is byte-identical to the removed one, and no content is rewritten, merged, or reworded. If it is documented instead, the record must name the heading and both line locations.",
+    "The section's heading `### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)` must continue to occur exactly once after the edit \u2014 the repair must not reintroduce the duplicate it removed."
+  ],
+  "outOfScope": [
+    "Removing or reconciling the other documented-vs-built drifts in the Phase 7 section: the stale `web-approvals -> web-infrastructure-api` line in its Dependency map, the `leave_requests` `status` / `approver_id` index drift, and the `reverses_request_id IS NOT NULL` queue predicate described but not built. The section already lists these as deliberately left unchanged.",
+    "Re-opening the settled Open questions items in the Phase 7 section (self-notification suppression, null managerId/approverId handling, queue membership, ADMIN queue scope, reversal-path notification keying, related_entity_code schema confirmation).",
+    "Any change to the built behaviour or its tests: src/modules/leave/leave.service.ts, tests/unit/modules/leave/leave.service.test.ts, and the web modules are the source of truth and are not adjusted to match the prose.",
+    "A general audit of every `### Phase N delivered` heading across the whole file for duplicates beyond the Phase 4 pair and the already-fixed Phase 7 pair \u2014 unless the phase chooses to close the class, in which case the audit is bounded to that heading pattern.",
+    "Editing docs/DECISIONS.md, docs/DOMAIN.md, or docs/GOLDEN_PRINCIPLES.md. The known DOMAIN.md audit-section drift is recorded in the Phase 4 section and is not this phase's to fix."
+  ],
+  "ambiguities": [
+    {
+      "description": "How to resolve the false invariant: narrow the claim to the Phase 7 heading only, or close the class by also removing the duplicate Phase 4 pair so the general claim becomes true.",
+      "options": [
+        "Narrow the claim to the Phase 7 heading (minimal, matches the review's stated defect: the over-broad claim, not the duplication)",
+        "Remove the duplicate Phase 4 pair as well, then keep a general claim scoped to the headings actually verified",
+        "Narrow the claim AND add the Phase 4 pair to the section's 'Deliberately left unchanged' list so the remaining instance is visible"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the Phase 4 duplicate pair is in scope at all, given the review explicitly says the defect is the over-broad claim and the duplication predates this phase (present on origin/main).",
+      "options": [
+        "Out of scope: fix only the claim; the Phase 4 duplication is a separate change",
+        "In scope: the claim cannot be made true without removing the pair, so remove it",
+        "In scope only as a documented, named exception in the repair record"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the repair record's existing \"Deliberately left unchanged by that repair\" list must be extended to name the Phase 4 duplicate pair, or whether leaving it unmentioned is acceptable once the general claim is narrowed.",
+      "options": [
+        "Extend the list to name the Phase 4 pair explicitly",
+        "Leave the list unchanged once the claim is narrowed to the Phase 7 heading",
+        "Replace the general claim with a pointer to the Phase 4 section, which already documents its own delivery"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "docs/ARCHITECTURE.md \u2014 Phase 7 delivered section (the repair record)",
+      "mustExistOrExtend": true,
+      "invariant": "The repair record is a factual account of a completed documentation-only change. Every claim in it must hold against the file at commit time; a claim that is false of the file is a defect in the record, not a licence to change the file to match it. The record's lifecycle is: written once per repair, superseded only by a later repair record that names it."
+    },
+    {
+      "entity": "`### Phase N delivered (...)` heading (docs/ARCHITECTURE.md)",
+      "mustExistOrExtend": true,
+      "invariant": "A delivery record heading is a resolvable anchor: a reader following a reference to it must land on one authoritative block. Uniqueness is a property of the heading STRING (including its parenthetical), not of the `Phase N` prefix \u2014 the file legitimately carries several distinct `### Phase 4 delivered (...)` headings for different features, and only an identical heading string is a duplicate."
+    },
+    {
+      "entity": "docs/ARCHITECTURE.md \u2014 Phase 7 delivered section (business rules 1\u201313)",
+      "mustExistOrExtend": true,
+      "invariant": "The rules describe built behaviour and are pinned by tests; they are not to be re-edited by a documentation repair. Rule 2 reads \"at most one approver notification\" with its emission condition, and rule 9 records self-notification suppression per CLARIFY-006 (amended 2026-10-09)."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Documentation repair of the Phase 7 delivered section's repair record in docs/ARCHITECTURE.md",
+      "authRule": "None \u2014 documentation only; no runtime surface, no endpoint, no RBAC.",
+      "idempotent": true,
+      "errorSemantics": "No runtime errors. The edit must not break the file's markdown structure: the Phase 7 heading remains a single `###` heading, the section's existing bullets and business rules remain intact, and no heading is left orphaned or duplicated."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The corrected claim must be consistent with the section's own \"Stale text left in place\" bullet and \"Deliberately left unchanged by that repair\" list \u2014 those already enumerate what the repair did NOT fix, so the claim must not assert a class of defect is closed while a named instance remains.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "Any statement about the cancellation notification recipient set must match the built implementation `LeaveService.cancellationRecipients` (build the set once, drop any notice whose recipientId === actor.id, collapse duplicates by recipient id) and the pinned test `notifies only the requester when the manager who approved it cancels it`.",
+      "referencePath": "src/modules/leave/leave.service.ts"
+    },
+    {
+      "requirement": "The self-notification suppression wording must match CLARIFY-006 in docs/DECISIONS.md (amended 2026-10-09, \"Every recipient is notified EXCEPT the actor who performed the cancellation\") \u2014 the same authority the section's rules 2, 5 and 9 already cite. No new decision number may be introduced.",
+      "referencePath": "docs/DECISIONS.md"
+    },
+    {
+      "requirement": "The web dependency statement must match the built edge set `web-approvals -> web-leave, web-employee, web-shared-types` recorded in the web build's dependency map, not the stale line in the Phase 7 section's own Dependency map.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    },
+    {
+      "requirement": "The Phase 4 duplicate pair's content must be treated as the audit feature's delivery record \u2014 the same text is the body of the `### Phase 4 delivered (audit entity-query + history endpoint unit tests)` section; any removal keeps one copy verbatim rather than merging it with the Phase 7 record.",
+      "referencePath": "docs/ARCHITECTURE.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "docs/ARCHITECTURE.md \u2014 Phase 7 delivered section (heading at line 1760)",
+      "why": "The repair record lives inside this section; the edit is confined to its repair-record bullets and must leave the section's heading, business rules, and \"Deliberately left unchanged\" list intact."
+    },
+    {
+      "target": "docs/ARCHITECTURE.md \u2014 `### Phase 4 delivered (audit entity-query + history endpoint unit tests)` (lines 1588 and 1601)",
+      "why": "The only remaining duplicate `### Phase N delivered` heading string in the file; it is the counterexample that falsifies the general claim, so the phase must either remove it or name it."
+    },
+    {
+      "target": "docs/DECISIONS.md \u2014 CLARIFY-006 (amended 2026-10-09) and ADR-005",
+      "why": "The section's authority for the notification-recipient and web-layering statements; the repair cites them and must not introduce a new decision number."
+    },
+    {
+      "target": "src/modules/leave/leave.service.ts \u2014 `LeaveService.cancellationRecipients` (line 606)",
+      "why": "The built behaviour the section's rules describe; the repair must not adjust it, and any prose it writes must remain consistent with it."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.service.test.ts \u2014 `notifies only the requester when the manager who approved it cancels it` (line 1230)",
+      "why": "The pinned test the section cites as evidence for rule 2's corrected wording; it must remain unchanged and must still match the prose."
+    }
+  ]
+}
