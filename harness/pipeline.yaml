@@ -289,3 +289,114 @@ phases:
         action: mark_feature_status
         inputs: [feature_id]
         output: { name: feature_status, channel: workflow_state }
+
+# Added by `gestalt template upgrade` — flows the template declares.
+flows:
+  fix-intent:
+    description: >
+      One corrective pass over a phase that failed its gate or build. Runs on its own
+      fix/<intent>/<phase>/<attempt> branch off the previous attempt, regenerates the phase's
+      code with the failure's edit prescriptions in scope, and merges back into the phase
+      branch. It deliberately stops BEFORE deploy — the parent phase re-gates the merged
+      result, so a fix never opens its own PR or runs CI.
+    steps:
+      - id: mint-fix-intent
+        type: action
+        action: create_fix_intent
+        inputs: [feature_id, phase_index]
+        output: { name: fix_intent, channel: workflow_state }
+      - id: fix-branch
+        type: action
+        action: branch_create
+        inputs: [feature_id, phase_index]
+        params: { kind: fix }
+        output: { name: fix_branch, channel: workflow_state }
+      # DERIVED, not copied. This runs the phase loop's own generate stages — the pipeline's
+      # actual agent nodes up to the deploy boundary. Listing them literally here would be
+      # correct today and silently wrong the first time someone added an agent to the loop:
+      # the phase would run it and the fix would not, with nothing to say so.
+      - id: regenerate
+        type: action
+        action: phase_generate_stages
+        inputs: [feature_id, phase_index]
+        output: { name: fix_produced, channel: workflow_state }
+      - id: merge-to-phase
+        type: action
+        action: branch_merge
+        inputs: [fix_branch]
+        params: { kind: to-phase }
+        output: { name: fix_merge, channel: workflow_state }
+
+  # §2 — the SAME corrective pass, stopping BEFORE the merge, for a fix that needs a human's
+  # ruling before it lands. Named by `on_findings.draft_flow`; the validator refuses a node that
+  # declares `approval_required_paths` and names a flow that is not here, because the silent
+  # alternative is a decision-record finding taking the self-merging flow above.
+  #
+  # The DRAFT IS THE BRANCH. These three steps leave `fix/<intent>/<phase>/<attempt>` pushed with
+  # the agent's commit on it and CI run against it; `gestalt signals approve-fix` re-validates and
+  # performs the merge this flow omits. Nothing serialises a patch anywhere: git is already the
+  # transport between activities, and a stored diff would be a second copy to go stale.
+  #
+  # 🔴 It is this flow MINUS ONE STEP, deliberately not a near-copy with its own wording. A fix
+  # held for approval must be the same work as a fix that merges, or an operator is ruling on
+  # something the platform would not have produced by itself.
+  # §2 — the SAME corrective pass, stopping BEFORE the merge, for a fix that needs a human's
+  # ruling before it lands. Named by `on_findings.draft_flow`; the validator refuses a node that
+  # declares `approval_required_paths` and names a flow that is not here, because the silent
+  # alternative is a decision-record finding taking the self-merging flow above.
+  #
+  # The DRAFT IS THE BRANCH. These three steps leave `fix/<intent>/<phase>/<attempt>` pushed with
+  # the agent's commit on it and CI run against it; `gestalt signals approve-fix` re-validates and
+  # performs the merge this flow omits. Nothing serialises a patch anywhere: git is already the
+  # transport between activities, and a stored diff would be a second copy to go stale.
+  #
+  # 🔴 It is this flow MINUS ONE STEP, deliberately not a near-copy with its own wording. A fix
+  # held for approval must be the same work as a fix that merges, or an operator is ruling on
+  # something the platform would not have produced by itself.
+  fix-intent-draft:
+    description: >
+      One corrective pass for a finding in a RECORDED DECISION — `docs/DECISIONS.md`, an ADR.
+      Identical to `fix-intent` except that it does not merge: the branch is left for an operator
+      to approve or reject, because the platform must not merge its own reading of the document
+      its other judgements are measured against.
+    steps:
+      - id: mint-fix-intent
+        type: action
+        action: create_fix_intent
+        inputs: [feature_id, phase_index]
+        output: { name: fix_intent, channel: workflow_state }
+      - id: fix-branch
+        type: action
+        action: branch_create
+        inputs: [feature_id, phase_index]
+        params: { kind: fix }
+        output: { name: fix_branch, channel: workflow_state }
+      - id: regenerate
+        type: action
+        action: phase_generate_stages
+        inputs: [feature_id, phase_index]
+        output: { name: fix_produced, channel: workflow_state }
+
+# ── Self-healing: what recovers an UNEXPECTED failure ──────────────────────────────────
+#
+# This table is for FAULTS — things nobody designed for. An infra drop mid-agent, a truncated
+# response, a code agent that wrote nothing, a build that broke in a way the tests did not
+# predict. The answer to those is genuinely not known, which is why a diagnostician reads the
+# failure and decides, and why that call earns its cost here.
+#
+# Gate, CI and review FINDINGS are not faults and are NOT listed here (ADR-074). They are the
+# platform's instruments returning their designed output, so they are owned by the `verify`
+# node that wraps the steps producing them — see `phase-verify` in the build loop, which
+# carries its own `flow`, `resume_at` and bounds. `resume_at` used to live in this table; it
+# moved with the concern.
+#
+# Every class left unmapped uses the platform default, flow `fix-intent` with a full body
+# re-run. A recovery whose flow edits code may narrow that with
+# `resume_at: <top-level body step>` — the validator rejects a resume point that would skip
+# the CI run its own fix needs to pass, wherever CI sits in the body.
+#
+#   self_healing:
+#     recoveries:
+#       shader-compile-error: { flow: asset-revalidation, resume_at: phase-verify }
+#
+# Nothing is mapped today: every fault class this template can raise is served by the default.

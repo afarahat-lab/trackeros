@@ -102,7 +102,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/intent-spec.json
     schema:
       models:
         _SuccessCriterion:
@@ -204,7 +203,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/design-spec.json
     schema:
       models:
         _Field:
@@ -323,7 +321,15 @@ agents:
     llm:
       model: ~
       temperature: 0.15
-      max_tokens: 5000
+      # 🔴 2026-10-13 — 5000 -> 12000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 5000 it
+      # would have truncated ordinary work. Sized from 3,107 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 3,498 · largest legitimate 6,930 · 0 call(s) at the 65,536 ceiling
+      # 12,000 is 1.73x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 12000
     tools:
       builtin: [readFile, listDirectory, searchFiles]
     prompt_extensions:
@@ -336,7 +342,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/spec.json
     max_iterations: 10
     token_budget: 600000
     schema:
@@ -476,7 +481,15 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 8000
+      # 🔴 2026-10-13 — 8000 -> 40000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 8000 it
+      # would have truncated ordinary work. Sized from 2,426 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 19,276 · largest legitimate 30,913 · 0 call(s) at the 65,536 ceiling
+      # 40,000 is 1.29x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 40000
     tools:
       builtin:
         - readFile          # read existing context files before updating
@@ -506,7 +519,6 @@ agents:
     - docs/DOMAIN.md
     - docs/DECISIONS.md
     - AGENTS.md
-    artifact_path: .gestalt/{feature_id}/{phase_id}/{correlation_id}/context-updates.json
     token_budget: 800000
     schema:
       models:
@@ -630,7 +642,33 @@ agents:
     llm:
       model: ~
       temperature: 0.0
-      max_tokens: 4000
+      # 🔴 §2 (2026-10-13) — 4,000 -> 40,000, AND IT IS NOW ACTUALLY APPLIED. This value reached
+      # the agent, was rendered into the prompt as a budget directive and passed to the
+      # single-shot path, and was NEVER set on the model for the APPEND path — which is the path
+      # this agent uses. So the cap was configured, carried and dropped, and a call ran to the
+      # registry's `max_output_tokens` (65,536) instead.
+      #
+      # SIZED FROM THE MEASURED COMPLETION DISTRIBUTION (reasoning + answer), 1,237
+      # `constraint-agent` calls over 2026-10-11..12:
+      #
+      #     p50       980
+      #     p90     7,023
+      #     p99    16,633
+      #     max    28,260   <- largest LEGITIMATE completion (excluding the runaways)
+      #     ----------------
+      #     p99.9  65,536   <- the runaway mode: reasons to the ceiling, emits NOTHING
+      #
+      # Nothing lies between 28,260 and 65,536, so the second mode is a runaway and not a long
+      # tail. 40,000 is 1.42x the largest legitimate completion — comfortably past the
+      # "1.11x HEADROOM IS NOT HEADROOM" line this file already records — and 61% of the old
+      # ceiling, so a runaway is now cut off 39% cheaper. Raising this was NOT an option: 4,000 is
+      # below the p90, so wiring it through unchanged would have truncated ordinary work.
+      #
+      # A call cut off here still surfaces as the explicit budget error:
+      # `reasoning_consumed_the_budget` keys on an EMPTY answer, not on the 65,536 number, so the
+      # 🔴 "REASONING CONSUMED THE WHOLE BUDGET" line and `truncated=True` are unchanged — pinned
+      # by `test_a_cap_cutoff_still_surfaces_as_the_explicit_budget_error`.
+      max_tokens: 40000
     tools:
       # §2 — gitDiff is a first-class tool now, not a shell command. It serves per-file HUNKS
       # (bounded, refusing a file outside the phase diff) and is read_only, so an identical
@@ -652,13 +690,17 @@ agents:
     - 'Scope your evaluation to the files changed in this phase only; files outside that set were passing
       before this phase, so do not re-evaluate them. When the ''Phase scope'' block LISTS the changed
       files, those are authoritative — evaluate exactly them and do NOT re-derive the list, because a
-      second derivation can disagree with the one the platform already resolved. Only when the block gives
-      a defaultBranch but no file list should you derive it yourself: run `git diff
-      origin/<defaultBranch>..HEAD --name-only` (TWO dots — the clone is shallow, so three-dot/merge-base
-      diffs do not resolve) via executeScript. If that fails or returns empty, fall through to evaluating
-      the artifact files inlined above.'
+      second derivation can disagree with the one the platform already resolved. Only when the block
+      gives a defaultBranch but no file list should you derive it yourself, and then use the gitDiff
+      TOOL with baseRef `origin/<defaultBranch>` — never a shell `git diff`. gitDiff compares from the
+      MERGE BASE; a shell `git diff origin/<defaultBranch>..HEAD` is two-dot and attributes the default
+      branch''s OWN later changes to this branch as deletions. That produced a fully-reasoned false
+      finding on 2026-10-12: a reviewer reported that a branch had removed 147 lines of configuration
+      that the default branch had ADDED after the branch was cut (the branch''s real change to that file
+      was +14/-2). You cannot tell the difference from inside the output, so use the tool. If gitDiff
+      fails or returns empty, fall through to evaluating the artifact files inlined above.'
     - 'The repository pattern is sanctioned data-access delegation. A business-logic-layer service that depends on a repository INTERFACE — via constructor injection or by importing the interface type — is correctly delegating data access to the data access layer; this is NOT a data-access-layer violation. Only flag a data-access violation when a non-data-access-layer file performs data access DIRECTLY: inline SQL, connection management, query execution, or direct datastore calls.'
-    - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's git diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
+    - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
     - Consult the dependency-direction graph in ARCHITECTURE.md. A cross-module dependency that follows a documented allowed direction is sanctioned — do not flag it as a circular or bidirectional-dependency risk unless you find an ACTUAL reverse import that creates a cycle. Speculative risk is not a violation.
     - The project's shared infrastructure directory (the common/shared module location defined in ARCHITECTURE.md) hosts cross-cutting infrastructure — shared connection pools or clients, utility modules, and shared type definitions. This directory is sanctioned shared infrastructure, NOT a layering violation. Data-access-layer code that imports a shared connection pool or client from the shared infrastructure directory is following the correct pattern. Do NOT flag such imports as data-access-layer violations, and do NOT flag the shared connection/utility module itself as data access outside the data access layer.
     - A service class calling a method on an injected repository interface is correct delegation to the data-access layer. Do NOT flag this as direct data access — the call goes through the interface, not to a data store directly.
@@ -667,18 +709,47 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    # §3 (2026-09-29) — 62 -> 40, MONITORED. Measured on run 79f682f0 (completed 5/5, one rebuild
-    # at 85c8b770f0ad): the largest constraint-agent attempt was 30 calls and per-phase gates ran
-    # 5-11, against 7-32 before. The three attempts that ever hit 40 did so on costs since removed —
-    # scope re-derivation (68 -> 11 calls), the toolchain hunt (now provisioned), and whole-file
-    # reads. 40 leaves 33% headroom over the observed maximum and is the value that predates the
-    # temporary raise. token_budget stays at 1,000,000: 40 x 15,584 (worst observed per-turn spend)
-    # = 623,360, so ITERATIONS remain the binding bound with room to spare.
-    # 🔴 REVISIT ON ANY CAP HIT. A gate cut at 40 again is evidence the removed costs came back or a
-    # new one appeared — investigate the tool-call breakdown (scripts/classify_tool_calls.py) before
-    # raising anything. Status tracked in STATE.md.
-    max_iterations: 40
-    token_budget: 1000000
+    # §3 (2026-09-29) — 62 -> 40, MONITORED. Measured on run 79f682f0 (completed 5/5): the largest
+    # constraint-agent attempt was 30 calls and per-phase gates ran 5-11, against 7-32 before. 40
+    # left 33% headroom over that maximum. The note ended "🔴 REVISIT ON ANY CAP HIT … investigate
+    # the tool-call breakdown before raising anything."
+    #
+    # 🔴 §3 (2026-10-12) — 40 -> 80, AND THE CAP WAS HIT. The breakdown was investigated first, and
+    # it is the reason this is a raise rather than a cost removal. The FEATURE review is a larger
+    # subject than a per-phase gate, and the two biggest slices sit exactly at 40:
+    #
+    #   slice        run 1 (18:30)                     run 2 (22:52)
+    #   leave        64 calls, 827,447 tok, COMPLETE   63 calls, 721,751 tok, TRUNCATED
+    #   (unscoped)   never reached                     62 calls, 566,988 tok, TRUNCATED
+    #   all others   16-36 calls, complete             10-34 calls, complete
+    #
+    # Nearly identical work, FEWER tokens, opposite outcome: `leave` finished a hair under the cap
+    # in run 1 and a hair over it in run 2. That is a marginal bound, not a returning cost — there
+    # is no inflated call class to remove, and the same conclusion was reached for review-agent at
+    # 40 earlier in the same session. Two feature reviews in a row ended INCONCLUSIVE because of it,
+    # each costing ~$2.5 and reaching no verdict.
+    #
+    # token_budget 1,000,000 -> 1,600,000, so ITERATIONS stay the binding bound: the truncated runs
+    # spent 721,751 / 40 = ~18,000 per iteration, so 80 iterations need ~1,450,000 and this budget
+    # binds at ~89. At 1,000,000 it would bind at ~55 — BEFORE the new cap — which is the shape
+    # that made global-gate-agent's budget bind at ~iteration 77 of 120.
+    #
+    # 🔴 1,600,000 AND NOT 2,000,000, which is what "double it in proportion" would have given.
+    # Two bounds say otherwise and the first was caught by an existing test rather than by me:
+    #   * `test_global_gate_agent_baseline_larger_but_still_bounded` requires the WHOLE-TREE gate's
+    #     budget to exceed this per-phase one, and global-gate-agent is at 2,000,000 — which is
+    #     also `GATE_TOKEN_BUDGET_CEILING`, so it cannot move. Equalising them would have inverted
+    #     a two-tier invariant that test exists to protect.
+    #   * 1,600,000 is review-agent's budget at the same 80 iterations, and the two agents run on
+    #     the SAME slices of the same diff. Giving them the same shape is a better answer than a
+    #     proportional one: a difference between them would need its own justification.
+    #
+    # 🔴 STILL REVISIT ON A CAP HIT AT 80. The honest limit on this change: it buys headroom on the
+    # two large slices and does nothing about WHY they are large. `(unscoped)` is a catch-all
+    # holding every file no module owns (12 of 18 on one measurement, including the tests), and a
+    # slice that is a leftover bin is the next thing to fix — not the cap again.
+    max_iterations: 80
+    token_budget: 1600000
     schema:
       models:
         _Finding:
@@ -739,13 +810,42 @@ agents:
       # could see the disagreement from either file alone. Corrected once both halves
       # became visible in one place.
       temperature: 0.0
-      max_tokens: 4000
+      # 🔴 2026-10-13 — 4000 -> 32000. This cap was CONFIGURED but never applied to
+      # the model on the multi-append path (the path this agent runs on); #306 fixed
+      # that forwarding, which made every such cap bind for the first time. At 4000 it
+      # would have truncated ordinary work. Sized from 4,020 measured calls
+      # (completion = output + output_reasoning, Langfuse events_core):
+      #   p99 12,092 · largest legitimate 23,364 · 0 call(s) at the 65,536 ceiling
+      # 32,000 is 1.37x the largest legitimate completion and stays under half
+      # the registry ceiling, so it bounds a runaway without bounding real work.
+      max_tokens: 32000
     tools:
       # §2 — the LIVE review tool set: gitDiff discovers this phase's changed files (the
-      # review runtime's first step), then readFile/searchFiles spot-check them. (The prior
-      # executeScript grant was never active — the runtime hardcoded gitDiff — so preserving
-      # runtime behavior means gitDiff here.) Same hard blocklist as code-agent applies.
-      builtin: [gitDiff, readFile, searchFiles]
+      # review runtime's first step), then readFile/searchFiles spot-check them. Same hard
+      # blocklist as code-agent applies (no rm -rf / no git push / no sudo / no curl|bash).
+      #
+      # 🔴 executeScript RESTORED (2026-10-18), and the claim it was removed on is FALSE.
+      # This block used to read "the prior executeScript grant was never active — the runtime
+      # hardcoded gitDiff". Measured on feature 93f4284a's review (2026-10-16): review-agent
+      # made 486 shell commands across 15 slices. It is active, and it was carrying work:
+      #
+      #   git log/show/status/rev-parse   181 calls   nothing else can do this
+      #   tsc --noEmit                     within 57 test/build calls
+      #
+      # TEST_REPORT_007 is the reason it must stay: the reviewer runs `tsc --noEmit` to verify
+      # import resolution BEFORE flagging an "Import cannot be resolved" finding. A reviewer
+      # that cannot check this reports FALSE findings instead of expensive ones — and a false
+      # finding dispatches a fix agent at a defect that does not exist.
+      #
+      # This is template drift in the UNUSUAL direction: the project was right and the template
+      # was wrong, and `preflight/template-drift` cannot see it — a project that differs from
+      # its vendored base is a deliberate local edit and stays silent by design. So it is
+      # corrected here, or every new project starts without the import check.
+      #
+      # The COST this removal was aimed at is handled instead by `shell_guard`: a pure file
+      # read or search through the shell is refused and told which tool to use, while git,
+      # builds, byte inspection and scratch paths run untouched.
+      builtin: [gitDiff, executeScript, readFile, searchFiles]
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
@@ -754,8 +854,34 @@ agents:
     - HARNESS.json
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
-    max_iterations: 40
-    token_budget: 800000
+    # 🔴 40 -> 80 (2026-10-11), on measurement.
+    #
+    # Feature `93f4284a`'s review: 4 of 11 slices spent their ENTIRE cap without ever calling
+    # `complete`, and every slice that DID call it completed — a 10/10 separator, so truncation
+    # is a behaviour rather than a property of the slice (`notification` with 3 files finished
+    # where `web-leave` with 3 files did not).
+    #
+    # The decisive point is not the three failures but one success: `web-presentation-pages` used
+    # ALL 40 iterations AND called `complete` — it finished on the wire. So 40 is too low for
+    # ordinary slices too, not just for the ones that misbehaved.
+    #
+    # The token budget was NOT the binding constraint: `leave` stopped at 725,628 of 1,200,000,
+    # leaving 40% unused. At 80 iterations the budget comes within reach, which is why
+    # `test_truncation_is_attributed_to_the_right_bound` pins that a budget stop is reported as a
+    # budget stop — raising the cap again would not fix one.
+    max_iterations: 80
+    # 🔴 DOUBLED WITH THE ITERATION CAP (2026-10-11). 800,000 -> 1,600,000.
+    #
+    # The two bounds must not disagree about how big the work is — the invariant
+    # `test_the_gate_s_budget_cannot_bind_before_its_ITERATION_cap` pins. Doubling
+    # `max_iterations` to 80 without this would put the BUDGET first: 80 x 15,584 (measured
+    # tokens/turn) = 1,246,720, above 800,000. The gate would then report a budget truncation
+    # for what is really an iteration limit, and name the wrong knob to the operator — exactly
+    # the failure that invariant exists for, which until today covered `constraint-agent` ONLY.
+    #
+    # And it is not hypothetical at this cap: on `93f4284a` the `leave` slice spent 725,628
+    # tokens in 40 iterations = 18,141/turn, so 80 turns is ~1.45M.
+    token_budget: 1600000
     schema:
       models:
         _Item:
@@ -926,7 +1052,45 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # #275 derived 24,000 from the 7 in-situ consults of feature `93f4284a` and applied it to
+      # `planner-agent` ALONE. The other four kept values that trace to #131 ("the template
+      # declares its agents in full") and were never derived from consult data at all. Measured
+      # over 106 non-saturated consults in the trace store, that left ONE agent truncating:
+      #
+      #   agent                   cap     observed max completion   n
+      #   planner-agent        24,000     21,610                   42
+      #   data-architect-agent  6,000      9,100                   12   <- 0.66x: TRUNCATED
+      #   chief-architect-agent 12,000     3,715                   28
+      #   domain-architect-agent 6,000     1,755                   18
+      #   app-architect-agent    6,000     1,133                    6
+      #
+      # One cap, not five, because these agents do the SAME job — answer a question from your own
+      # artifact — the question is routed by topology rather than by difficulty, and per-agent
+      # maxima differing 19x on samples of 6 to 42 is mostly sampling noise. Pooled (n=106): max
+      # answer 935, max reasoning 21,162, max completion 21,610.
+      #
+      # The asymmetry decides it. Too LOW truncates, which is the failure the pilot exists to
+      # handle; too HIGH now raises `UnexpectedModelBehavior` on `finish_reason: length` within a
+      # bounded time, mapped to `CONSULT_BUDGET_FAILURE`, which stops the chain.
+      #
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11), BECAUSE 1.11x HEADROOM IS NOT HEADROOM.
+      # 24,000 sat 1.11x above the largest of 106 samples, which says the next slightly-longer
+      # consult gets cut off — and with no retry (decision record, condition 5) a cut-off consult is
+      # a FAILED consult, not a slower one. 32,000 is 1.48x the pooled maximum.
+      #
+      # It costs nothing on an ordinary call. A completion cap is a CEILING, not an allocation: the
+      # p50 consult spends ~210 completion tokens and is unaffected by where the ceiling sits. The
+      # only calls that reach into the extra 8,000 are the long ones that would otherwise fail, and
+      # for those the alternative is not a cheaper answer but no answer.
+      #
+      # The cap's job is to bound the 65,536-token runaway — the model spending its entire
+      # completion budget thinking and emitting nothing, which is the registry's
+      # `max_output_tokens`. 32,000 is still less than half of that, so a runaway is bounded at
+      # under half the time and half the cost it used to take, while every observed real consult
+      # clears comfortably.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §2 — inspect the repo; ARCHITECTURE.md continuity is readFile-scoped
     prompt_extensions:
@@ -958,7 +1122,45 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # #275 derived 24,000 from the 7 in-situ consults of feature `93f4284a` and applied it to
+      # `planner-agent` ALONE. The other four kept values that trace to #131 ("the template
+      # declares its agents in full") and were never derived from consult data at all. Measured
+      # over 106 non-saturated consults in the trace store, that left ONE agent truncating:
+      #
+      #   agent                   cap     observed max completion   n
+      #   planner-agent        24,000     21,610                   42
+      #   data-architect-agent  6,000      9,100                   12   <- 0.66x: TRUNCATED
+      #   chief-architect-agent 12,000     3,715                   28
+      #   domain-architect-agent 6,000     1,755                   18
+      #   app-architect-agent    6,000     1,133                    6
+      #
+      # One cap, not five, because these agents do the SAME job — answer a question from your own
+      # artifact — the question is routed by topology rather than by difficulty, and per-agent
+      # maxima differing 19x on samples of 6 to 42 is mostly sampling noise. Pooled (n=106): max
+      # answer 935, max reasoning 21,162, max completion 21,610.
+      #
+      # The asymmetry decides it. Too LOW truncates, which is the failure the pilot exists to
+      # handle; too HIGH now raises `UnexpectedModelBehavior` on `finish_reason: length` within a
+      # bounded time, mapped to `CONSULT_BUDGET_FAILURE`, which stops the chain.
+      #
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11), BECAUSE 1.11x HEADROOM IS NOT HEADROOM.
+      # 24,000 sat 1.11x above the largest of 106 samples, which says the next slightly-longer
+      # consult gets cut off — and with no retry (decision record, condition 5) a cut-off consult is
+      # a FAILED consult, not a slower one. 32,000 is 1.48x the pooled maximum.
+      #
+      # It costs nothing on an ordinary call. A completion cap is a CEILING, not an allocation: the
+      # p50 consult spends ~210 completion tokens and is unaffected by where the ceiling sits. The
+      # only calls that reach into the extra 8,000 are the long ones that would otherwise fail, and
+      # for those the alternative is not a cheaper answer but no answer.
+      #
+      # The cap's job is to bound the 65,536-token runaway — the model spending its entire
+      # completion budget thinking and emitting nothing, which is the registry's
+      # `max_output_tokens`. 32,000 is still less than half of that, so a runaway is bounded at
+      # under half the time and half the cost it used to take, while every observed real consult
+      # clears comfortably.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §2
     prompt_extensions:
@@ -993,7 +1195,45 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 6000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # #275 derived 24,000 from the 7 in-situ consults of feature `93f4284a` and applied it to
+      # `planner-agent` ALONE. The other four kept values that trace to #131 ("the template
+      # declares its agents in full") and were never derived from consult data at all. Measured
+      # over 106 non-saturated consults in the trace store, that left ONE agent truncating:
+      #
+      #   agent                   cap     observed max completion   n
+      #   planner-agent        24,000     21,610                   42
+      #   data-architect-agent  6,000      9,100                   12   <- 0.66x: TRUNCATED
+      #   chief-architect-agent 12,000     3,715                   28
+      #   domain-architect-agent 6,000     1,755                   18
+      #   app-architect-agent    6,000     1,133                    6
+      #
+      # One cap, not five, because these agents do the SAME job — answer a question from your own
+      # artifact — the question is routed by topology rather than by difficulty, and per-agent
+      # maxima differing 19x on samples of 6 to 42 is mostly sampling noise. Pooled (n=106): max
+      # answer 935, max reasoning 21,162, max completion 21,610.
+      #
+      # The asymmetry decides it. Too LOW truncates, which is the failure the pilot exists to
+      # handle; too HIGH now raises `UnexpectedModelBehavior` on `finish_reason: length` within a
+      # bounded time, mapped to `CONSULT_BUDGET_FAILURE`, which stops the chain.
+      #
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11), BECAUSE 1.11x HEADROOM IS NOT HEADROOM.
+      # 24,000 sat 1.11x above the largest of 106 samples, which says the next slightly-longer
+      # consult gets cut off — and with no retry (decision record, condition 5) a cut-off consult is
+      # a FAILED consult, not a slower one. 32,000 is 1.48x the pooled maximum.
+      #
+      # It costs nothing on an ordinary call. A completion cap is a CEILING, not an allocation: the
+      # p50 consult spends ~210 completion tokens and is unaffected by where the ceiling sits. The
+      # only calls that reach into the extra 8,000 are the long ones that would otherwise fail, and
+      # for those the alternative is not a cheaper answer but no answer.
+      #
+      # The cap's job is to bound the 65,536-token runaway — the model spending its entire
+      # completion budget thinking and emitting nothing, which is the registry's
+      # `max_output_tokens`. 32,000 is still less than half of that, so a runaway is bounded at
+      # under half the time and half the cost it used to take, while every observed real consult
+      # clears comfortably.
+      max_tokens: 32000
     tools:
       builtin: [readFile, searchFiles, getFileTree]   # §2
     prompt_extensions:
@@ -1036,7 +1276,45 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 12000
+      # 🔴 THE CONSULT COMPLETION CAP — ONE VALUE FOR ALL FIVE CONSULTABLE AGENTS (2026-10-10).
+      #
+      # #275 derived 24,000 from the 7 in-situ consults of feature `93f4284a` and applied it to
+      # `planner-agent` ALONE. The other four kept values that trace to #131 ("the template
+      # declares its agents in full") and were never derived from consult data at all. Measured
+      # over 106 non-saturated consults in the trace store, that left ONE agent truncating:
+      #
+      #   agent                   cap     observed max completion   n
+      #   planner-agent        24,000     21,610                   42
+      #   data-architect-agent  6,000      9,100                   12   <- 0.66x: TRUNCATED
+      #   chief-architect-agent 12,000     3,715                   28
+      #   domain-architect-agent 6,000     1,755                   18
+      #   app-architect-agent    6,000     1,133                    6
+      #
+      # One cap, not five, because these agents do the SAME job — answer a question from your own
+      # artifact — the question is routed by topology rather than by difficulty, and per-agent
+      # maxima differing 19x on samples of 6 to 42 is mostly sampling noise. Pooled (n=106): max
+      # answer 935, max reasoning 21,162, max completion 21,610.
+      #
+      # The asymmetry decides it. Too LOW truncates, which is the failure the pilot exists to
+      # handle; too HIGH now raises `UnexpectedModelBehavior` on `finish_reason: length` within a
+      # bounded time, mapped to `CONSULT_BUDGET_FAILURE`, which stops the chain.
+      #
+      # 🔴 RAISED 24,000 -> 32,000 (2026-10-11), BECAUSE 1.11x HEADROOM IS NOT HEADROOM.
+      # 24,000 sat 1.11x above the largest of 106 samples, which says the next slightly-longer
+      # consult gets cut off — and with no retry (decision record, condition 5) a cut-off consult is
+      # a FAILED consult, not a slower one. 32,000 is 1.48x the pooled maximum.
+      #
+      # It costs nothing on an ordinary call. A completion cap is a CEILING, not an allocation: the
+      # p50 consult spends ~210 completion tokens and is unaffected by where the ceiling sits. The
+      # only calls that reach into the extra 8,000 are the long ones that would otherwise fail, and
+      # for those the alternative is not a cheaper answer but no answer.
+      #
+      # The cap's job is to bound the 65,536-token runaway — the model spending its entire
+      # completion budget thinking and emitting nothing, which is the registry's
+      # `max_output_tokens`. 32,000 is still less than half of that, so a runaway is bounded at
+      # under half the time and half the cost it used to take, while every observed real consult
+      # clears comfortably.
+      max_tokens: 32000
     prompt_extensions:
       - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
       - "You receive three specialist designs. Your job is to reconcile them, not regenerate them."
@@ -1072,7 +1350,7 @@ agents:
     llm:
       model: ~
       temperature: 0.1
-      max_tokens: 3000
+      max_tokens: 32000
     tools:
       builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §2 — inspect the repo while planning phases
     prompt_extensions:
@@ -1182,7 +1460,19 @@ agents:
     # inside the existing 1.2M budget, so the budget stays untouched. Reverts with the
     # per-phase raise above.
     max_iterations: 120
-    token_budget: 1200000
+    # 🔴 1,200,000 -> 2,000,000 (2026-10-11) — a PRE-EXISTING disagreement between this agent's
+    # two bounds, found by extending `test_the_gate_s_budget_cannot_bind_before_its_ITERATION_cap`
+    # from the constraint-agent to every bounded gate agent.
+    #
+    # At `max_iterations: 120` and 15,584 measured tokens/turn the work needs 1,870,080, so the
+    # BUDGET bound first — at roughly iteration 77 of 120. A sweep cut there reports a budget
+    # truncation, and the operator-facing note then names the wrong knob: raising the budget was
+    # in fact the right move here, but only by accident, and raising the iteration cap (the
+    # number that looks binding) would have done nothing.
+    #
+    # Nothing was changed about this agent today. It was wrong already, and a per-agent invariant
+    # that covered one of three agents is a convention rather than an invariant.
+    token_budget: 2000000
     schema:
       models:
         _Finding:

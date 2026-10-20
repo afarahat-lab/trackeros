@@ -1,0 +1,412 @@
+# pipeline.yaml — corporate-ops-web-mobile pipeline topology (ADR-067)
+#
+# Phase 3 lifts the per-phase loop into an explicit `type: loop` node (the general
+# replacement for `repeats_per_phase`). The loop iterates `phase_plan` (produced by
+# the planner), binding each phase to `current_phase`, and runs the generate / gate /
+# deploy composites per phase. The phase-evaluator is now the loop's CONTROLLER
+# (`gestalt/phase-evaluator`) — it runs as its own activity BETWEEN iterations and
+# returns a verdict (continue / adjust / escalate), subsuming the old `integrate`
+# phase. `max_iterations` (the platform phase cap) is enforced by the interpreter.
+#
+# A loop body — like a composite — is OPAQUE: workflow-level inputs are NOT
+# auto-visible inside it, so the loop declares every workflow value its steps consume
+# (feature_id / base_branch / feature_branch); the per-phase index + scope arrive via
+# the `current_phase` item binding. Each step at every nesting level is its own
+# Temporal activity (ADR-066 checkpoint granularity). Failures inside the loop body
+# RAISE a typed signal into the platform failure envelope (self-heal / park) — the
+# controller steers the happy path only.
+#
+# FeatureCycleWorkflow.run() INTERPRETS this file (the ADR-067 Phase 3 §7 switchover is
+# live — see test_run_uses_interpreter_path). This file is the ground-truth topology; the
+# prior hardcoded orchestration is preserved as _run_hardcoded (intact, unused) until §8.
+# Every `action` node here must have a runtime impl reachable from
+# workflows.dispatchable_action_names() (registry ∪ verdict ∪ code-provider) — enforced by
+# test_action_dispatch, so a validated action can never again die at dispatch.
+
+name: corporate-ops-web-mobile
+version: "3.4.0"
+
+phases:
+  # ── Planning: architecture crew → planner → persist (runs once) ──
+  planning:
+    repeats_per_phase: false
+    stages:
+      - id: architecture-crew
+        type: parallel
+        parallel:
+          - id: domain-design
+            type: agent
+            agent: domain-architect-agent
+            inputs: [feature_description]
+            output: { name: domain_spec, channel: workflow_state }
+          - id: data-design
+            type: agent
+            agent: data-architect-agent
+            inputs: [feature_description]
+            output: { name: data_spec, channel: workflow_state }
+          - id: app-design
+            type: agent
+            agent: app-architect-agent
+            inputs: [feature_description]
+            output: { name: app_spec, channel: workflow_state }
+      # The chief UNIONS the specialists' open_questions into its reconciled output (Brief 2, done
+      # in the chief agent so the planner's consult set is unchanged). Output is the pre-clarify
+      # reconciled architecture; the clarify gate below produces the final `architecture`.
+      - id: reconcile
+        type: agent
+        agent: chief-architect-agent
+        inputs: [domain_spec, data_spec, app_spec]
+        output: { name: architecture_reconciled, channel: workflow_state }
+      # Brief 2 — planning-layer clarification gate. Consumes ONLY the reconciled architecture (so
+      # it adds no new agent-producer path to the planner's consult walk). If a foundational
+      # open_question remains, PARKS ONCE (reusing the wait_condition/clarify mechanism) before
+      # phase 0; the operator's answer is folded into architecture.business_rules (a broad-scoped
+      # binding rule) — the same channel the planner + downstream consume. No open question ⇒
+      # passes straight through, producing `architecture` unchanged.
+      - id: clarify-architecture
+        type: action
+        action: clarify_architecture
+        inputs: [architecture_reconciled]
+        output: { name: architecture, channel: workflow_state }
+      - id: plan
+        type: agent
+        agent: planner-agent
+        inputs: [architecture]
+        output: { name: phase_plan, channel: workflow_state }
+      - id: persist-plan
+        type: action
+        action: persist_plan
+        inputs: [phase_plan, architecture, domain_spec, data_spec, app_spec]
+        output: { name: plan_files, channel: files }
+
+  # ── Build: the per-phase loop. Iterate phase_plan; the phase-evaluator controls
+  #    the loop between iterations (continue / adjust / escalate). ──
+  build:
+    repeats_per_phase: false
+    stages:
+      - id: phase-loop
+        type: loop
+        over: phase_plan
+        # `architecture` (the reconciled full system design) is threaded into the loop
+        # body so intent-agent can cross-check + consult it (ADR-069). It is REFERENCE
+        # context only — every consuming agent's task scope stays its own phase.
+        inputs: [feature_id, base_branch, feature_branch, architecture]
+        item: current_phase
+        output: { name: deploy_result, channel: workflow_state }
+        controller:
+          agent: gestalt/phase-evaluator
+          max_iterations: 10
+        steps:
+          - id: phase-branch
+            type: action
+            action: branch_create
+            inputs: [feature_id, current_phase, base_branch]
+            output: { name: phase_branch, channel: workflow_state }
+          - id: prepare-phase
+            type: action
+            action: prepare_phase
+            inputs: [feature_id, current_phase]
+            output: { name: intent_id, channel: workflow_state }
+          # Merged intent+design (consolidation Brief 2) — ONE agent specifying the phase's "what"
+          # (success criteria / constraints / scope) AND the constraint/consistency invariants the
+          # implementation must satisfy, leaving implementation shape to the code agent. `architecture`
+          # is kept as REFERENCE context (ADR-069) — for cross-checking + so chief-architect remains a
+          # real data-flow consult predecessor of this node (and, by forwarding, of everything that
+          # consumes `spec`); the agent's task scope is strictly current_phase.
+          - id: intent-design
+            type: agent
+            agent: intent-design-agent
+            inputs: [current_phase, intent_id, architecture]
+            output: { name: spec, channel: workflow_state }
+          # Code-generation composite (ADR-067 Phase 3 amendment A1/A2) — a `work_dir`
+          # composite: every step shares ONE persistent work dir derived from
+          # `phase_branch` (no ephemeral per-step re-clone). The provider action
+          # (openhands_code_agent — swap to aider_code_agent for the Aider backend, a
+          # one-line edit) generates into the shared dir but does NOT discover or commit;
+          # git_status then git_commit_push are separate, reusable, work-dir-scoped steps.
+          # The provider is a VERDICT action: cap-hit-incomplete / zero-write raises a
+          # typed signal into the loop's self-heal envelope. Declares current_phase so the
+          # interpreter can thread the phase index inside this opaque composite.
+          - id: code-generation
+            type: composite
+            work_dir: phase_branch
+            inputs: [spec, current_phase, phase_branch]
+            output: { name: commit_sha, channel: workflow_state }
+            steps:
+              - id: generate
+                type: action
+                action: openhands_code_agent
+                inputs: [spec, current_phase]
+                output: { name: generation_result, channel: workflow_state }
+              - id: discover
+                type: action
+                action: git_status
+                output: { name: source_writes, channel: workflow_state }
+              - id: commit
+                type: action
+                action: git_commit_push
+                inputs: [source_writes]
+                output: { name: commit_sha, channel: workflow_state }
+          # Context — runs AFTER code-generation (was before it): documentation must describe what
+          # was ACTUALLY BUILT, not the plan. `commit_sha` marks that a committed diff exists;
+          # `feature_branch` (the PR base, workflow-level) is the ref its gitDiff grant diffs the
+          # phase branch AGAINST to get the real phase diff (a clean working tree post-commit makes
+          # a base-less gitDiff empty, so the base ref is required — not vestigial). `spec` stays as
+          # the invariants to check the diff AGAINST (the review-agent reframe, applied here too).
+          # Docs commit into the phase branch before the PR, so they ship atomically with the code
+          # through CI + gate ("docs cannot lag", the already-decided doc-emission principle).
+          - id: context
+            type: agent
+            agent: context-agent
+            inputs: [spec, commit_sha, feature_branch]
+            output: { name: context_files, channel: files }
+          # Deploy + gate — open PR → poll CI → GATE (after CI, ADR-041) → merge.
+          # create_pr / poll_ci / gate are VERDICT nodes: a non-ok result RAISES a
+          # typed signal into the loop's self-heal envelope. The gate is a single
+          # platform action (gate_activity runs constraint + review + synthesis + §2
+          # false-positive detection — those are class-(c) specialized runtimes, not
+          # generic agent nodes), and it runs AFTER CI passes.
+          # ADR-074 — these four steps JUDGE the phase's work, so they are a `verify` node
+          # rather than four steps whose failures fall through to self-healing. A gate finding
+          # is not a fault: it is the gate doing its job, with file, line, rule and the
+          # offending line attached. Routing one to the DIAGNOSTICIAN asked an LLM what an
+          # already-structured result meant — an answer the platform then overrode
+          # deterministically (`reconcile_diagnosis_action`,
+          # `coerce_escalate_with_prescribable_findings`).
+          #
+          # `resume_at: open-pr` is the re-entry point because a corrective pass EDITS CODE:
+          # the steps worth repeating are the ones that check code. Resuming at `gate` would
+          # judge and merge a tree CI never ran on, and the validator rejects it.
+          #
+          # What this node deliberately does NOT absorb still reaches self-healing or a human:
+          # a golden-principle breach, findings carrying no file, a truncated gate, an infra
+          # drop. Those are unknowns; these four steps only own what they can prescribe.
+          - id: phase-verify
+            type: verify
+            inputs: [phase_branch, feature_branch, intent_id, commit_sha]
+            output: { name: gate_verdict, channel: workflow_state }
+            on_findings:
+              flow: fix-intent
+              resume_at: open-pr
+              # Quoted values are not needed here (this is a typed block, not `params`).
+              max_rounds: 3
+              max_attempts_per_cause: 2
+            steps:
+            - id: open-pr
+              type: action
+              action: create_pr
+              inputs: [phase_branch, feature_branch, intent_id]
+              output: { name: pr_ref, channel: workflow_state }
+            - id: poll-ci
+              type: action
+              action: poll_ci
+              inputs: [pr_ref]
+              output: { name: ci_result, channel: workflow_state }
+            # CI-agent (Brief 2) — judges the COMPLETED run's output (read-only) and classifies
+            # each finding by DevOps severity. Its verdict — not the raw exit code — decides
+            # block (→ self-heal, same path as a gate finding) / re-run (flaky) / proceed
+            # (non-blocking findings recorded). MUST directly follow poll_ci (validator-enforced),
+            # which now hands it a completed run (pass or fail) instead of raising on failure.
+            - id: judge-ci
+              type: action
+              action: judge_ci
+              inputs: [ci_result]
+              output: { name: ci_judgment, channel: workflow_state }
+            - id: gate
+              type: action
+              action: gate
+              # The gate's AGENT ROSTER. Add an agent here and declare it in agents.yaml
+              # (with `gateRuntime: constraint` or `review`) and it runs in the gate — no
+              # platform code. Order is the order they run in.
+              #
+              # review-agent was REMOVED from this roster on 2026-09-20 and now runs ONCE per
+              # feature, in `finalize` (see `feature-review`). What stays here is the
+              # deterministic, introduction-point check: constraint-agent's dependency and
+              # layering rules are cheapest to enforce in the phase that breaks them, and
+              # since #126/#127 they are mechanical lookups rather than judgment.
+              #
+              # Why the split: this gate re-reads an ACCUMULATING codebase every phase
+              # (measured, run 32ad270f phase 7: 62 tool calls / ~860k tokens / ~54 min for
+              # ONE agent on ONE phase), so an N-phase feature paid for N subjective reviews
+              # of a tree that mostly had to be judged as a whole anyway. Note what did NOT
+              # move: a violation caught here is still caught before the next phase builds on
+              # it, which is the property an end-of-feature-only gate would have lost.
+              params: { agents: "constraint-agent" }
+              inputs: [phase_branch, intent_id, commit_sha, ci_judgment]
+              output: { name: gate_verdict, channel: workflow_state }
+          # gap-B — the merge MODE is a static param (not a workflow value): a phase
+          # branch merges INTO the feature branch here.
+          - id: merge-phase
+            type: action
+            action: branch_merge
+            inputs: [phase_branch, gate_verdict]
+            params: { kind: phase-to-feature }
+            output: { name: deploy_result, channel: workflow_state }
+
+  # ── Finalize: review the whole feature → merge feature→main → mark completed (once) ──
+  finalize:
+    repeats_per_phase: false
+    stages:
+      # ADR-074 — the feature-wide verification is a `verify` node, the SAME construct the
+      # phase loop uses. It used to be a bespoke fix loop written in Python
+      # (`_dispatch_feature_review`): the right shape — judge, fix by root cause, judge again —
+      # in the wrong place, so two tiers carried two implementations of one idea and only one
+      # of them got each improvement.
+      #
+      # `attribute_to_phases` is what a FEATURE-level verification needs and a phase's does
+      # not. Its findings arrive with no phase, while the recovery machinery is phase-keyed, so
+      # each is attributed to the phase that last wrote its file (via the platform's own
+      # `(corr <8>)` commit marker) and the fix is then merged back into the feature branch —
+      # the branch this verification reads. Skip either half and the loop spends its rounds
+      # changing nothing.
+      #
+      # `resume_at` is the review itself: the corrective pass already re-verifies the phase it
+      # touched through that phase's own gate, so what is left to redo here is the feature-wide
+      # judgement.
+      - id: feature-validation
+        type: verify
+        inputs: [feature_id]
+        output: { name: feature_review_result, channel: workflow_state }
+        on_findings:
+          flow: fix-intent
+          resume_at: feature-review
+          attribute_to_phases: true
+          max_rounds: 3
+          max_attempts_per_cause: 2
+        steps:
+        - id: feature-review
+          type: action
+          action: feature_review
+          inputs: [feature_id]
+          # The ROSTER only. The bounds that used to sit here as `params` — max_fix_rounds,
+          # max_attempts_per_cause — moved onto the enclosing node's `on_findings`, where the
+          # loop that honours them actually lives. Leaving them here would have read as
+          # configuration and been ignored.
+          #
+          # `constraint-agent` runs beside the reviewer because the feature diff is the last
+          # point anything sees the build as a WHOLE, and the constraint agent's checks are
+          # deterministic: the dependency map and `ownedDecisions` are the two that caught a
+          # duplicated authorization rule the subjective reviewer read past. A per-phase gate
+          # cannot see a rule duplicated ACROSS phases, which is exactly how that one arrived.
+          params: { agents: "review-agent,constraint-agent" }
+          output: { name: feature_review_result, channel: workflow_state }
+      # The running record is `.gestalt/feature-review-findings.md` on the feature branch:
+      # every finding, and which round resolved it.
+      - id: merge-feature
+        type: action
+        action: branch_merge
+        inputs: [feature_branch]
+        params: { kind: feature-to-main }
+        output: { name: feature_merge_sha, channel: workflow_state }
+      - id: mark-complete
+        type: action
+        action: mark_feature_status
+        inputs: [feature_id]
+        output: { name: feature_status, channel: workflow_state }
+
+# ── Named flows: sequences the platform invokes BY NAME, not part of the phase walk ──
+#
+# `phases` above is what a feature run walks start to finish. A flow runs when something
+# decides it should. Today that is the self-healing router, which invokes `fix-intent` when
+# it prescribes a corrective pass; the same shape is how a future flow triggered by some
+# other agent gets added — a template edit, not a platform change.
+#
+# A flow declares its HAPPY PATH. What happens when a step FAILS stays with the platform:
+# the schema has no conditional node, and a fix that fails must also preserve its work so the
+# next attempt can chain off it — compensation, not a step.
+flows:
+  fix-intent:
+    description: >
+      One corrective pass over a phase that failed its gate or build. Runs on its own
+      fix/<intent>/<phase>/<attempt> branch off the previous attempt, regenerates the phase's
+      code with the failure's edit prescriptions in scope, and merges back into the phase
+      branch. It deliberately stops BEFORE deploy — the parent phase re-gates the merged
+      result, so a fix never opens its own PR or runs CI.
+    steps:
+      - id: mint-fix-intent
+        type: action
+        action: create_fix_intent
+        inputs: [feature_id, phase_index]
+        output: { name: fix_intent, channel: workflow_state }
+      - id: fix-branch
+        type: action
+        action: branch_create
+        inputs: [feature_id, phase_index]
+        params: { kind: fix }
+        output: { name: fix_branch, channel: workflow_state }
+      # DERIVED, not copied. This runs the phase loop's own generate stages — the pipeline's
+      # actual agent nodes up to the deploy boundary. Listing them literally here would be
+      # correct today and silently wrong the first time someone added an agent to the loop:
+      # the phase would run it and the fix would not, with nothing to say so.
+      - id: regenerate
+        type: action
+        action: phase_generate_stages
+        inputs: [feature_id, phase_index]
+        output: { name: fix_produced, channel: workflow_state }
+      - id: merge-to-phase
+        type: action
+        action: branch_merge
+        inputs: [fix_branch]
+        params: { kind: to-phase }
+        output: { name: fix_merge, channel: workflow_state }
+
+  # §2 — the SAME corrective pass, stopping BEFORE the merge, for a fix that needs a human's
+  # ruling before it lands. Named by `on_findings.draft_flow`; the validator refuses a node that
+  # declares `approval_required_paths` and names a flow that is not here, because the silent
+  # alternative is a decision-record finding taking the self-merging flow above.
+  #
+  # The DRAFT IS THE BRANCH. These three steps leave `fix/<intent>/<phase>/<attempt>` pushed with
+  # the agent's commit on it and CI run against it; `gestalt signals approve-fix` re-validates and
+  # performs the merge this flow omits. Nothing serialises a patch anywhere: git is already the
+  # transport between activities, and a stored diff would be a second copy to go stale.
+  #
+  # 🔴 It is this flow MINUS ONE STEP, deliberately not a near-copy with its own wording. A fix
+  # held for approval must be the same work as a fix that merges, or an operator is ruling on
+  # something the platform would not have produced by itself.
+  fix-intent-draft:
+    description: >
+      One corrective pass for a finding in a RECORDED DECISION — `docs/DECISIONS.md`, an ADR.
+      Identical to `fix-intent` except that it does not merge: the branch is left for an operator
+      to approve or reject, because the platform must not merge its own reading of the document
+      its other judgements are measured against.
+    steps:
+      - id: mint-fix-intent
+        type: action
+        action: create_fix_intent
+        inputs: [feature_id, phase_index]
+        output: { name: fix_intent, channel: workflow_state }
+      - id: fix-branch
+        type: action
+        action: branch_create
+        inputs: [feature_id, phase_index]
+        params: { kind: fix }
+        output: { name: fix_branch, channel: workflow_state }
+      - id: regenerate
+        type: action
+        action: phase_generate_stages
+        inputs: [feature_id, phase_index]
+        output: { name: fix_produced, channel: workflow_state }
+
+# ── Self-healing: what recovers an UNEXPECTED failure ──────────────────────────────────
+#
+# This table is for FAULTS — things nobody designed for. An infra drop mid-agent, a truncated
+# response, a code agent that wrote nothing, a build that broke in a way the tests did not
+# predict. The answer to those is genuinely not known, which is why a diagnostician reads the
+# failure and decides, and why that call earns its cost here.
+#
+# Gate, CI and review FINDINGS are not faults and are NOT listed here (ADR-074). They are the
+# platform's instruments returning their designed output, so they are owned by the `verify`
+# node that wraps the steps producing them — see `phase-verify` in the build loop, which
+# carries its own `flow`, `resume_at` and bounds. `resume_at` used to live in this table; it
+# moved with the concern.
+#
+# Every class left unmapped uses the platform default, flow `fix-intent` with a full body
+# re-run. A recovery whose flow edits code may narrow that with
+# `resume_at: <top-level body step>` — the validator rejects a resume point that would skip
+# the CI run its own fix needs to pass, wherever CI sits in the body.
+#
+#   self_healing:
+#     recoveries:
+#       shader-compile-error: { flow: asset-revalidation, resume_at: phase-verify }
+#
+# Nothing is mapped today: every fault class this template can raise is served by the default.

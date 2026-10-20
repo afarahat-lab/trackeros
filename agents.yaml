@@ -672,7 +672,7 @@ agents:
       real change to that file was +14/-2). You cannot tell the difference from inside the output, so use
       the tool. If gitDiff fails or returns empty, fall through to evaluating the artifact files inlined above.'
     - 'The repository pattern is sanctioned data-access delegation. A business-logic-layer service that depends on a repository INTERFACE — via constructor injection or by importing the interface type — is correctly delegating data access to the data access layer; this is NOT a data-access-layer violation. Only flag a data-access violation when a non-data-access-layer file performs data access DIRECTLY: inline SQL, connection management, query execution, or direct datastore calls.'
-    - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's git diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
+    - Before reporting an import as a broken, missing, or non-existent dependency, confirm the target file is actually absent on the branch using readFile or `ls` via executeScript. A file created in a PRIOR phase is intentionally not in this phase's diff but DOES exist on the branch — never flag an import of a prior-phase file as broken or missing.
     - Consult the dependency-direction graph in ARCHITECTURE.md. A cross-module dependency that follows a documented allowed direction is sanctioned — do not flag it as a circular or bidirectional-dependency risk unless you find an ACTUAL reverse import that creates a cycle. Speculative risk is not a violation.
     - The project's shared infrastructure directory (the common/shared module location defined in ARCHITECTURE.md) hosts cross-cutting infrastructure — shared connection pools or clients, utility modules, and shared type definitions. This directory is sanctioned shared infrastructure, NOT a layering violation. Data-access-layer code that imports a shared connection pool or client from the shared infrastructure directory is following the correct pattern. Do NOT flag such imports as data-access-layer violations, and do NOT flag the shared connection/utility module itself as data access outside the data access layer.
     - A service class calling a method on an injected repository interface is correct delegation to the data-access layer. Do NOT flag this as direct data access — the call goes through the interface, not to a data store directly.
@@ -687,7 +687,6 @@ agents:
       # per-turn throughput + the §1 cap raise + the §2 git-diff
       # scoping should bring constraint-agent under 90s typical.
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      reasoning_effort: low
       temperature: 0.0
       # 🔴 2026-10-13 — 4000 -> 40000. This cap was CONFIGURED but never applied to
       # the model on the multi-append path (the path this agent runs on); #306 fixed
