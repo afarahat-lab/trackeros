@@ -120,12 +120,12 @@ Decision: the new static route `GET /leaves/pending-decisions` is registered ins
 `leaveRoutes(fastify)` BEFORE the existing parametric `GET /leaves/:id`, and its 200 body is a
 bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows.
 
-Context: Fastify matches routes in registration order, so a static path registered after a
-parametric sibling is shadowed by it. Registered after `GET /leaves/:id`, a request to
-`/leaves/pending-decisions` resolves as `id = 'pending-decisions'`, reaches `getById`, and
-returns 404 — a silent, order-dependent failure that no type check or unit test of the handler
-would catch. Separately, the queue renders only what a decision needs, and the design's
-`findPendingDecisions(actorId, actorRole)` signature would have put role scoping in the
+Context: the pinned router — `fastify` ^4.29.1, resolving `find-my-way` 8.2.2 — matches static
+nodes ahead of parametric ones irrespective of registration order. A request to
+`/leaves/pending-decisions` therefore always resolves to the static route and never as
+`id = 'pending-decisions'` on `GET /leaves/:id`, whether the static path is registered before or
+after the parametric sibling. Separately, the queue renders only what a decision needs, and the
+design's `findPendingDecisions(actorId, actorRole)` signature would have put role scoping in the
 repository.
 
 Alternatives rejected:
@@ -143,26 +143,26 @@ Alternatives rejected:
   `status = 'SUBMITTED'` predicate.
 
 Consequences: the route handler is a thin pass-through (`resolveActor` -> service -> 200) with no
-query parsing, no role branch and no SQL, and the ordering comment in the file is load-bearing —
-moving the registration below `GET /leaves/:id` breaks the endpoint. `PendingDecision` stays in
-`src/modules/leave/leave.model.ts` and is exported from the module's `index.ts`; it is not
-promoted to `src/shared/types/`. The endpoint is not added to `PUBLIC_PATHS`, so it requires a
-valid bearer token.
+query parsing, no role branch and no SQL; the comment in the file describes only the handler, and
+the registration's position is a readability choice rather than a matching requirement — the
+pinned router matches the static path ahead of the parametric sibling whichever is registered
+first. `PendingDecision` stays in `src/modules/leave/leave.model.ts` and is exported from the
+module's `index.ts`; it is not promoted to `src/shared/types/`. The endpoint is not added to
+`PUBLIC_PATHS`, so it requires a valid bearer token.
 
-**Test coverage (added by the feature's test phase, then hardened).** The ordering constraint is
-no longer protected only by the comment and this ADR: `tests/unit/modules/leave/leave.routes.test.ts`
-registers `leaveRoutes` and injects `GET /leaves/pending-decisions` through the real Fastify
-router. The block now holds 11 cases. The original 5 assert 200 with the queue, 200 with `[]`,
-401 `UNAUTHORIZED` with the service never called, the resolved actor forwarded unchanged, and a
-bare array of exactly the seven `PendingDecision` fields. A follow-up hardening pass added 6
-more, of which two bear directly on this ADR:
+**Test coverage (added by the feature's test phase, then hardened).**
+`tests/unit/modules/leave/leave.routes.test.ts` registers `leaveRoutes` and injects
+`GET /leaves/pending-decisions` through the real Fastify router. The block now holds 11 cases.
+The original 5 assert 200 with the queue, 200 with `[]`, 401 `UNAUTHORIZED` with the service never
+called, the resolved actor forwarded unchanged, and a bare array of exactly the seven
+`PendingDecision` fields. A follow-up hardening pass added 6 more, of which two bear directly on
+this ADR:
 
-- **The ordering is now asserted for its own sake.** A case builds an instance whose service
-  carries BOTH `listPendingDecisions` and a `getById` that throws `NotFoundError`; the static
-  path returns 200 and `getById` is asserted `not.toHaveBeenCalled()`. Previously the ordering
-  was pinned only indirectly — the 200 assertions would have failed had the parametric route
-  won, but nothing named the shadowing as the cause. Registering the route after
-  `GET /leaves/:id` now fails a test that says why.
+- **The static path reaches its own handler.** A case builds an instance whose service carries
+  BOTH `listPendingDecisions` and a `getById` that throws `NotFoundError`; the static path
+  returns 200 and `getById` is asserted `not.toHaveBeenCalled()`. Both assertions hold under
+  either registration order, so the case pins the pass-through — the static path is never routed
+  to the by-id handler — rather than the order in which the two are registered.
 - **The pass-through is pinned end to end.** A MANAGER case asserts the actor object is
   forwarded to the service unchanged (so the route does not scope the queue itself); a reversed
   fixture comes back in the same order, proving no re-sort or cap; dates are asserted as ISO

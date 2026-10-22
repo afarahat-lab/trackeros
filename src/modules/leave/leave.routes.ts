@@ -185,8 +185,8 @@ export async function leaveRoutes(fastify: FastifyInstance): Promise<void> {
     }
   });
 
-  // Registered BEFORE '/leaves/:id' so the static path cannot be shadowed by the
-  // parametric one. The endpoint takes no input, so there is nothing to parse.
+  // Static pending-decisions read: a fixed path with no parameters, so the handler
+  // takes no input to parse.
   fastify.get('/leaves/pending-decisions', async (request: LeaveAuthRequest, reply) => {
     try {
       const actor = resolveActor(request);
