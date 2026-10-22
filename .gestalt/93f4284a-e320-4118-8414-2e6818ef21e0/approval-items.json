@@ -1,0 +1,20 @@
+[
+  {
+    "base_sha": "48dcf648a0217d323593520107234f8f0b239d5b",
+    "ci_conclusion": "success",
+    "created_at": "2026-10-22T00:46:15.976977+00:00",
+    "decided_by": "",
+    "decision": "",
+    "decision_reason": "",
+    "feature_id": "93f4284a-e320-4118-8414-2e6818ef21e0",
+    "file_digest": "b03885c52ac3a6def72576fb2cfe9b72b3ee1c464af0ef65b557b8f0ab228fcf",
+    "file_path": "docs/ARCHITECTURE.md",
+    "fix_branch": "fix/93f4284a-e320-4118-8414-2e6818ef21e0/0/1",
+    "fix_head_sha": "d6628b8add9c714d7a416b02d4e01a7e91710129",
+    "item_id": "fix-b640e26e9a",
+    "message": "[review/documentation] The documented 200 body for `GET /leaves/pending-decisions` contradicts the recorded decision ADR-004 and the built code. ADR-004 (docs/DECISIONS.md, Accepted) states: \"its 200 body is a bare array of the leave-owned `PendingDecision` projection (7 fields), not `LeaveRequest` rows\", and explicitly rejects \"Returning full `LeaveRequest` rows and letting the client project\". The built route returns `listPendingDecisions`, typed `Promise<PendingDecision[]>` (src/modules/leave/leave.service.ts:50, :478; src/modules/leave/leave.routes.ts:193), and the repository maps rows through `toPendingDecision` (src/modules/leave/leave.repository.ts:247). The doc line still says \"200 with an array of `LeaveRequest` rows\", so a reader implementing against it would expose `approverId`, `approvalComment`, `reason` and the cancellation fields the ADR says must not be in the queue view. Per the recorded-decision rule the code is correct and this living document is the stale artifact.\n  Evidence: \"**Errors.** Errors return `{ error: string; code: string }` via the existing `sendError` helper (`AppError` -> its `statusCode` + `code`; any other throw -> 500 `{ error: 'Internal Server Error' }`). For `GET /leaves/pending-decisions`: 401 (`UnauthorizedError`, code `UNAUTHORIZED`) for a missing or invalid actor; 200 with an array of `LeaveRequest` rows (possibly empty) on success \u2014 an empty queue is a valid 200 with `[]`, not a 404. For `POST /leaves/:id/cancel` the existing contract is unchanged: 400 validation, 401 missing/invalid actor, 403 `ForbiddenError` from `assertCanCancel`, 404 `NotFoundError` for an unknown id, 409 `ConflictError` for an already-begun leave or an already-reversed APPROVED request, 200 with the cancelled (or reversal) row on success. A failure to insert the approver notification is not mapped to a new status: it throws inside the unit of work, the transaction rolls back, and the caller receives the underlying error (500) \u2014 the cancelled request is never left committed without its notification record.\"\n  Fix: Change \"200 with an array of `LeaveRequest` rows (possibly empty) on success\" to state the built shape: a bare array of the leave-owned `PendingDecision` projection (7 fields), possibly empty \u2014 matching ADR-004 in docs/DECISIONS.md.",
+    "phase_index": -1,
+    "quoted_line": "",
+    "rule_id": "review/documentation"
+  }
+]

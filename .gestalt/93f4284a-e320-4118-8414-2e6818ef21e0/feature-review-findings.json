@@ -14,7 +14,9 @@
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
       "fixed_at_attempt": 2,
-      "file_digest": ""
+      "file_digest": "",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/test-coverage",
@@ -28,7 +30,9 @@
       "first_seen_attempt": 1,
       "last_seen_attempt": 1,
       "fixed_at_attempt": 2,
-      "file_digest": ""
+      "file_digest": "",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/documentation",
@@ -38,11 +42,13 @@
       "quoted_line": "- **A duplicated delivery record was removed.** The heading `### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)` appeared TWICE with byte-identical bodies (immediately after *Phase 1 delivered* and again immediately before *Open questions*). One copy was deleted and the other kept verbatim — pure de-duplication, no content rewritten, merged, or reworded. Each `### Phase N delivered (...)` heading in this file now appears exactly once, so a reader resolving that heading gets one authoritative block.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "awaiting-approval",
       "first_seen_attempt": 1,
       "last_seen_attempt": 14,
       "fixed_at_attempt": null,
-      "file_digest": "8b6f8d97fef949a621be9c70156b5eb7"
+      "file_digest": "8b6f8d97fef949a621be9c70156b5eb7",
+      "approval_item": "fix-b640e26e9a",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/documentation",
@@ -56,7 +62,9 @@
       "first_seen_attempt": 1,
       "last_seen_attempt": 12,
       "fixed_at_attempt": 13,
-      "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c"
+      "file_digest": "90c8c23e1749bb1cc7e2606c4c2f886c",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/configuration",
@@ -70,7 +78,9 @@
       "first_seen_attempt": 2,
       "last_seen_attempt": 2,
       "fixed_at_attempt": 3,
-      "file_digest": ""
+      "file_digest": "",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/architecture",
@@ -84,7 +94,9 @@
       "first_seen_attempt": 3,
       "last_seen_attempt": 3,
       "fixed_at_attempt": 4,
-      "file_digest": "e3169737801513873daa2b907c613f9a"
+      "file_digest": "e3169737801513873daa2b907c613f9a",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/review/stale-spec",
@@ -98,7 +110,9 @@
       "first_seen_attempt": 4,
       "last_seen_attempt": 4,
       "fixed_at_attempt": 5,
-      "file_digest": "9363a0c16159739ff82b619ff1feb51b"
+      "file_digest": "9363a0c16159739ff82b619ff1feb51b",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/stale-spec",
@@ -112,7 +126,9 @@
       "first_seen_attempt": 6,
       "last_seen_attempt": 12,
       "fixed_at_attempt": 13,
-      "file_digest": "9363a0c16159739ff82b619ff1feb51b"
+      "file_digest": "9363a0c16159739ff82b619ff1feb51b",
+      "approval_item": "",
+      "rejected_reason": ""
     },
     {
       "rule_id": "review/documentation",
@@ -126,7 +142,9 @@
       "first_seen_attempt": 11,
       "last_seen_attempt": 14,
       "fixed_at_attempt": null,
-      "file_digest": "b869e1546cc556444772ae530e8cdf01"
+      "file_digest": "b869e1546cc556444772ae530e8cdf01",
+      "approval_item": "",
+      "rejected_reason": ""
     }
   ]
 }
