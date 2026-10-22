@@ -1,6 +1,6 @@
 {
   "scope": "feature 93f4284a-e320-4118-8414-2e6818ef21e0",
-  "attempts": 14,
+  "attempts": 15,
   "findings": [
     {
       "rule_id": "review/consistency",
@@ -37,16 +37,16 @@
     {
       "rule_id": "review/documentation",
       "file_path": "docs/ARCHITECTURE.md",
-      "line": 1775,
-      "message": "[review/documentation] The newly added repair record asserts a file-wide invariant that the file does not satisfy: \"Each `### Phase N delivered (...)` heading in this file now appears exactly once\". Verified false — `### Phase 4 delivered (audit entity-query + history endpoint unit tests)` still appears TWICE, at line 1588 and line 1601, with byte-identical bodies (diff of lines 1588–1600 against 1601–1613 reports no differences). The Phase 7 de-duplication itself is correct and content-preserving (the removed block was byte-identical to the kept one, and the heading now occurs once at line 1760), but the generalisation to \"each Phase N heading\" is contradicted by the Phase 4 pair, so a reader is told the duplicate-delivery-record class of defect is closed when one instance remains. The duplicate Phase 4 pair predates this phase (it is present on origin/main), so the defect is the over-broad claim, not the duplication.\n  Evidence: \"- **A duplicated delivery record was removed.** The …",
-      "quoted_line": "- **A duplicated delivery record was removed.** The heading `### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)` appeared TWICE with byte-identical bodies (immediately after *Phase 1 delivered* and again immediately before *Open questions*). One copy was deleted and the other kept verbatim — pure de-duplication, no content rewritten, merged, or reworded. Each `### Phase N delivered (...)` heading in this file now appears exactly once, so a reader resolving that heading gets one authoritative block.",
+      "line": 123,
+      "message": "[review/documentation] [review/documentation] This feature's diff deletes the audit module's documented surface from the \"Phase 3 delivered (audit and notification modules)\" section, leaving only the notification paragraph quoted above. The diff against `origin/main` removes: the two-module description (\"Two modules, each under `src/modules/<name>/` with the same split-file layout as Phase 2 ...\"), the entire `**audit** — AuditLog model (id, actorId, action: AuditAction, entityType, entityId, beforeState: `unknown | null`, afterState: `unknown | null`, occurredAt: Date) ...` paragraph, the audit feature's \"Later extension\" note recording `findByEntity(entityType, entityId)` / `getByEntity(entityType, entityId)`, all four \"Divergences from the plan worth noting\" bullets (nullable `beforeState`/`afterState`, `markRead`, optional trailing `PoolClient`, no audit writes), and the Jest test-coverage sentence. The heading still promises \"audit and notification modules\" while the body no …",
+      "quoted_line": "**notification** — `Notification` model (id, recipientId, type, title, message, relatedEntityType: `string | null`, relatedEntityId: `string | null`, relatedEntityCode: `string | null`, status: NotificationStatus, createdAt: Date, readAt: `Date | null`). `CreateNotificationInput = Omit<Notification, 'id' | 'status' | 'createdAt' | 'readAt' | 'relatedEntityCode'> & { status?: NotificationStatus; relatedEntityCode?: string | null }` — status defaults to PENDING when omitted and `relatedEntityCode` is persisted as `null` when the call site omits it. `INotificationRepository` (create, findById, updateStatus) + `PgNotificationRepository` (generates `id`/`createdAt`, defaults status to PENDING, `read_at` null on create). `INotificationService` (create, getById, markRead) + `NotificationService` validates required strings and status enum membership; `markRead` sets status READ and `readAt` to now, throwing NotFoundError(404) on unknown id.",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 1,
-      "last_seen_attempt": 14,
+      "last_seen_attempt": 15,
       "fixed_at_attempt": null,
-      "file_digest": "8b6f8d97fef949a621be9c70156b5eb7",
+      "file_digest": "b7b00967c91136a6ef6e3ddc16b17c78",
       "approval_item": "",
       "rejected_reason": ""
     },
@@ -133,16 +133,32 @@
     {
       "rule_id": "review/documentation",
       "file_path": "docs/DECISIONS.md",
-      "line": 123,
-      "message": "[review/documentation] ADR-004's central premise is factually wrong, and the whole ADR (plus its \"load-bearing comment\" consequence at line 146-147) rests on it. Fastify 4.29.1 — the version pinned in package.json/package-lock.json — uses find-my-way 8.2.2, which matches static nodes ahead of parametric ones irrespective of registration order (its README: \"static routes are always inserted before parametric and wildcard\"). Verified by execution against the pinned versions: registering `GET /leaves/:id` FIRST and `GET /leaves/pending-decisions` SECOND, then injecting `GET /leaves/pending-decisions`, returns 200 from the static handler — not the 404 via `getById` this ADR claims. The same holds when both are registered inside a `leaveRoutes(fastify)` plugin. So \"a static path registered after a parametric sibling is shadowed by it\" and \"resolves as `id = 'pending-decisions'`, reaches `getById`, and returns 404\" are both false, and the rejected alternative (\"Registering the route after …",
-      "quoted_line": "Context: Fastify matches routes in registration order, so a static path registered after a",
+      "line": 164,
+      "message": "[review/documentation] This test-coverage claim is false for the same reason as the Context above: it asserts that the ordering is now protected by a failing test. Verified by execution against the pinned fastify 4.29.1 / find-my-way 8.2.2: registering `GET /leaves/pending-decisions` AFTER `GET /leaves/:id` inside a plugin still returns 200 from the static handler with `getById` never called, so the cited case passes either way and does not fail when the registration order is reversed. The case does pin the pass-through (200, `getById` not called), but not the ordering it is credited with protecting.\n  Evidence: \"  `GET /leaves/:id` now fails a test that says why.\"",
+      "quoted_line": "  `GET /leaves/:id` now fails a test that says why.",
       "severity": "",
       "agent_role": "",
       "status": "open",
       "first_seen_attempt": 11,
-      "last_seen_attempt": 14,
+      "last_seen_attempt": 15,
       "fixed_at_attempt": null,
       "file_digest": "b869e1546cc556444772ae530e8cdf01",
+      "approval_item": "",
+      "rejected_reason": ""
+    },
+    {
+      "rule_id": "review/documentation",
+      "file_path": "src/modules/leave/leave.routes.ts",
+      "line": 188,
+      "message": "[review/documentation] This comment asserts a load-bearing registration-order constraint that is false for the pinned router. Fastify 4.29.1 uses find-my-way 8.2.2, which matches static nodes ahead of parametric ones irrespective of registration order. Verified by execution against the installed versions: registering `GET /leaves/:id` FIRST and `GET /leaves/pending-decisions` SECOND (both directly and inside a `leaveRoutes(fastify)`-shaped plugin) still routes `GET /leaves/pending-decisions` to the static handler (200), never to `getById`. The comment (and the test that claims to pin it) tells a future maintainer that moving this registration below `GET /leaves/:id` breaks the endpoint, which is not true — so the stated reason for the ordering is misleading, and the ordering itself is presented as load-bearing when it is not.\n  Evidence: \"  // Registered BEFORE '/leaves/:id' so the static path cannot be shadowed by the\"\n  Fix: Either drop the ordering claim from the comment (the …",
+      "quoted_line": "  // Registered BEFORE '/leaves/:id' so the static path cannot be shadowed by the",
+      "severity": "",
+      "agent_role": "",
+      "status": "open",
+      "first_seen_attempt": 15,
+      "last_seen_attempt": 15,
+      "fixed_at_attempt": null,
+      "file_digest": "b6db36aa2c631e85199a94691ec2fbc6",
       "approval_item": "",
       "rejected_reason": ""
     }
