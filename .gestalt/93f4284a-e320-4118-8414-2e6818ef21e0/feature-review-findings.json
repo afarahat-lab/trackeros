@@ -42,12 +42,12 @@
       "quoted_line": "- **A duplicated delivery record was removed.** The heading `### Phase 7 delivered (web approvals queue consumes GET /leaves/pending-decisions)` appeared TWICE with byte-identical bodies (immediately after *Phase 1 delivered* and again immediately before *Open questions*). One copy was deleted and the other kept verbatim — pure de-duplication, no content rewritten, merged, or reworded. Each `### Phase N delivered (...)` heading in this file now appears exactly once, so a reader resolving that heading gets one authoritative block.",
       "severity": "",
       "agent_role": "",
-      "status": "awaiting-approval",
+      "status": "open",
       "first_seen_attempt": 1,
       "last_seen_attempt": 14,
       "fixed_at_attempt": null,
       "file_digest": "8b6f8d97fef949a621be9c70156b5eb7",
-      "approval_item": "fix-b640e26e9a",
+      "approval_item": "",
       "rejected_reason": ""
     },
     {
