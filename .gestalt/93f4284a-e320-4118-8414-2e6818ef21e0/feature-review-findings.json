@@ -138,12 +138,12 @@
       "quoted_line": "  `GET /leaves/:id` now fails a test that says why.",
       "severity": "",
       "agent_role": "",
-      "status": "open",
+      "status": "awaiting-approval",
       "first_seen_attempt": 11,
       "last_seen_attempt": 15,
       "fixed_at_attempt": null,
       "file_digest": "b869e1546cc556444772ae530e8cdf01",
-      "approval_item": "",
+      "approval_item": "fix-d008f57c5d",
       "rejected_reason": ""
     },
     {
