@@ -1,0 +1,138 @@
+{
+  "scope": {
+    "affectedDomains": [
+      "leave",
+      "documentation"
+    ],
+    "affectedLayers": [
+      "presentation",
+      "docs"
+    ],
+    "isBreakingChange": false,
+    "estimatedComplexity": "small"
+  },
+  "successCriteria": [
+    {
+      "description": "The comment immediately preceding the static pending-decisions registration in src/modules/leave/leave.routes.ts no longer states or implies that registration order determines which handler matches the path; the registration statement itself is unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ADR-004's Context in docs/DECISIONS.md no longer asserts that Fastify matches routes in registration order, nor that a static path registered after a parametric sibling is shadowed by it; it states that the pinned router (find-my-way 8.2.2, via fastify ^4.29.1) matches static nodes ahead of parametric ones irrespective of registration order.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "ADR-004's Consequences in docs/DECISIONS.md no longer calls the ordering comment load-bearing and no longer claims that moving the registration below the parametric sibling breaks the endpoint; the Consequences still record the other decisions (the PendingDecision projection, its ownership, its export, and the endpoint's auth requirement) unchanged.",
+      "testable": true,
+      "layer": "unit"
+    },
+    {
+      "description": "The test-coverage paragraph in docs/DECISIONS.md no longer credits tests/unit/modules/leave/leave.routes.test.ts with failing when the static registration is moved below the parametric one, and no longer presents the ordering as pinned by a test; the paragraph's other claims (the case count, the 200/401/field-set assertions, the actor pass-through, the verbatim array, the ISO dates, the 500 body) remain accurate.",
+      "testable": true,
+      "layer": "unit"
+    }
+  ],
+  "constraints": [
+    "Documentation-and-comment-only phase: no file under src/, web/, tests/, migrations/, seeds/, or scripts/ may be modified, and no test may be added, changed, or deleted. The only files this phase may touch are src/modules/leave/leave.routes.ts (the comment only) and docs/DECISIONS.md.",
+    "The static pending-decisions registration in src/modules/leave/leave.routes.ts must remain exactly where it is, with its handler body, its position relative to the parametric sibling, and its behaviour unchanged. Only the comment text changes; the ordering is neither moved nor presented as required.",
+    "The corrected prose must be true of the pinned dependency, not of Fastify in general: package.json pins fastify ^4.29.1, which resolves find-my-way 8.2.2, and that router matches static nodes ahead of parametric ones irrespective of registration order. Do not replace the false claim with a different unverified claim (e.g. \"Fastify matches in registration order except for static paths\", or a version-agnostic statement about Fastify's router).",
+    "The correction must be applied at all three sites in one change and must not leave any of them contradicting another: the route comment, ADR-004's Context and Consequences, and the ADR-004 test-coverage paragraph must all agree that the ordering is not load-bearing. A partial edit that fixes one site and leaves another asserting the ordering is a failure of this phase.",
+    "No new ADR, CLARIFY number, decision record, or architecture section may be introduced. ADR-004 keeps its number, its date, its Status, and its Decision paragraph; only its Context and Consequences text and its test-coverage paragraph are corrected.",
+    "The corrected text must not weaken or delete the decisions ADR-004 actually records: the 200 body is a bare array of the leave-owned PendingDecision projection (not LeaveRequest rows), PendingDecision stays in src/modules/leave/leave.model.ts and is exported from the module's index.ts rather than promoted to src/shared/types/, the endpoint is not added to PUBLIC_PATHS so it requires a valid bearer token, and the role-scoped visibility rule stays in the service rather than being re-expressed in the repository."
+  ],
+  "outOfScope": [
+    "Changing the route registration order, the handler body, or any runtime behaviour in src/modules/leave/leave.routes.ts. The ordering is left exactly as built; only the comment's rationale is removed.",
+    "Adding, removing, renaming, or re-asserting any test case in tests/unit/modules/leave/leave.routes.test.ts \u2014 including the case named 'is matched ahead of GET /leaves/:id \u2014 the static path is not shadowed by the parametric one'. That case's assertions (200, getById not called) are true under either registration order and are left as built; only the documentation's claim about what the test protects is corrected.",
+    "Editing docs/ARCHITECTURE.md. Its 'Feature: Notify the approver when a leave request is cancelled' section makes no claim about route registration order or shadowing, so it is not a site of this defect and must not be rewritten to add or remove one.",
+    "Auditing or correcting any other documented-vs-built drift in ADR-004's neighbourhood \u2014 the leave_requests status/approver_id indexes, the reverses_request_id IS NOT NULL queue predicate, the stale web-approvals -> web-infrastructure-api dependency line, and the duplicated audit-feature Phase 4 delivered heading are all deliberately left unchanged."
+  ],
+  "ambiguities": [
+    {
+      "description": "The test file itself carries the same false claim in two places the prescription does not list: the case title 'is matched ahead of GET /leaves/:id \u2014 the static path is not shadowed by the parametric one' and its inline comment 'Had the parametric route won, getById would have produced a 404 (or a 500).' The intent names exactly three sites and says no test may be changed, so it is unclear whether these in-test strings are a fourth site to correct or are deliberately left as built.",
+      "options": [
+        "Leave the test file byte-identical (the three named sites are the whole scope; the case title and inline comment are the test's own wording and the assertions are true either way)",
+        "Correct the case title and inline comment too, since they repeat the same false claim and a maintainer reads them as the ordering rationale"
+      ],
+      "impactIfWrong": "medium"
+    },
+    {
+      "description": "Whether the rewritten route comment should retain any rationale for the registration's position (e.g. grouping the static reads together, or readability) or should drop the ordering rationale entirely and describe only what the handler does.",
+      "options": [
+        "Drop the ordering rationale entirely; the comment describes only the handler (a static path taking no input)",
+        "Keep a non-load-bearing note that the position is a readability choice, explicitly stating it is not required for correct matching"
+      ],
+      "impactIfWrong": "low"
+    },
+    {
+      "description": "The test-coverage paragraph's bullet 'The ordering is now asserted for its own sake' must stop crediting the test with protecting the ordering, but it is unclear whether the bullet should be deleted outright or rewritten to state what the case does pin (that the static path reaches its own handler and never the by-id handler, under any registration order).",
+      "options": [
+        "Delete the bullet and fold its still-true content (the case asserts the static path reaches its own handler) into the surrounding prose",
+        "Rewrite the bullet in place to state what the case actually pins, keeping the paragraph's structure and case count"
+      ],
+      "impactIfWrong": "low"
+    }
+  ],
+  "entityInvariants": [
+    {
+      "entity": "leaveRoutes registration set (src/modules/leave/leave.routes.ts)",
+      "mustExistOrExtend": true,
+      "invariant": "The set of registered routes, their handlers, and their relative registration order are unchanged by this phase. The static pending-decisions path resolves to its own handler and the parametric sibling resolves to the by-id handler for genuine ids, and this holds irrespective of the order in which the two are registered \u2014 so no ordering constraint is a precondition of either endpoint working."
+    },
+    {
+      "entity": "ADR-004 (docs/DECISIONS.md)",
+      "mustExistOrExtend": true,
+      "invariant": "Remains exactly one Accepted ADR with its number, date, Status, and Decision paragraph intact. Its Context and Consequences describe the router's actual matching behaviour for the pinned dependency rather than a registration-order rule, and no new ADR, CLARIFY, or decision record is created to carry the correction."
+    }
+  ],
+  "interfaceConstraints": [
+    {
+      "operation": "Read the pending-decisions queue (the static pending-decisions read registered in leaveRoutes)",
+      "authRule": "Unchanged: requires a valid bearer token; the path is not in PUBLIC_PATHS; a missing or invalid actor yields 401 UNAUTHORIZED before the service is called.",
+      "idempotent": true,
+      "errorSemantics": "Unchanged: 200 with a bare array (possibly empty) on success; 401 for a missing/invalid actor; a service throw yields 500 with a generic body. This phase changes no status code, body shape, or error mapping for this operation."
+    },
+    {
+      "operation": "Read a single leave request by id (the parametric sibling registered in leaveRoutes)",
+      "authRule": "Unchanged: requires a valid bearer token; a missing or invalid actor yields 401 UNAUTHORIZED before the service is called.",
+      "idempotent": true,
+      "errorSemantics": "Unchanged: 404 NotFoundError for an unknown id, 200 with the request on success. This phase must not alter this operation's matching, its handler, or its error mapping."
+    }
+  ],
+  "consistencyRequirements": [
+    {
+      "requirement": "The rewritten comment must describe only what the code beneath it does (a static path registered inside leaveRoutes, taking no input) and must not assert a matching-order rule. It must stay adjacent to the registration it annotates and must not contradict the registration order actually present in the file.",
+      "referencePath": "src/modules/leave/leave.routes.ts"
+    },
+    {
+      "requirement": "The corrected ADR-004 Context and Consequences must be consistent with the pinned dependency declared in package.json (fastify ^4.29.1, resolving find-my-way 8.2.2) and with the verified behaviour that static nodes are matched ahead of parametric ones irrespective of registration order. Do not restate the claim in a version-agnostic form.",
+      "referencePath": "package.json"
+    },
+    {
+      "requirement": "The corrected test-coverage paragraph must describe only what the existing cases in the pending-decisions describe block actually assert. The case named 'is matched ahead of GET /leaves/:id \u2014 the static path is not shadowed by the parametric one' asserts a 200 and that getById was not called; both hold under either registration order, so the paragraph must not claim the case fails when the registration moves, and must not claim the ordering is pinned by a test.",
+      "referencePath": "tests/unit/modules/leave/leave.routes.test.ts"
+    },
+    {
+      "requirement": "The three corrected sites must agree with each other and with the built code: none may retain the words 'load-bearing', 'shadowed', or 'registration order' as a rationale for the ordering, and none may imply that moving the registration breaks the endpoint. The Decision paragraph of ADR-004 and the route's actual registration position remain as built.",
+      "referencePath": "docs/DECISIONS.md"
+    }
+  ],
+  "integrationPoints": [
+    {
+      "target": "src/modules/leave/leave.routes.ts \u2014 the comment block immediately preceding the static pending-decisions registration",
+      "why": "One of the three sites carrying the false ordering claim; the registration it annotates must stay untouched."
+    },
+    {
+      "target": "docs/DECISIONS.md \u2014 ADR-004 Context and Consequences",
+      "why": "The second and third sites: the Context asserts registration-order matching and the Consequences call the comment load-bearing; both must be corrected in the same change."
+    },
+    {
+      "target": "docs/DECISIONS.md \u2014 ADR-004 test-coverage paragraph",
+      "why": "Credits the route test with protecting an ordering it does not protect; must be corrected to match what the test actually asserts."
+    },
+    {
+      "target": "tests/unit/modules/leave/leave.routes.test.ts \u2014 the pending-decisions describe block",
+      "why": "Read-only reference: the corrected documentation must describe these cases accurately. The file itself is not modified."
+    }
+  ]
+}
