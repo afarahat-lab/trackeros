@@ -45,9 +45,9 @@
     "base_sha": "8adf5b88d6bef42c68889b8a418e53e854098670",
     "ci_conclusion": "success",
     "created_at": "2026-10-26T00:53:21.303926+00:00",
-    "decided_by": "a@b.c",
-    "decision": "reject",
-    "decision_reason": "Rejection-path test, not a judgement on the content: docs/ARCHITECTURE.md is NOT approval-gated in production \u2014 this item exists only because the harness was run with a one-off --approval-paths override to exercise this tier. The finding is real and must stay open for the ordinary (ungated) fix path, which is why this rejection is reversed immediately afterwards.",
+    "decided_by": "",
+    "decision": "",
+    "decision_reason": "",
     "feature_id": "93f4284a-e320-4118-8414-2e6818ef21e0",
     "file_digest": "b6ebf183f710d4f14afeab7742342f37b55fc12108ecc83583423bf389df514e",
     "file_path": "docs/ARCHITECTURE.md",
@@ -57,9 +57,9 @@
     "message": "[review/documentation] The documented `findPendingDecisions` signature and semantics contradict both the recorded decision ADR-004 and the built code. ADR-004 (docs/DECISIONS.md, Accepted) records: \"the design's `findPendingDecisions(actorId, actorRole)` signature would have put role scoping in the repository\" (rejected) and \"The service mirrors `list`'s branch and passes `employeeIds`; the repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate.\" The built interface is `findPendingDecisions(employeeIds?: string[], client?: PoolClient): Promise<PendingDecision[]>` (src/modules/leave/leave.repository.ts:27, :247), the service passes `employeeIds` (src/modules/leave/leave.service.ts:493), and the repository's own comment states \"no `reverses_request_id` filter\". The doc line instead asserts the rejected `(actorId, actorRole)` shape, a `LeaveRequest[]` return, a `reverses_request_id IS NULL` predicate that is not built, `ORDER BY start_date ASC, id ASC` (built: `ORDER BY start_date ASC`), and role scoping inside the repository (\"EMPLOYEE: none\") which the built service contradicts (an EMPLOYEE gets `[actor.id]`).\n  Evidence: \"- `ILeaveRepository.findPendingDecisions(actorId: string, actorRole: EmployeeRole, client?: PoolClient): Promise<LeaveRequest[]>` \u2014 NEW. Returns the requests still awaiting this actor's decision: `status = SUBMITTED` AND `reverses_request_id IS NULL`, scoped by role (ADMIN: all; MANAGER: the requester's `employees.manager_id = actorId`; EMPLOYEE: none). `ORDER BY start_date ASC, id ASC`. Read-only: no `forUpdate`, no transaction, returns an array (possibly empty), never null. `CANCELLED` is excluded by construction, which is what makes a cancelled request stop being listed.\"\n  Fix: Restate the built signature and semantics: `findPendingDecisions(employeeIds?: string[], client?: PoolClient): Promise<PendingDecision[]>` \u2014 the repository applies only the `employeeIds` filter and the `status = 'SUBMITTED'` predicate, ordered `start_date ASC`; role scoping lives in `LeaveService.listPendingDecisions` (ADMIN: no filter; MANAGER: `[actor.id, ...directReportIds]`; EMPLOYEE: `[actor.id]`).",
     "phase_index": -1,
     "quoted_line": "",
-    "reopened_by": "",
-    "reopened_reason": "",
+    "reopened_by": "a@b.c",
+    "reopened_reason": "Reversing the test rejection: the finding is real and must stay in the open set for the ordinary ungated fix path. This also exercises the reversal itself \u2014 a rejection with no way back is a trap, not a decision.",
     "rule_id": "review/documentation",
-    "undid_decision": ""
+    "undid_decision": "reject"
   }
 ]
