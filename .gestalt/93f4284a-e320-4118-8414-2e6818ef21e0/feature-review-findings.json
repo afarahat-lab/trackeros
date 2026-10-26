@@ -42,13 +42,13 @@
       "quoted_line": "**notification** — `Notification` model (id, recipientId, type, title, message, relatedEntityType: `string | null`, relatedEntityId: `string | null`, relatedEntityCode: `string | null`, status: NotificationStatus, createdAt: Date, readAt: `Date | null`). `CreateNotificationInput = Omit<Notification, 'id' | 'status' | 'createdAt' | 'readAt' | 'relatedEntityCode'> & { status?: NotificationStatus; relatedEntityCode?: string | null }` — status defaults to PENDING when omitted and `relatedEntityCode` is persisted as `null` when the call site omits it. `INotificationRepository` (create, findById, updateStatus) + `PgNotificationRepository` (generates `id`/`createdAt`, defaults status to PENDING, `read_at` null on create). `INotificationService` (create, getById, markRead) + `NotificationService` validates required strings and status enum membership; `markRead` sets status READ and `readAt` to now, throwing NotFoundError(404) on unknown id.",
       "severity": "",
       "agent_role": "",
-      "status": "awaiting-approval",
+      "status": "rejected",
       "first_seen_attempt": 1,
       "last_seen_attempt": 15,
       "fixed_at_attempt": null,
       "file_digest": "b7b00967c91136a6ef6e3ddc16b17c78",
       "approval_item": "fix-d146125b89",
-      "rejected_reason": ""
+      "rejected_reason": "Rejection-path test, not a judgement on the content: docs/ARCHITECTURE.md is NOT approval-gated in production — this item exists only because the harness was run with a one-off --approval-paths override to exercise this tier. The finding is real and must stay open for the ordinary (ungated) fix path, which is why this rejection is reversed immediately afterwards."
     },
     {
       "rule_id": "review/documentation",
