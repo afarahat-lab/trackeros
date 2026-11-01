@@ -58,7 +58,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/intent-spec.json
     schema:
       models:
         _SuccessCriterion:
@@ -157,7 +156,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/design-spec.json
     schema:
       models:
         _Field:
@@ -294,7 +292,6 @@ agents:
     - AGENTS.md
     - PLAN.md
     - .gestalt/architecture/reconciled.json
-    artifact_path: .gestalt/{correlation_id}/spec.json
     max_iterations: 10
     token_budget: 600000
     schema:
@@ -467,7 +464,6 @@ agents:
     - docs/DOMAIN.md
     - docs/DECISIONS.md
     - AGENTS.md
-    artifact_path: .gestalt/{correlation_id}/context-updates.json
     token_budget: 800000
     schema:
       models:
