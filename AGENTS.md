@@ -43,6 +43,26 @@ Trackeros — a corporate operations web and mobile platform for
 - Frontend: React + Vite
 - Database: PostgreSQL
 
+## Stack conventions
+
+🔴 **The heading matters.** The platform's `code-agent` rules tell the agent to read
+`AGENTS.md` section `## Stack conventions` for this project's import and module conventions,
+rather than carrying TypeScript/npm specifics in the rules themselves. Before 2026-11-10 those
+specifics lived in trackeros's own copy of the rules and this section did not exist, so the
+agent was pointed at a heading that was not here.
+
+- **The manifest is `package.json`.** Every import must resolve either to a file that exists in
+  this repository or to a dependency `package.json` declares. A new dependency is added there,
+  not assumed.
+- **ES module syntax, and that includes JSON.** Do not use `require()` for a JSON import — import
+  it with ES module syntax, which needs `resolveJsonModule` enabled in `tsconfig.json`. This is
+  stated because it is the one case where the obvious CommonJS reflex produces code that compiles
+  in isolation and fails here.
+- **Module boundaries:** a module is entered through its `index.ts` and nothing else — see
+  `## Architecture rules` rule 1, and `docs/ARCHITECTURE.md` for the module layout.
+- **Transaction boundaries** are rule 5 below, with the decision recorded in full under
+  `### 5 — transaction boundaries`.
+
 See `docs/ARCHITECTURE.md` for the full architecture overview and
 module layout.
 

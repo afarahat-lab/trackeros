@@ -133,9 +133,8 @@ agents:
     role: "Senior software architect"
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      temperature: 0.1
+      model: gestalt-default
+      temperature: 0.2
       max_tokens: 4000
     tools:
       builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
@@ -495,84 +494,34 @@ agents:
       required_non_empty: []
 
   code-agent:
+    # 🔴 TEMPLATE WORDING TAKEN IN FULL (owner, 2026-11-10), the transaction-boundary rule
+    # included. Three of the four project-only rules were TypeScript/npm specifics —
+    # `package.json`, `resolveJsonModule`, `require()` — which the template moved into `AGENTS.md`
+    # section `## Stack conventions`. That section did NOT exist here, so this PR adds it: the
+    # facts are preserved, in the document the agent reads, and the rules stop carrying project
+    # specifics.
+    #
+    # The fourth needed no move. `AGENTS.md` ALREADY states transaction boundaries twice — as
+    # `## Architecture rules` rule 5 and in full under `### 5 — transaction boundaries (decided
+    # 2026-08-30)` — and `AGENTS.md` is in this agent's `reference_paths`. The custom rule was a
+    # third copy of a fact already in the document the agent reads.
     rules:
     - Generated code must compile without errors. Verify with executeScript before returning.
-    - All imports must resolve to files that exist in the project or are declared in package.json.
+    - All imports must resolve to a file that exists in the project or to a dependency the project's own manifest declares. AGENTS.md names this project's manifest and its import conventions — read it rather than assuming one stack's.
     - You MUST run a compile/lint check via executeScript before emitting the final files. This is not optional.
-    - Do not use require() for JSON imports — import them using ES module syntax with resolveJsonModule enabled in tsconfig.
+    - Follow the import and module conventions in AGENTS.md section `## Stack conventions`. They are this project's, derived from its own stack; do not apply another stack's module syntax, build settings or compiler flags because they are familiar.
     - Before generating any repository, service, or controller code, read the DTO and interface files it will use. Never reference a field on a type without confirming it exists in the type definition.
     - Before generating code that calls methods on a dependency, read the dependency's source file to confirm which methods exist. Only call methods that are actually defined.
     - Read the project's compiler/linter configuration file (tsconfig.json, mypy.ini, pyproject.toml, .eslintrc etc) before generating code. Follow the strictness settings it defines — do not assume permissive defaults.
     - Read the project's dependency manifest (package.json, requirements.txt, go.mod, pom.xml etc) before importing external packages. Only import packages that are listed as dependencies.
     - Your verification command is configured to fail when no source implementation files exist. You MUST write implementation files before verification can pass. Do not consider the task complete based on a passing verification that ran before any source files were written.
-    - 'Transaction boundaries: the SERVICE owns the unit of work (it decides what is inside the
-      transaction) and the DATA-ACCESS layer opens it. Services take an injected IUnitOfWork with
-      withTransaction(fn) and never import a pool, a client, or a module-level db helper. Do NOT put
-      withTransaction on a repository. Participating repository and service methods take the client as an
-      optional LAST parameter and fall back to the shared pool when it is omitted. See AGENTS.md
-      ''Architecture rules'' item 5.'
-    - When code in one module needs data or behavior owned by another module, depend on that module's public SERVICE interface — never import another module's repository or other private files. A module's repository is private to that module; cross-module access goes through the owning module's service. A service may import its own module's repository interface (the standard repository pattern).
+    - When code in one module needs data or behaviour owned by another module, depend on that module's DECLARED PUBLIC ENTRY POINT — never import another module's private internals. Within a module, importing its own internals is correct. `docs/ARCHITECTURE.md` states what this project's modules expose publicly; read it rather than assuming a layering convention.
     - Every method that calls an injected repository or external service must wrap the call in explicit error handling. Do not let errors from dependency calls propagate unhandled.
     role: "Senior TypeScript engineer"
     goal: "Generate production-quality TypeScript code that follows the project harness"
     llm:
-      # TR_050 — initially switched off deepseek-ai/DeepSeek-V3.2
-      # onto moonshotai/Kimi-K2.6 for code-agent because DeepSeek
-      # V3.2 reasoned ABOUT Aider's SEARCH/REPLACE protocol but
-      # did not reliably EMIT the blocks — Aider's diff parser
-      # saw zero edits and exited with only metadata changes.
-      #
-      # 2026-06-15 (TR_056-aider-diag) — switched off Kimi-K2.6
-      # onto deepseek-ai/DeepSeek-V4-Pro because Kimi-K2.6 on
-      # DeepInfra now drops chunked-transfer streams mid-response
-      # (litellm.APIConnectionError: peer closed connection
-      # without sending complete message body). Symptom on
-      # platform: code-agent exits 124 after the 15-min
-      # subprocess timeout (executeScript's MAX_SCRIPT_TIMEOUT_MS)
-      # while litellm retries the broken connection.
-      #
-      # V4-Pro is the new bet: improved instruction-following
-      # vs V3.2 means it should emit SEARCH/REPLACE blocks
-      # reliably. If V4-Pro also fails Aider's diff parser
-      # (same failure mode as V3.2), revert to Kimi and find a
-      # different mitigation for the streaming flake.
-      #
-      # TR_077-qwen — swapped off deepseek-ai/DeepSeek-V4-Pro onto
-      # Qwen/Qwen3.6-27B to test whether a different code-agent model
-      # gets past the layering wall + Mode A on dependency-bearing
-      # service phases. Exact DeepInfra model string confirmed against
-      # https://api.deepinfra.com/v1/openai/models (Qwen/Qwen3.6-27B).
-      # Unregistered model string → resolves via the env DeepInfra
-      # default (LLM_BASE_URL/LLM_API_KEY) per llm/index.ts fallback.
-      #
-      # 2026-06-20 — switched code-agent to fireworks/qwen3p6-plus.
-      # deepseek-v4-pro entered a degenerate repetition loop on Aider
-      # (restating one observation until it blew the 16k output cap →
-      # 0/partial source). Qwen 3.6 converged cleanly on the same
-      # intent via `gestalt agent test code-agent` (build + 17/17 jest
-      # green, no loop, 3.2 min). The other agents stay on
-      # deepseek-v4-pro. (TR_079 driver finding.)
-      #
-      # 2026-06-29 (ADR-063) — switched to fireworks/kimi-k2p7-code for the
-      # OpenHands code-agent. qwen3p7-plus burned all of OpenHands'
-      # CodeActAgent iterations without emitting edits (too weak for the
-      # agentic tool loop); kimi-k2p7-code completed a trivial task cleanly
-      # (AgentState.FINISHED, file written) in the smoke test.
-      #
-      # 2026-06-30 — switched off kimi-k2p7-code onto
-      # FireworkAI-Deepseek-v4-pro for OpenHands. Root cause isolated:
-      # OpenHands 1.6.0's str_replace_editor hardcodes a REQUIRED
-      # `security_risk` param; kimi-k2p7-code never emits it on the
-      # non-native function-calling path → every edit rejected
-      # ("Missing required parameters: {'security_risk'}") → 0 files.
-      # DeepSeek-V4-Pro SUPPLIES security_risk → validated on the real
-      # platform path (clean main clone): 0 errors, 4 files written via
-      # str_replace_editor, persisted + discovered. So it's the right
-      # OpenHands code-agent model.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      temperature: 0.1
-      # No reasoning_effort — Aider drives its own reasoning loop;
-      # DeepInfra also does not support reasoning_effort.
+      model: gestalt-code
+      temperature: 0.2
       max_tokens: 8000
     tools:
       builtin:
@@ -791,23 +740,8 @@ agents:
     role: "Senior engineer and code reviewer"
     goal: "Assess generated code quality and architectural correctness — verify findings with executeScript before flagging"
     llm:
-      # TR_050 — DeepInfra DeepSeek-V3.2 (no reasoning_effort —
-      # not supported by DeepInfra).
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
+      model: gestalt-reasoning
       temperature: 0.0
-      # 🔴 2026-10-13 — 4000 -> 32000. This cap was CONFIGURED but never applied to
-      # the model on the multi-append path (the path this agent runs on); #306 fixed
-      # that forwarding, which made every such cap bind for the first time. At 4000 it
-      # would have truncated ordinary work. Sized from 4,020 measured calls
-      # (completion = output + output_reasoning, Langfuse events_core):
-      #   p99 12,092 · largest legitimate 23,364 · 0 call(s) at the 65,536 ceiling
-      # 32,000 is 1.37x the largest legitimate completion and stays under half
-      # the registry ceiling, so it bounds a runaway without bounding real work.
-      #
-      # 2026-10-26 — 32000 -> 44000, BEFORE it binds. The review graph dropped this cap until
-      # gestalt #356, so 32,000 never applied. Re-measured over 10,806 calls (90 days): largest
-      # legitimate 31,096 — 1.03x under 32,000 — and 13 calls at the 65,536 runaway. 44,000 is
-      # 1.42x the largest legitimate, the headroom constraint-agent carries.
       max_tokens: 44000
     tools:
       # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
@@ -1114,16 +1048,23 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   app-architect-agent:
+    # 🔴 TEMPLATE WORDING TAKEN (owner, 2026-11-10). The five differing rules here asserted a FIXED
+    # four-layer architecture ("presentation, application, domain, infrastructure") and "every
+    # public service method must be defined in an interface". The template's defer to what
+    # `docs/ARCHITECTURE.md` actually declares — "where it names layers, respect them; where it
+    # names only a couple of directories…". Same intent, and the project's own document is where
+    # its architecture is stated, so the rules stop restating it and stop diverging at every
+    # upgrade.
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
-    - Define clear layer boundaries — presentation, application, domain, infrastructure
+    - Define the module boundaries the project actually has, using the areas, names and vocabulary `docs/ARCHITECTURE.md` declares. Where it names layers, respect them; where it names only a couple of directories, that IS the structure — do not invent presentation / application / domain / infrastructure layers a project has not adopted.
     - Dependencies flow inward only — outer layers depend on inner layers, never the reverse
-    - Every public service method must be defined in an interface before the implementation
+    - Where this project declares service interfaces, every public method belongs to one before its implementation. Where `docs/ARCHITECTURE.md` declares no services, the project''s exported functions ARE its public surface — record them as such rather than inventing an interface layer to satisfy this rule.
     - No circular dependencies between modules — verify your dependencyMap before returning
-    - Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location src/shared/types/ — declare ONE module whose path is src/shared/types/ that owns those types; do not scatter them. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at src/modules/<name>/. Never place an enum or DTO that multiple modules import into its own single-purpose module directory (e.g. never src/modules/LeaveType/ for a cross-module LeaveType enum — that belongs in src/shared/types/).
+    - Shared value-type placement — apply this MECHANICALLY to every type; it is a rule, not a per-case judgment. A pure data shape with NO owned business logic (an enum, a simple DTO, a shared value type, or a methodless interface) that is used by MORE THAN ONE module MUST be placed under the shared-types location `docs/ARCHITECTURE.md` declares — declare ONE module whose path is that location and that owns those types; do not scatter them. If that document names no shared-types location, say so in your notes rather than inventing a path. A type WITH owned behavior (an entity with lifecycle or state rules, a service, or a repository/interface that declares methods) OR a pure value type used by ONLY ONE module MUST get its own module directory at the module location `docs/ARCHITECTURE.md` declares. Never place an enum or DTO that multiple modules import into its own single-purpose module directory — a cross-module `OrderStatus` enum belongs in the shared-types location, not in a module of its own.
     - Foundational computation semantics are BINDING or OPEN — when a service derives a count, range, or rounded value whose rule must hold across sibling methods but the correct choice is genuinely undecided, record it as an openQuestion (question, impact, candidate options); never bake the rule silently into one service method and leave the methods that consume the same value unspecified (the BR-001 anti-pattern).
-    - 'Cross-cutting AUTH / IDENTITY contract — decide and record `authContract` WHENEVER this feature exposes API endpoints or role-gated access. State concretely: the authenticated-request/identity shape (e.g. request.user: { id, role }), the role model / enum values (e.g. employee | manager | hr_admin), and how identity and role are obtained and enforced (an auth middleware verifies the caller and populates the request; RBAC is enforced by a route-level guard, never inline — per AGENTS.md). Leave `authContract` EMPTY when the feature has no API surface and no access control — do NOT invent an auth contract a pure data-model feature does not need.'
-    - 'Cross-cutting ERROR / RESPONSE contract — decide and record `errorResponseContract` WHENEVER this feature exposes API endpoints. State the standard error/response shape and the responses for the common failures: validation failure (HTTP 400), authentication failure (401), authorization failure (403), and not-found (404). Leave `errorResponseContract` EMPTY when the feature exposes no endpoints.'
+    - 'Cross-cutting AUTH / IDENTITY contract — decide and record `authContract` WHENEVER this feature exposes API endpoints or role-gated access. State it CONCRETELY, in the terms THIS PROJECT uses: read `docs/ARCHITECTURE.md` for the project''s authenticated-request/identity shape, its role model, and where identity and authorisation are enforced, and record a contract consistent with them. Do not assume a shape the project has not declared — if the project''s documents describe no authorisation layer, the feature has no auth contract to record. Leave `authContract` EMPTY when the feature has no API surface and no access control — do NOT invent an auth contract a pure data-model feature does not need.'
+    - 'Cross-cutting ERROR / RESPONSE contract — decide and record `errorResponseContract` WHENEVER this feature exposes a request-handling surface. State the standard error/response shape and the responses for the common failures, in the terms THIS project uses: read `docs/ARCHITECTURE.md` and `docs/GOLDEN_PRINCIPLES.md` for its failure convention. A project with an HTTP surface states status codes; a library states what it throws. Do not impose HTTP status codes on a project that has no HTTP. Leave `errorResponseContract` EMPTY when the feature exposes no such surface.'
     role: "Application architect"
     goal: "Define the application layer: module boundaries, service interfaces, dependency direction, and recommended phase decomposition"
     llm:
@@ -1170,6 +1111,26 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   chief-architect-agent:
+    # 🔴 DECIDED BY THE OWNER, 2026-11-10, resolving a template conflict — and the first change
+    # is the one that was actively broken: this agent had `tools: {builtin: []}`, so it could read
+    # NO file at all. By-reference reading is the platform standard (an input arrives as a path
+    # plus a digest, never inlined), and an agent with no read tool cannot follow a reference;
+    # `read_paths` would have governed nothing, because there was nothing to govern.
+    #
+    # Matches gestalt-verification's chief exactly — the configuration the platform's own
+    # verification runs exercise.
+    runtime: base-agent
+    # Deliberately NOT `.gestalt/`: the chief reads the PROJECT. Its specialists' artifacts reach
+    # it as references it materialises, and materialising one is what grants access to that path
+    # for the run.
+    # The TEMPLATE's list, which is gestalt-verification's plus `web` and `PLAN.md` — the two
+    # paths gv does not HAVE. trackeros has both (checked), and a chief that cannot read `web/` on
+    # a web project is handicapped for no reason. Taking the template's value also leaves this
+    # field with nothing to conflict about on future upgrades, where the gv list would conflict
+    # for ever.
+    read_paths: [docs, src, web, tests, HARNESS.json, PLAN.md]
+    # The one file it writes. A `base-agent` role with no write grant fails the pre-flight.
+    write_paths: ['.gestalt/architecture/reconciled.json']
     rules:
     - Your role is reconciliation, not regeneration — work with what the specialists produced
     - Resolve symbol name conflicts by choosing one canonical name and applying it everywhere — across entities, repositories, services, and the markdown summary
@@ -1218,7 +1179,7 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: []   # §config-migration — explicit platform grant
+      builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - You receive three specialist designs. Your job is to reconcile them, not regenerate them.
@@ -1495,11 +1456,8 @@ agents:
       gate cannot see: duplicate/redefined types, layering violations visible from the importer''s
       side, barrel-import violations, and accumulated rule breaches'
     llm:
-      model: null
+      model: gestalt-reasoning
       temperature: 0.0
-      # 2026-10-26 — 4000 -> 40000, BEFORE it binds (gestalt #356). This agent runs the
-      # CONSTRAINT graph, whose p90 is 7,023 and largest legitimate 28,260; it has no generations
-      # of its own to size from, so it takes constraint-agent's measured cap.
       max_tokens: 40000
     tools:
       builtin:
