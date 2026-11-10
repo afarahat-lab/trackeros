@@ -721,6 +721,15 @@ agents:
     # came back. 1,600,000 matches review-agent at the same 80 iterations (the two run on the SAME
     # slices) and keeps ITERATIONS binding: ~18,000/iteration x 80 = ~1,450,000, binding at ~89.
     max_iterations: 80
+    # 🔴 HELD AGAINST THE TEMPLATE (2026-11-10). The template's gate caps went NEUTRAL — 40 /
+    # 1,000,000 — because the values below were calibrated on THIS project and were being
+    # shipped to every project, including three-file repositories. These values stay, and the
+    # `hold:` is what stops the next template upgrade from fast-forwarding them down: without
+    # it the merge reads "project == base, template moved" as an upgrade not yet applied, and
+    # applies it. A reason is required, so a hold cannot be a silent pin.
+    hold:
+      max_iterations: "cut at 40 on the two biggest feature-review slices: `leave` completed at 64 calls / 827,447 tokens, then truncated at 63 calls / 721,751 — a marginal bound, not an inflated call class"
+      token_budget: "80 turns x ~18,000 measured tokens/turn needs ~1,450,000, so ITERATIONS stay the binding bound; at 1,000,000 the budget would bind at ~55, before the cap"
     schema:
       models:
         _Finding:
@@ -830,6 +839,12 @@ agents:
     # Note the token budget was NOT the binding constraint: `leave` stopped at 725,628 of
     # 1,200,000, leaving 40% unused. Raising the budget would have changed nothing.
     max_iterations: 80
+    # 🔴 HELD AGAINST THE TEMPLATE (2026-11-10) — see constraint-agent above for why the
+    # template went neutral. These two agents run on the SAME slices of the same diff, so they
+    # keep equal bounds; a difference between them would need its own justification.
+    hold:
+      max_iterations: "4 of 11 review slices cut at 40 on feature 93f4284a, including one (`web-presentation-pages`) that used all 40 AND signalled done — so 40 was too low for ordinary slices, not only for the pathological"
+      token_budget: "same slices as constraint-agent at the same 80 iterations; equal shape needs no separate justification"
     schema:
       models:
         _Item:
@@ -1500,6 +1515,12 @@ agents:
     # 🔴 TEMPORARY (2026-09-28) — 60 -> 120, purely to keep this whole-tree tier above the
     # per-phase one raised to 85 above. Not evidence about this agent: it has never capped.
     max_iterations: 120
+    # 🔴 HELD AGAINST THE TEMPLATE (2026-11-10). The template's sweep went to 60 / 1,200,000;
+    # this tier reads the WHOLE tree of this project, which is what these values were measured
+    # against.
+    hold:
+      max_iterations: "whole-tree sweep on this repository; the budget bound at ~iteration 77 of 120 before the raise, so iterations were not the limit being hit"
+      token_budget: "120 turns x 15,584 measured tokens/turn needs 1,870,080; below that the budget binds first and the operator-facing note names the wrong knob"
     token_budget: 2000000
     schema:
       models:
