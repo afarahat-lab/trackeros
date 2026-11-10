@@ -1123,12 +1123,19 @@ agents:
     # Deliberately NOT `.gestalt/`: the chief reads the PROJECT. Its specialists' artifacts reach
     # it as references it materialises, and materialising one is what grants access to that path
     # for the run.
-    # The TEMPLATE's list, which is gestalt-verification's plus `web` and `PLAN.md` — the two
-    # paths gv does not HAVE. trackeros has both (checked), and a chief that cannot read `web/` on
-    # a web project is handicapped for no reason. Taking the template's value also leaves this
-    # field with nothing to conflict about on future upgrades, where the gv list would conflict
-    # for ever.
-    read_paths: [docs, src, web, tests, HARNESS.json, PLAN.md]
+    # 🔴 NO `PLAN.md` (removed 2026-11-11, owner's decision; platform #475 did the same in the
+    # template). It is never purged — `run_scratch_paths` touches nothing outside `.gestalt/`, so
+    # the planning commit's PLAN.md merges to this project's default branch and stays. The chief
+    # runs BEFORE `persist-plan`, the LAST stage of the planning phase, so during planning that
+    # file holds the PREVIOUS feature's plan. Evidenced HERE: this repository's `main` carried
+    # `594d4d13`'s plan (2026-10-07) while `93f4284a` was created 2026-10-08.
+    #
+    # Pointing an architect at it is worse than omitting it: the content looks authoritative and
+    # belongs to a different feature. The platform now REFUSES this combination — a test derives
+    # the planning roster from `pipeline.yaml` and checks both `read_paths` and `reference_paths`
+    # against `STALE_DURING_PLANNING` — so restoring it needs that constant to change first,
+    # which happens when PLAN.md moves under `.gestalt/<feature id>/`.
+    read_paths: [docs, src, web, tests, HARNESS.json]
     # The one file it writes. A `base-agent` role with no write grant fails the pre-flight.
     write_paths: ['.gestalt/architecture/reconciled.json']
     rules:
