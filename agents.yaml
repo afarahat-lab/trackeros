@@ -32,6 +32,11 @@
 agents:
 
   intent-agent:
+    # 🔴 REQUIRED FOR AN APPEND PROFILE since 2026-11-13, and this project never received it:
+    # the bound is what stops a `save_` loop and unset means UNBOUNDED, so the loader REFUSES
+    # the role. Measured 2026-11-18: this role could not load at all here. The value is the
+    # shipped template's, which carries the measurement behind it.
+    max_iterations: 40
     rules:
     - "Before finalizing your output, cross-check it against the project's maintained architecture (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered reference context, NOT as an expansion of your task. If your output would contradict a decision already recorded there, do NOT silently diverge: flag the inconsistency (or consult the agent that owns it) so it is resolved deliberately. The maintained document is the source of truth for existing decisions."
     - This intent describes a single phase of a multi-phase feature. If a 'Deferred to later phases' section is present, the items listed there are intentionally out of scope for this phase. Do not flag them as ambiguities or missing functionality.
@@ -51,6 +56,15 @@ agents:
       builtin: [readFile, searchFiles]   # §config-migration — explicit platform grant
     prompt_extensions: []
     profile: intent
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    task: |-
+      Analyse the intent and extract the IntentSpec.
+    user_message: |-
+      Analyse the intent in the context above, following the mandatory rules already in the system prompt. First read the reference files listed in the system prompt (ARCHITECTURE.md for system boundaries, AGENTS.md for conventions); use searchFiles to inspect existing patterns. Then produce the IntentSpec by calling the save_<field> tools — one call per success criterion (save_successCriteria), constraint (save_constraints, field 'value'), out-of-scope item (save_outOfScope, field 'value'), and ambiguity (save_ambiguities, with its options + impactIfWrong). When done, call `complete` with the scope object (affectedDomains, affectedLayers, isBreakingChange, estimatedComplexity).
     reference_paths:
     - HARNESS.json
     - docs/ARCHITECTURE.md
@@ -130,6 +144,11 @@ agents:
       - successCriteria
 
   design-agent:
+    # 🔴 REQUIRED FOR AN APPEND PROFILE since 2026-11-13, and this project never received it:
+    # the bound is what stops a `save_` loop and unset means UNBOUNDED, so the loader REFUSES
+    # the role. Measured 2026-11-18: this role could not load at all here. The value is the
+    # shipped template's, which carries the measurement behind it.
+    max_iterations: 40
     role: "Senior software architect"
     goal: "Produce domain model changes, API contracts, and component specs"
     llm:
@@ -141,6 +160,15 @@ agents:
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
     profile: design
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    task: |-
+      Produce the design spec for this intent — domain changes, API contracts, and component specs. Return them as a single JSON object exactly matching the structure described.
+    user_message: |-
+      Produce the design spec for this intent, following the mandatory rules already in the system prompt. First read the reference files listed in the system prompt (ARCHITECTURE.md for existing boundaries); use readFile / listDirectory / searchFiles to inspect existing modules and patterns. Then call the save_<field> tools — one call per domain change (save_domainChanges), API contract (save_apiContracts), and component spec (save_componentSpecs). When every item is saved, call `complete`.
     rules:
     - 'Before finalizing your output, cross-check it against the project''s maintained architecture
       (docs/ARCHITECTURE.md and .gestalt/architecture/reconciled.json) — provided to you as gathered
@@ -284,6 +312,19 @@ agents:
     prompt_extensions:
       - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
     profile: intent-design
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    task: |-
+      Specify this phase: its success criteria, constraints, and the entity/interface/consistency invariants the implementation MUST satisfy. Do NOT prescribe implementation shape — no HTTP methods/paths, no component names, no field lists; the code agent chooses the shape.
+    user_message: |-
+      Analyse the intent + phase scope in the context above, following the mandatory rules in the system prompt. FIRST investigate the real codebase (readFile / listDirectory / searchFiles) and the reference docs — the constraint fields are only answerable from what already exists. Then call the save_<field> tools:
+      - ALWAYS produce at least one measurable success criterion (save_successCriteria). This is a planner-decomposed phase, so DERIVE the criteria from the phase scope / PLAN.md even when it does not state them verbatim — a criterion is what a reviewer can check is DONE (e.g. 'the Status enum exposes DRAFT/ACTIVE/ARCHIVED', 'the repository.create call persists a row and returns it', 'invalid input is rejected with a typed error'). Never leave successCriteria empty on the grounds that PLAN.md was not explicit — synthesise them from the phase's purpose.
+      - one call per success criterion (save_successCriteria), constraint (save_constraints, field 'value'), out-of-scope item (save_outOfScope, field 'value'), and ambiguity (save_ambiguities with options + impactIfWrong);
+      - one call per entity invariant (save_entityInvariants: entity + its lifecycle/rule, NOT its fields), interface constraint (save_interfaceConstraints: the operation that must exist + its auth/idempotency/error rules, NOT its route/verb/body), consistency requirement (save_consistencyRequirements: what to reuse/match + the referencePath to it), and integration point (save_integrationPoints).
+      You decide implementation SHAPE by leaving it out — specify only what must hold. When done, call `complete` with the scope object (affectedDomains, affectedLayers, isBreakingChange, estimatedComplexity).
     reference_paths:
     - HARNESS.json
     - docs/ARCHITECTURE.md
@@ -416,6 +457,11 @@ agents:
       - successCriteria
 
   context-agent:
+    # 🔴 REQUIRED FOR AN APPEND PROFILE since 2026-11-13, and this project never received it:
+    # the bound is what stops a `save_` loop and unset means UNBOUNDED, so the loader REFUSES
+    # the role. Measured 2026-11-18: this role could not load at all here. The value is the
+    # shipped template's, which carries the measurement behind it.
+    max_iterations: 40
     role: "Technical writer"
     write_paths:
       # Brief 1 — what THIS agent may write. GOVERNANCE files (docs/GOLDEN_PRINCIPLES.md,
@@ -453,6 +499,24 @@ agents:
         - gitDiff           # see this phase's diff before updating docs
     prompt_extensions: []
     profile: context
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    task: |-
+      Update the project context files (docs/* + AGENTS.md) to reflect what this phase ACTUALLY built — document the committed implementation, not the plan. Only propose updates for files that genuinely need to change.
+    user_message: |-
+      This runs AFTER code-generation, so the phase's code is committed on this branch. Inspect the REAL committed diff with gitDiff (+ readFile) to see what was actually implemented, and document THAT. Use the phase spec's invariants/constraints only as a CHECK against drift: if the code diverges from a spec invariant, document the code as built and note the divergence — do NOT document the plan's prescribed shape when the implementation chose a different valid one (the same 'satisfy the constraints, don't match a prescribed shape' framing the review agent uses).
+
+      HOW TO READ AND WRITE, and this is the part that decides what this costs:
+      1. Read the PHASE DIFF first (gitDiff), so you know which documentation is affected.
+      2. For a large document, your task carries a HEADING INDEX — every heading with its size and whether it is uniquely addressable. Read ONLY the sections the phase affects, with `readFile(path=..., section="<heading>")`.
+      3. Write with a SECTION update: `save_updates` with `section` set to the heading text and `content` set to that section's NEW BODY ONLY. Every other byte is preserved for you.
+
+      🔴 THE ANTI-PATTERN, named because it is expensive and invisible: do NOT read a large document whole. ARCHITECTURE.md is ~36,000 tokens. A tool loop re-sends the entire conversation on every turn, so loading it once costs ~36,000 tokens again on EVERY remaining turn — measured at 40% of one invocation's total spend, to produce one update. Omit `section` only to create a new file or rewrite one whole, which requires having read the whole file and is refused otherwise.
+
+      Call `complete` when done. If nothing needs to change, `complete` with no updates.
     reference_paths:
     # §3 — narrowed to the files this agent MAINTAINS. Audited on run f890ed1a: all five
     # previous references were read exactly 8 times each (once per invocation) — the turn-1
@@ -989,6 +1053,13 @@ agents:
       - Do not specify persistence (data architect handles that) or modules / APIs (application architect handles that)
       - Every lifecycle state must be named explicitly so the chief can fold it into architectureMdUpdate
     profile: domain-architect
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    user_message: |-
+      Design the domain slice for this feature. Produce your design by calling the save_<field> tools — one call per item (e.g. one save call per entity, repository, module, service, dependency edge, recommended phase, or SQL schema). Use the read-only file tools to inspect the repo if needed. When every item is saved, call `complete` exactly once with the remaining summary fields. Do not return the design as JSON text.
     reference_paths:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
@@ -1043,6 +1114,13 @@ agents:
       - Every repository interface must name its concrete backing implementation using the declared stack — PostgreSQL via pg Pool
       - Index rationale must reflect the entity's lifecycle and access patterns
     profile: data-architect
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    user_message: |-
+      Design the persistence slice for this feature. Produce your design by calling the save_<field> tools — one call per item (e.g. one save call per entity, repository, module, service, dependency edge, recommended phase, or SQL schema). Use the read-only file tools to inspect the repo if needed. When every item is saved, call `complete` exactly once with the remaining summary fields. Do not return the design as JSON text.
     reference_paths:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
@@ -1106,6 +1184,13 @@ agents:
       - No circular dependencies between modules — verify dependencyMap before returning
       - Recommended phases should each fit within Aider's effective context window
     profile: app-architect
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    user_message: |-
+      Design the application slice for this feature. Produce your design by calling the save_<field> tools — one call per item (e.g. one save call per entity, repository, module, service, dependency edge, recommended phase, or SQL schema). Use the read-only file tools to inspect the repo if needed. When every item is saved, call `complete` exactly once with the remaining summary fields. Do not return the design as JSON text.
     reference_paths:
     - docs/ARCHITECTURE.md
     - docs/GOLDEN_PRINCIPLES.md
@@ -1195,6 +1280,13 @@ agents:
       - If a specialist slice is missing, supply the smallest reconciliation that keeps the feature buildable
       - Keep SQL schemas CONCEPTUAL (table name, field names, keys, index rationale) — do NOT write CREATE TABLE / SQL DDL
     profile: chief-architect
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    user_message: |-
+      Reconcile the three specialist designs above into ONE coherent architecture. Resolve symbol-name conflicts across specialists (harmonise entity and table names), fill cross-slice gaps (for example a domain entity with no table), verify stack compliance, and keep SQL CONCEPTUAL — table, field, key and index names only, NO DDL.
 
   planner-agent:
     rules:
@@ -1260,6 +1352,13 @@ agents:
       - 'The scope field must be directly actionable by the code agent: specific, self-contained, referencing existing files by exact path'
       - Maximum 10 phases per feature — if more are needed, the feature is too large and should be split
     profile: planner
+    # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
+    # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
+    # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
+    # `cfg.user_message`), so a role switched to it without this runs with no task line —
+    # which is what this project's `runtime: base-agent` chief had been doing.
+    user_message: |-
+      Decompose this feature into an ordered list of small, independently deployable phases. Produce the plan by calling save_phases once per phase (title, scope, dependencies, optional architecture). Use the read-only tools to inspect the repo if needed. When every phase is saved, call `complete`. Do not return the plan as JSON text.
     reference_paths:
     - HARNESS.json
     - docs/ARCHITECTURE.md
