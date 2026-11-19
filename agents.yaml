@@ -651,6 +651,11 @@ agents:
 
   # ── Gate layer (Amendment 2026-06: tools enabled by default) ──
   constraint-agent:
+    # 🔴 THE SINGLE RUNTIME (platform roadmap item 6), 2026-11-20. It lands WITH the
+    # re-based budget below and cannot land before it: the loader refuses
+    # `token_budget_basis` on a legacy role, and refuses a base-agent role whose budget
+    # carries no basis. The figure and the counter it was chosen for stay together.
+    runtime: base-agent
     # Raised from the 400k platform default after run ecef04ad's gate came back
     # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
     # budget of 790k (the platform scales the default with diff size). The frontend
@@ -658,7 +663,19 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1600000
+    # 🔴 RE-BASED FOR THE WEIGHTED COUNTER (1,600,000 -> 2,000,000), 2026-11-20, and it is
+    # NOT a raise. `runtime: base-agent` counts a budget with the price table's weights
+    # (cache x0.02, output x4.0) where the legacy loop used 0.10 and 1.0, so the same
+    # figure buys less work. Measured over every GENERATION named `constraint-agent` in the
+    # platform's trace store (7,331 calls) the weighted counter totals 1.2491x the
+    # legacy one, exactly (both weightings are linear in fresh/cache/output).
+    #     1,600,000 x 1.2491 = 1,998,560  ->  2,000,000
+    #
+    # Both gate roles take constraint-agent's figure rather than their own: the platform
+    # refuses a review budget below the phase gate's, and separate ratios would invert
+    # them — the shape that cost a two-hour run on `93f4284a`.
+    token_budget: 2000000
+    token_budget_basis: weighted
     rules:
     - Data access is only permitted in the designated data access layer of this project. Code in business logic, presentation, or routing layers must delegate all data operations to the data access layer.
     - The data access layer is the only layer permitted to contain connection management, query execution, and direct interaction with the data store.
@@ -742,7 +759,7 @@ agents:
     # applies it. A reason is required, so a hold cannot be a silent pin.
     hold:
       max_iterations: "cut at 40 on the two biggest feature-review slices: `leave` completed at 64 calls / 827,447 tokens, then truncated at 63 calls / 721,751 — a marginal bound, not an inflated call class"
-      token_budget: "80 turns x ~18,000 measured tokens/turn needs ~1,450,000, so ITERATIONS stay the binding bound; at 1,000,000 the budget would bind at ~55, before the cap"
+      token_budget: "80 turns x 19,466 measured WEIGHTED tokens/turn needs 1,557,280, so ITERATIONS stay the binding bound at 2,000,000; the template ships 1,250,000, which would bind at ~64 turns, before the 80-turn cap. Re-stated for the weighted counter on 2026-11-20 — the old reason was arithmetic on the legacy counter (~18,000/turn) and no longer describes the bound in force"
     schema:
       models:
         _Finding:
@@ -786,6 +803,11 @@ agents:
       required_non_empty: []
 
   review-agent:
+    # 🔴 THE SINGLE RUNTIME (platform roadmap item 6), 2026-11-20. It lands WITH the
+    # re-based budget below and cannot land before it: the loader refuses
+    # `token_budget_basis` on a legacy role, and refuses a base-agent role whose budget
+    # carries no basis. The figure and the counter it was chosen for stay together.
+    runtime: base-agent
     # Raised from the 400k platform default after run ecef04ad's gate came back
     # INCONCLUSIVE: both gate agents were cut at ~817k/~795k against an effective
     # budget of 790k (the platform scales the default with diff size). The frontend
@@ -793,7 +815,19 @@ agents:
     # component tree — so the diff the gate must read is far larger than a backend
     # phase's. 1.2M matches the documented ceiling the whole-codebase global gate
     # already runs under, so it is a known-survivable bound rather than a guess.
-    token_budget: 1600000
+    # 🔴 RE-BASED FOR THE WEIGHTED COUNTER (1,600,000 -> 2,000,000), 2026-11-20, and it is
+    # NOT a raise. `runtime: base-agent` counts a budget with the price table's weights
+    # (cache x0.02, output x4.0) where the legacy loop used 0.10 and 1.0, so the same
+    # figure buys less work. Measured over every GENERATION named `review-agent` in the
+    # platform's trace store (12,026 calls) the weighted counter totals 1.2117x the
+    # legacy one, exactly (both weightings are linear in fresh/cache/output).
+    #     1,600,000 x 1.2491 = 1,998,560  ->  2,000,000
+    #
+    # Both gate roles take constraint-agent's figure rather than their own: the platform
+    # refuses a review budget below the phase gate's, and separate ratios would invert
+    # them — the shape that cost a two-hour run on `93f4284a`.
+    token_budget: 2000000
+    token_budget_basis: weighted
     rules:
     - Only flag violations for concerns explicitly in scope for this intent.
     - Do not flag items as missing if they already exist on the project main branch.
@@ -842,7 +876,7 @@ agents:
     # keep equal bounds; a difference between them would need its own justification.
     hold:
       max_iterations: "4 of 11 review slices cut at 40 on feature 93f4284a, including one (`web-presentation-pages`) that used all 40 AND signalled done — so 40 was too low for ordinary slices, not only for the pathological"
-      token_budget: "same slices as constraint-agent at the same 80 iterations; equal shape needs no separate justification"
+      token_budget: "same slices as constraint-agent at the same 80 iterations; equal shape needs no separate justification. And the platform refuses a review budget below the phase gate's, so these two move together by rule, not only by symmetry"
     schema:
       models:
         _Item:
@@ -1776,7 +1810,7 @@ agents:
     # against.
     hold:
       max_iterations: "whole-tree sweep on this repository; the budget bound at ~iteration 77 of 120 before the raise, so iterations were not the limit being hit"
-      token_budget: "120 turns x 15,584 measured tokens/turn needs 1,870,080; below that the budget binds first and the operator-facing note names the wrong knob"
+      token_budget: "120 turns x 15,584 measured tokens/turn needs 1,870,080; below that the budget binds first and the operator-facing note names the wrong knob. Still the LEGACY rate, correctly: this role stays on the legacy loop — it has zero generations in the trace store and no pipeline node names it, so there is nothing to re-base from"
     token_budget: 2000000
     schema:
       models:
