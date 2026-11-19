@@ -1006,6 +1006,75 @@ agents:
   # working single-agent setting under TR_050.
 
   domain-architect-agent:
+    # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
+    # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
+    # 40 is the same value the three generate-family append profiles carry: a specialist emits
+    # roughly 20-30 items (the chief's 84 are the union of all three plus reconciliation), and
+    # at this stack's measured 1.2-5.0 saves per response that is ~6-25 requests.
+    max_iterations: 40
+    # 🔴 THE APPEND SCHEMA MOVED HERE FROM PYTHON (owner, 2026-11-16). This specialist's output
+    # is NOT one of the four platform contracts — nothing in the platform parses it, the chief
+    # reconciles it — so by CONSTRAINTS.md (2026-11-11) it is `agents.yaml`'s to own, and its
+    # `AppendProfile` row in `specialists.py` is being retired.
+    #
+    # GENERATED from the Python models rather than hand-written, and
+    # `test_the_specialists_schema_moved_faithfully.py` compares the config-built schema against
+    # those models field by field — name, type, requiredness and description — so this block
+    # cannot drift from the row it replaces while both exist.
+    schema:
+      models:
+        BusinessRuleItem:
+          fields:
+            rule:
+              type: str
+              optional: false
+            scope:
+              type: str
+              optional: true
+            applies_to:
+              type: str
+              optional: true
+        DomainEntityDesign:
+          fields:
+            name:
+              type: str
+              optional: false
+            attributes:
+              type: list[str]
+              optional: false
+            purpose:
+              type: str
+              optional: false
+            lifecycle_states:
+              type: list[str]
+              optional: true
+              default_factory: list
+        OpenQuestion:
+          fields:
+            question:
+              type: str
+              optional: false
+            impact:
+              type: str
+              optional: false
+            candidate_options:
+              type: list[str]
+              optional: true
+              default_factory: list
+      append:
+        businessRules: BusinessRuleItem
+        domainEntities: DomainEntityDesign
+        openQuestions: OpenQuestion
+      finalize:
+        domain_notes:
+          type: str
+          optional: false
+        not_applicable_reason:
+          type: str
+          optional: true
+        not_applicable_evidence:
+          type: str
+          optional: true
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
     - Define domain entities with exact field names, types, and lifecycle states
@@ -1065,6 +1134,91 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   data-architect-agent:
+    # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
+    # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
+    # 40 is the same value the three generate-family append profiles carry: a specialist emits
+    # roughly 20-30 items (the chief's 84 are the union of all three plus reconciliation), and
+    # at this stack's measured 1.2-5.0 saves per response that is ~6-25 requests.
+    max_iterations: 40
+    # 🔴 THE APPEND SCHEMA MOVED HERE FROM PYTHON (owner, 2026-11-16). This specialist's output
+    # is NOT one of the four platform contracts — nothing in the platform parses it, the chief
+    # reconciles it — so by CONSTRAINTS.md (2026-11-11) it is `agents.yaml`'s to own, and its
+    # `AppendProfile` row in `specialists.py` is being retired.
+    #
+    # GENERATED from the Python models rather than hand-written, and
+    # `test_the_specialists_schema_moved_faithfully.py` compares the config-built schema against
+    # those models field by field — name, type, requiredness and description — so this block
+    # cannot drift from the row it replaces while both exist.
+    schema:
+      models:
+        OpenQuestion:
+          fields:
+            question:
+              type: str
+              optional: false
+            impact:
+              type: str
+              optional: false
+            candidate_options:
+              type: list[str]
+              optional: true
+              default_factory: list
+        RepositoryDesign:
+          fields:
+            interface_name:
+              type: str
+              optional: false
+            concrete_name:
+              type: str
+              optional: false
+            methods:
+              type: list[str]
+              optional: false
+            backing:
+              type: str
+              optional: false
+        SqlSchemaItem:
+          fields:
+            table_name:
+              type: str
+              optional: false
+              description: "The table name (snake_case). Name only — no SQL."
+            fields:
+              type: list[str]
+              optional: true
+              default_factory: list
+              description: "Conceptual field names ONLY — no SQL types, no DDL. e.g. ['account_id', 'item_type', 'status', 'created_at']."
+            primary_key:
+              type: str
+              optional: true
+              description: "Primary-key field name(s), comma-separated. Name(s) only."
+            foreign_keys:
+              type: list[str]
+              optional: true
+              default_factory: list
+              description: "FK relationships as 'field -> other_table.field'. No SQL."
+            index_rationale:
+              type: list[str]
+              optional: true
+              default_factory: list
+              description: "Indexes as 'field: why it is indexed' — e.g. 'account_id: frequent lookups by account'. Rationale only, no DDL."
+      append:
+        openQuestions: OpenQuestion
+        repositories: RepositoryDesign
+        sqlSchemas: SqlSchemaItem
+      finalize:
+        data_notes:
+          type: str
+          optional: false
+        transaction_contract:
+          type: str
+          optional: true
+        not_applicable_reason:
+          type: str
+          optional: true
+        not_applicable_evidence:
+          type: str
+          optional: true
     rules:
     - The existing architecture (docs/ARCHITECTURE.md, provided as gathered reference context) records decisions already made for this project by earlier features. Your new design must EXTEND and remain consistent with it — do not silently contradict or duplicate existing decisions. Where this feature's requirements genuinely do not fit the existing pattern, surface that as an explicit concern rather than resolving it by ignoring the existing document.
     - Every domain entity that persists state requires a CONCEPTUAL table spec — table name, field names (no SQL types), primary key, foreign-key relationships, index rationale. Do NOT write SQL DDL or CREATE TABLE; the code agent generates migrations from this specification
@@ -1126,6 +1280,101 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   app-architect-agent:
+    # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
+    # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
+    # 40 is the same value the three generate-family append profiles carry: a specialist emits
+    # roughly 20-30 items (the chief's 84 are the union of all three plus reconciliation), and
+    # at this stack's measured 1.2-5.0 saves per response that is ~6-25 requests.
+    max_iterations: 40
+    # 🔴 THE APPEND SCHEMA MOVED HERE FROM PYTHON (owner, 2026-11-16). This specialist's output
+    # is NOT one of the four platform contracts — nothing in the platform parses it, the chief
+    # reconciles it — so by CONSTRAINTS.md (2026-11-11) it is `agents.yaml`'s to own, and its
+    # `AppendProfile` row in `specialists.py` is being retired.
+    #
+    # GENERATED from the Python models rather than hand-written, and
+    # `test_the_specialists_schema_moved_faithfully.py` compares the config-built schema against
+    # those models field by field — name, type, requiredness and description — so this block
+    # cannot drift from the row it replaces while both exist.
+    schema:
+      models:
+        DependencyEdgeItem:
+          fields:
+            source:
+              type: str
+              optional: false
+              description: "The module/component that depends on another."
+            target:
+              type: str
+              optional: false
+              description: "The module/component it depends on."
+        ModuleDesign:
+          fields:
+            name:
+              type: str
+              optional: false
+            path:
+              type: str
+              optional: false
+            owns:
+              type: list[str]
+              optional: false
+        OpenQuestion:
+          fields:
+            question:
+              type: str
+              optional: false
+            impact:
+              type: str
+              optional: false
+            candidate_options:
+              type: list[str]
+              optional: true
+              default_factory: list
+        RecommendedPhaseDesign:
+          fields:
+            title:
+              type: str
+              optional: false
+            rationale:
+              type: str
+              optional: false
+            estimated_files:
+              type: int
+              optional: false
+        ServiceDesign:
+          fields:
+            name:
+              type: str
+              optional: false
+            path:
+              type: str
+              optional: false
+            methods:
+              type: list[str]
+              optional: true
+              default_factory: list
+              # 🔴 `{{language}}`, NOT "TypeScript" (2026-11-16). The Python row this moved from
+              # said "no TypeScript types" — a stack-specific instruction sitting in a model
+              # the platform ships to every project, which `test_prompts_are_domain_neutral`
+              # refused the moment it reached the template. Moving configuration out of code is
+              # what exposed it: in Python nothing was checking.
+              description: "Method signatures as NAME + PARAMETER NAMES ONLY — no {{language}} types, no return types. e.g. 'reserveStock(accountId, itemType, quantity, period)'. Types are the design-agent's responsibility, not the architect's."
+      append:
+        dependencyMap: DependencyEdgeItem
+        modules: ModuleDesign
+        openQuestions: OpenQuestion
+        recommendedPhases: RecommendedPhaseDesign
+        services: ServiceDesign
+      finalize:
+        app_notes:
+          type: str
+          optional: false
+        auth_contract:
+          type: str
+          optional: true
+        error_response_contract:
+          type: str
+          optional: true
     # 🔴 TEMPLATE WORDING TAKEN (owner, 2026-11-10). The five differing rules here asserted a FIXED
     # four-layer architecture ("presentation, application, domain, infrastructure") and "every
     # public service method must be defined in an interface". The template's defer to what
