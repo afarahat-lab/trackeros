@@ -1445,6 +1445,15 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   chief-architect-agent:
+    # 🔴 REQUIRED, and this role is the reason the platform check was widened (gestalt #544,
+    # 2026-11-19). It runs `runtime: base-agent` in APPEND mode — its profile comes from the
+    # `architecture_reconciled` CONTRACT, not from a `schema:` block here — and the platform's
+    # load-time check only ever saw YAML-declared `append:` blocks, so this role was running
+    # with NO bound on its `save_` loop. Unset means UNBOUNDED; the run now REFUSES before
+    # the first model call until it is set.
+    #
+    # 60 is the shipped template's own value for this role.
+    max_iterations: 60
     # 🔴 DECIDED BY THE OWNER, 2026-11-10, resolving a template conflict — and the first change
     # is the one that was actively broken: this agent had `tools: {builtin: []}`, so it could read
     # NO file at all. By-reference reading is the platform standard (an input arrives as a path
