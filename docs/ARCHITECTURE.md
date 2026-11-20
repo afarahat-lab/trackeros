@@ -8,7 +8,7 @@ The architecture is modular, with a clear separation of concerns between models,
 
 - Runtime: Node 20 LTS
 - Package manager: npm
-- Test framework: Jest (API) / Vitest (web React + Vite SPA)
+- Test framework: Jest (API) / Vitest (web React + Vite SPA) — the owner's decision, 2026-11-20
 - Backend: Fastify
 - Frontend: React + Vite
 - Database: PostgreSQL
@@ -910,10 +910,18 @@ No new repository interfaces are introduced. Existing concrete implementations r
 
 ### Open Questions
 - Demo credentials: hardcoded vs env-driven with defaults.
-- Test framework: declared stack lists Jest, but web uses Vitest and feature requires vitest run; confirm whether Vitest is accepted for the Vite SPA or web should migrate to Jest.
 
 ### Stack Compliance Note
-API/backend uses Jest per declared stack; web subproject retains Vitest (existing) with `vitest run` per feature requirement. This deviation is surfaced as an open question.
+**Two test runners, by the owner's decision (2026-11-20): Jest for the API, Vitest for the web
+app.** This is the declared stack, not a deviation and not pending a ruling.
+
+The API (root `package.json`) runs `jest`; the web app (`web/package.json`) runs `vitest run`
+against React 18 + Vite 5. A Vite SPA is the case Vitest exists for — it shares the app's own
+Vite config and transform pipeline — so migrating `web/` to Jest would mean maintaining a second
+transform chain for no gain.
+
+The open question that used to sit above this note is removed: it had been answered by the code
+for some time, and leaving it open made every later feature re-read a settled choice as unsettled.
 <!-- gestalt:architecture feature=b020624d-f000-464a-871e-edfa5e57ac4e END -->
 
 <!-- gestalt:architecture feature=7d61f09d-b7fc-45d9-8704-fa055d377b19 START -->
