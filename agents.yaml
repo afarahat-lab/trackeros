@@ -1040,6 +1040,28 @@ agents:
   # working single-agent setting under TR_050.
 
   domain-architect-agent:
+    # 🔴 ITEM 6 — `runtime: base-agent` (owner, 2026-11-21). MEASURED through
+    # `role_attribution` over this platform's whole trace store, per RUN (a planning
+    # session, in which this role runs once):
+    #
+    #     generations 402   max/run 27   p95/run 24   worst weighted 442,500
+    #
+    # `max_iterations` stays 40: the hard stop is `40 + 2 x 25% = 60` requests, which is
+    # 2.2x the worst run ever observed for this role. 🔴 NOT the ~43 the
+    # `_require_bound_for_append` docstring projects — that figure divides the CHIEF's
+    # combined 84-item artifact by the measured saves-per-response, and no single slice
+    # has approached it.
+    #
+    # `token_budget` is sized on the worst observed across all three (442,500,
+    # domain-architect) rather than this role's own, because the three run as one crew on
+    # one feature and a per-role split would imply a precision the spread does not
+    # support. 2.3x that worst case.
+    runtime: base-agent
+    token_budget: 1000000
+    # REQUIRED alongside a base-agent budget: the two runtimes weight a budget
+    # differently (legacy cache 0.10 / output 1.0 — weighted cache 0.02 / output 4.0),
+    # and the figures above are the WEIGHTED counter.
+    token_budget_basis: weighted
     # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
     # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
     # 40 is the same value the three generate-family append profiles carry: a specialist emits
@@ -1168,6 +1190,28 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   data-architect-agent:
+    # 🔴 ITEM 6 — `runtime: base-agent` (owner, 2026-11-21). MEASURED through
+    # `role_attribution` over this platform's whole trace store, per RUN (a planning
+    # session, in which this role runs once):
+    #
+    #     generations 272   max/run 19   p95/run 15   worst weighted 186,366
+    #
+    # `max_iterations` stays 40: the hard stop is `40 + 2 x 25% = 60` requests, which is
+    # 3.2x the worst run ever observed for this role. 🔴 NOT the ~43 the
+    # `_require_bound_for_append` docstring projects — that figure divides the CHIEF's
+    # combined 84-item artifact by the measured saves-per-response, and no single slice
+    # has approached it.
+    #
+    # `token_budget` is sized on the worst observed across all three (442,500,
+    # domain-architect) rather than this role's own, because the three run as one crew on
+    # one feature and a per-role split would imply a precision the spread does not
+    # support. 2.3x that worst case.
+    runtime: base-agent
+    token_budget: 1000000
+    # REQUIRED alongside a base-agent budget: the two runtimes weight a budget
+    # differently (legacy cache 0.10 / output 1.0 — weighted cache 0.02 / output 4.0),
+    # and the figures above are the WEIGHTED counter.
+    token_budget_basis: weighted
     # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
     # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
     # 40 is the same value the three generate-family append profiles carry: a specialist emits
@@ -1314,6 +1358,28 @@ agents:
     - docs/GOLDEN_PRINCIPLES.md
 
   app-architect-agent:
+    # 🔴 ITEM 6 — `runtime: base-agent` (owner, 2026-11-21). MEASURED through
+    # `role_attribution` over this platform's whole trace store, per RUN (a planning
+    # session, in which this role runs once):
+    #
+    #     generations 578   max/run 32   p95/run 23   worst weighted 284,675
+    #
+    # `max_iterations` stays 40: the hard stop is `40 + 2 x 25% = 60` requests, which is
+    # 1.9x the worst run ever observed for this role. 🔴 NOT the ~43 the
+    # `_require_bound_for_append` docstring projects — that figure divides the CHIEF's
+    # combined 84-item artifact by the measured saves-per-response, and no single slice
+    # has approached it.
+    #
+    # `token_budget` is sized on the worst observed across all three (442,500,
+    # domain-architect) rather than this role's own, because the three run as one crew on
+    # one feature and a per-role split would imply a precision the spread does not
+    # support. 2.3x that worst case.
+    runtime: base-agent
+    token_budget: 1000000
+    # REQUIRED alongside a base-agent budget: the two runtimes weight a budget
+    # differently (legacy cache 0.10 / output 1.0 — weighted cache 0.02 / output 4.0),
+    # and the figures above are the WEIGHTED counter.
+    token_budget_basis: weighted
     # 🔴 THE APPEND LOOP'S BOUND, required for any `append:` profile — unset means UNBOUNDED,
     # and the thing it bounds is a model that keeps calling `save_` with nothing to stop it.
     # 40 is the same value the three generate-family append profiles carry: a specialist emits
