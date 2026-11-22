@@ -964,74 +964,15 @@ agents:
       builtin: [readFile, listDirectory]
     prompt_extensions: []
 
-  # ── Planning layer (migration 024) ──────────────────────────────
-  # architecture-agent is consulted twice per feature:
-  #   1. High-level design (feature-level) — before any code is written
-  #   2. Focused design (phase-level)      — before each phase is submitted
-  # Operator opt-in: HARNESS.json `planner.enabled` controls whether
-  # the planning layer engages at all; `planner.architectureReviewPerPhase`
-  # controls the per-phase pass.
-  architecture-agent:
-    rules:
-    - High-level architecture must fit within the existing module structure defined in ARCHITECTURE.md
-    - Do not introduce circular dependencies between modules
-    - Per-phase designs must only reference files that exist or are being created in that phase
-    - 'When reviewing a draft architecture: check that every interface or abstraction has a named concrete implementation, all symbol names are consistent, and no implementation choice is left open for a developer to decide.'
-    - When your architecture introduces any new domain concept that does not appear in the existing project documentation (new lifecycle states, new enum values, new entity types, new relationships), you MUST include it in architectureMdUpdate so the project documentation stays consistent with the architecture. Never introduce a concept in code interfaces that is absent from the project docs.
-    - 'When a phase includes multiple domain mutations that must be coordinated (a primary operation plus a cross-cutting concern such as audit logging, event publishing, or cache invalidation), explicitly state the transaction semantics: whether the operations execute atomically in a single transaction, as separate transactions, or via a compensating pattern. Do not leave transaction behavior implicit.'
-    - When a canonical schema is provided for a table, use it exactly. Do not redefine column types, sizes, or constraints. A table must have one definition across all architecture views.
-    - When the declared stack includes a relational database, you MUST include a complete SQL schema in your output for every persistent domain entity you define. A domain entity without a corresponding table definition is incomplete. The schema must include column names, types, constraints, and indices relevant to the entity's lifecycle.
-    - Cross-module dependencies must target the owning module's public SERVICE interface, never its repository or other private files. When a per-phase design needs data owned by another module, specify a dependency on that module's service — not its repository. A service depending on its OWN module's repository interface is the standard repository pattern and is correct.
-    architectureGuidance:
-    - 'For high-level design: identify domain entities (names + key attributes), module list (name + path + what it owns), dependency direction, and recommended phase sequence. Nothing more.'
-    - 'For per-phase design: produce exact TypeScript interface signatures, specific import statements using actual file paths, SQL schema if needed, and 3-5 measurable success criteria.'
-    - Phase designs must reference only files that already exist OR files being created in this phase — never assume future phases exist.
-    - Keep per-phase designs focused on the phase scope — do not redesign the whole feature.
-    - 'Per-phase design must include for each dependency: exact file path, exact exported names, exact import statement. Scope: only files that exist now + files being created this phase. Nothing else.'
-    - Never reference a module by name alone — always by its exact file path relative to the file being created.
-    - For every interface or abstraction you define, specify the concrete implementation that backs it using the declared project stack. Do not leave implementation choices ambiguous — specify enough detail that a developer can implement without asking clarifying questions.
-    - The project stack declared in HARNESS.json is the authoritative source for all technology choices. You MUST use the declared test framework, web framework, database client, and package manager exactly as named. Do not substitute alternatives based on personal preference or assumed defaults. If the declared stack names a specific framework, every reference in your output must use that framework's name and conventions.
-    - 'Before emitting your response, verify: every framework reference in your output matches the declared stack. If you find a mismatch, correct it before returning.'
-    - Every state transition described in the feature must have a corresponding method in at least one phase. If an entity changes state during the feature lifecycle, ensure the phase plan includes a method for each transition — not just the initial creation.
-    role: "Senior software architect"
-    goal: "Produce high-level architecture designs and focused per-phase technical specifications that fit the existing project structure"
-    llm:
-      # TR_050 — switched off moonshotai/Kimi-K2.6 to
-      # deepseek-ai/DeepSeek-V3.2. Kimi inference on DeepInfra
-      # was unreliable at 12k max_tokens (~50% timeout rate over
-      # 2 cycles even with LLM_TIMEOUT_MS=300000). DeepSeek-V3.2
-      # has run reliably for every other agent in this matrix
-      # including the heavy Aider call (133k tokens consumed
-      # without timeout). Kimi remains pinned to self-healing-
-      # agent where the prompt size is much smaller.
-      model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
-      temperature: 0.1
-      max_tokens: 3000
-    tools:
-      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
-    prompt_extensions:
-      - "Always ground your design in the existing ARCHITECTURE.md — extend it, never contradict it"
-      - "High-level designs focus on domain entities, module boundaries, and dependency direction only — not implementation details"
-      - "Per-phase designs focus on exact interfaces, import paths, and success criteria for that specific phase only"
-      - "Domain entities should have minimal attributes at the high level — add detail in per-phase designs"
-      - "Module dependencies must be acyclic — check before recommending"
-      # TR_034 — per-phase designs must be scoped to exact file paths +
-      # exports + import statements. Aider's hallucinations in TR_033
-      # came from module-name references in the architecture
-      # description; these rules force file paths only.
-      - "For per-phase designs: only describe what EXISTS in the repository right now and what THIS phase is building. Never describe future modules or modules not yet built."
-      - "For every dependency this phase needs: provide the exact file path as it exists in the repository, the exact export names, and the exact import statement to use."
-      - "Do not use module names as import paths. Use file paths."
-      - "Example of correct output: 'The database connection is at src/shared/db/connection.ts and exports: export const pool: Pool. Import it as: import { pool } from \"../../shared/db/connection\"'"
-      - "Example of incorrect output: 'Use the shared/db module'"
-
   # ─── Architecture crew (TR_051 / ADR-056 Phase 1) ────────────────────
   # LangGraph StateGraph: three specialists deliberate in parallel,
-  # then chief reconciles. Replaces the feature-level designFeature +
-  # reviewDesign pair on the architecture-agent above. The
-  # architecture-agent entry remains in use for the per-phase
-  # designPhase + reviewPhaseDesign (Phase 2 of the migration replaces
-  # those too).
+  # then chief reconciles. This is the architecture layer, whole. It
+  # REPLACED the single `architecture-agent`, which was removed on
+  # 2026-11-22: no pipeline node named it and `designPhase` /
+  # `reviewPhaseDesign` had no caller, so its fifty lines of rules were
+  # configuration that governed nothing. A per-phase architecture pass,
+  # if one is wanted again, is a pipeline node and a role declared for
+  # it, not a dormant entry.
   #
   # TR_050 matrix: specialists on deepseek-ai/DeepSeek-V3.2 (steady,
   # reliable under DeepInfra); chief on moonshotai/Kimi-K2.6 because
