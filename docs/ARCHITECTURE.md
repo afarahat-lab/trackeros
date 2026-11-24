@@ -418,12 +418,12 @@ Migration note: add nullable `password_hash` to `employees` using `t.text(...)` 
 
 ### Dependency map
 - auth -> employee, shared-auth, shared-types, shared-errors
-# `shared-auth` is here for the `AuthUser` type employee.routes.ts reads off the request.
+`shared-auth` is here for the `AuthUser` type employee.routes.ts reads off the request.
 - employee -> shared-auth, shared-types, shared-errors, shared-db
 - policy -> leave-type, shared-types, shared-errors
 - balance -> employee, policy, shared-date, shared-types, shared-errors, shared-db
 - leave -> balance, validation, policy, employee, audit, notification, leave-type, shared-date, shared-types, shared-errors, shared-db
-# `shared-errors` is here because accrual.ts throws ConflictError on an out-of-range date.
+`shared-errors` is here because accrual.ts throws ConflictError on an out-of-range date.
 - shared-date -> shared-errors, shared-types
 - shared-auth -> shared-types, shared-errors
 
@@ -452,9 +452,9 @@ deliberately does NOT reach `web-infrastructure-api` directly; it goes through t
 - web-leave -> web-infrastructure-api, web-shared-types
 - web-approvals -> web-employee, web-leave, web-shared-types
 - web-presentation-components -> web-auth
-# `web-leave` is here for ONE import: `canApproveLeave`. A route guard asking the module
-# that owns the authorization rule is the point — the guard used to carry its own inverted
-# copy (`role === EMPLOYEE -> deny`), which fails OPEN the day a fourth role exists.
+`web-leave` is here for ONE import: `canApproveLeave`. A route guard asking the module
+that owns the authorization rule is the point — the guard used to carry its own inverted
+copy (`role === EMPLOYEE -> deny`), which fails OPEN the day a fourth role exists.
 - web-presentation-guards -> web-auth, web-leave, web-shared-types
 - web-presentation-pages -> web-approvals, web-auth, web-employee, web-leave, web-presentation-components, web-shared-date, web-shared-types
 
