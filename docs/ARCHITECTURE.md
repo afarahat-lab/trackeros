@@ -422,6 +422,36 @@ No existing lifecycle state changes. Employee, LeaveType, LeavePolicy, LeaveRequ
 9. A trail read returns ALL matching entries — no limit, offset, date filter, or action filter.
 10. Each entry is projected as exactly `{ id, actorId, action, entityType, entityId, beforeState, afterState, occurredAt }` — the entity, not a summary. No field added, renamed, or dropped.
 
+
+### Owner rulings — 2026-11-25
+
+_Answers to the open questions the architecture crew carried. Each states whether it ratifies
+the code as it stands or changes it._
+
+- **The audit trail stays on the ORIGINAL request.** A GP-008 reversal row does not carry a
+  trail of its own; the reversal is an event in the original's history. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **`beforeState` / `afterState` are returned verbatim.** No redaction, for now: the trail is
+  visible to exactly the callers who may see the request. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **`getHistory` returns the audit-owned `AuditLog` as is** — not promoted to
+  `src/shared/types/`, not re-declared in leave, not a leave-owned projection. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **The history endpoint returns the full trail, with no cap.** Pagination and filtering stay
+  out of scope. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **`GET /leaves` returns ONE row per request.** Reversal rows are excluded, and the original
+  shows that it was reversed. **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **Every aggregate of leave days goes through ONE repository function that excludes reversal
+  rows.** No `SUM` of leave days anywhere else. **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **The demo password comes from an environment variable**, with a default ONLY outside
+  production, and the seed REFUSES to run in production. **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **The approvals API returns the employee's display name.** **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **The readiness outcome is never cached or memoized.** A fresh check on every call. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **Request logging is turned OFF for the readiness route.** **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **The PORT validity predicate is STRICT**: trim, `/^[0-9]+$/`, `1..65535`; everything else
+  falls back to 3000. The lenient `parseInt` / `Number` alternatives the data and app slices
+  offered are rejected. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **An invalid PORT logs a WARNING, then falls back to 3000.** The silent fallback is
+  overturned. **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+- **The startup line uses `app.log.info`,** not `console.log`. **DECIDED AS A CHANGE 2026-11-25 (owner)** — binding, and the code does NOT yet satisfy it. To be implemented as a trackeros feature run through Gestalt, not edited by hand.
+
 ## Conceptual table specifications
 
 ### Leave management (core) — Conceptual tables
@@ -503,6 +533,14 @@ Indexes: `id` (PK; serves the existing `findById` lookup by audit id — the onl
 **`leave_requests`** — UNCHANGED and referenced by name only; defined once in the earlier leave/cancellation/GP-008 specs. This feature adds no column and no index.
 Fields: `id`, `employee_id`, `leave_type_code`, `start_date`, `end_date`, `requested_days`, `reason`, `status`, `approver_id`, `approval_comment`, `submitted_at`, `decided_at`, `cancelled_by`, `cancelled_at`, `reverses_request_id`. PK `id`. FKs: `employee_id -> employees.id`, `leave_type_code -> leave_types.code`, `approver_id -> employees.id`, `cancelled_by -> employees.id`, `reverses_request_id -> leave_requests.id`.
 Indexes: `id` (PK; the lookup the history endpoint performs FIRST, via the existing `LeaveService.getById(actor, requestId)`, before any audit row is read — visibility is established here, not in the audit module). `employee_id` — the column the leave module's visibility rule reads; the audit module never reads it. `(employee_id, status)` — role-scoped list queries; not used by the history endpoint. `reverses_request_id` (UNIQUE, nullable) — the GP-008 linkage; a cancelled-after-approval request is TWO rows and the CANCEL audit entry is keyed to the ORIGINAL id, so the endpoint returns the trail of the row whose id was requested and does not merge the two.
+
+
+### Owner rulings — 2026-11-25
+
+- **`audit_logs` keeps its `(entity_type, entity_id)` index unchanged.** It is not extended with
+  `occurred_at` (or `id`), so the ordered scan is not index-served. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **The application stamps `occurred_at`.** The column's database default stays unused by the
+  repository path. **RATIFIED 2026-11-25 (owner)** — already true of the code.
 
 ## Repository interfaces and implementations
 
@@ -727,6 +765,18 @@ Every public service method is declared on an interface before its implementatio
 
 Dependencies flow inward: routes -> service interfaces -> repository interfaces -> shared-db. No new edge is added by this feature; every edge in the dependency map already exists.
 
+
+### Owner rulings — 2026-11-25
+
+- **The leave module owns `LEAVE_REQUEST_ENTITY_TYPE`** — defined once in
+  `src/modules/leave/leave.model.ts` and imported by both the write path and the history read.
+  **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **No controller layer.** Routes call services directly. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **`LeavePolicyStatus` stays module-local,** imported through `policy/index.ts`. It is not
+  promoted to `src/shared/types`. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **`src/shared/config/` owns PORT only, for now.** `DATABASE_URL` stays in
+  `src/shared/db/connection.ts` and `JWT_SECRET` in `src/shared/auth/index.ts`. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+
 ## Cross-cutting contracts
 
 ### Leave management (core)
@@ -819,6 +869,14 @@ Dependencies flow inward: routes -> service interfaces -> repository interfaces 
 
 **Transaction.** EMPTY — this feature is read-only. It writes no audit record, opens no transaction, and forwards no `PoolClient`. The existing `IUnitOfWork` contract is untouched; GP-002 is not engaged by a read.
 
+
+### Owner rulings — 2026-11-25
+
+- **The bearer token lives in `sessionStorage`.** **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **Token expiry is detected by the server's 401 alone.** No proactive JWT `exp` inspection on
+  the client. **RATIFIED 2026-11-25 (owner)** — already true of the code.
+- **UTC dates render through `Intl` with `timeZone: 'UTC'`.** **RATIFIED 2026-11-25 (owner)** — already true of the code.
+
 ## Ownership and naming decisions
 
 ### Leave management (core) — Canonical naming decisions
@@ -848,56 +906,15 @@ The visibility rule (ADMIN sees all; MANAGER sees own plus direct reports, one l
 
 ## Open questions
 
-_Carried forward from the feature blocks. A question is retired only when the
-clarification record shows it answered, or when the block's own stated resolution is
-VERIFIED against the tree. 11 were retired that second way; the clarification record
-retired none, because it holds no answers at all — 41 parks, 318 questions, 0 answers,
-all time (`provenance='recovered'`)._
+**None.** All twenty-two questions the architecture crew carried were answered by the owner
+on 2026-11-25 and are recorded as binding rules in the sections they belong to — business
+rules, conceptual tables, module boundaries and cross-cutting contracts, each marked
+RATIFIED (already true of the code) or DECIDED AS A CHANGE (binding, not yet implemented).
 
-- **GP-008 reversal trail** — should a reversal row have a non-empty trail of its own, or is the empty trail correct (the reversal is an event in the ORIGINAL's history)?
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **`beforeState`/`afterState` exposure** — the trail is visible to exactly the callers who may see the request, but it makes full snapshots bulk-readable and reveals the `actorId` of every actor who touched the request. Redaction must be decided now if wanted, because the projection rule is binding feature-wide.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **Index extension** — should `(entity_type, entity_id)` be extended with `occurred_at` (and `id`) so the ordered scan is index-served? A migration decision that must be made once for the table.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **`occurred_at` clock authority** — app-stamped `new Date()` vs the column's DB default `now()`; the DB default is currently dead code for every row the repository inserts.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **`entity_type` literal ownership** — the leave module owns `LEAVE_REQUEST_ENTITY_TYPE` (defined once in `src/modules/leave/leave.model.ts` and imported by both the write path and the history read); a divergence would silently return an empty array, which this contract treats as a valid 200.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **`getHistory` return type** — the audit-owned `AuditLog` entity as-is (leading option; it must not be promoted to `src/shared/types/` and must not be re-declared in leave) vs a leave-owned projection.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **Unbounded response size** — pagination and filtering are out of scope, so the endpoint returns the full trail with no cap.
-  _(feature `594d4d13` · no resolution recorded anywhere)_
-- **GET /leaves list shape** — still open: the read path returns both rows unchanged, paired by `reversesRequestId`. Every existing consumer (LeaveListPage, ApprovalsPage, DashboardPage) will render two rows unless it learns to filter.
-  _(feature `79f682f0` · the block itself says STILL OPEN)_
-- **Aggregation double-counting** — **still open.** The reversal row copies `requestedDays`/dates from the original (never re-derived, never zeroed), so any aggregation that sums `requestedDays` must filter on `reverses_request_id IS NULL` or the original APPROVED row and its reversal row are double-counted. The constraint is correct and binding feature-wide; what is NOT resolved is the hazard it describes — **no aggregation exists yet and nothing enforces the filter** (verified: no `SUM(requested_days)` anywhere in `src/`). It returns to `still open` because a constraint written down is not a constraint enforced.
-  _(feature `79f682f0` · the block itself says STILL OPEN)_
-- Demo credentials: hardcoded vs env-driven with defaults.
-  _(feature `b020624d` · no resolution recorded anywhere)_
-- **Caching / memoization** — the binding rule says no caching; a future TTL would introduce a staleness bound and a third probe concern. Still open as a future concern only — the delivered path caches nothing, and Phase 3 pins this with a test asserting a fresh `check()` on every call (two calls → probe called twice).
-  _(feature `dfc85052` · the block itself says STILL OPEN)_
-- **Readiness-path request-log volume** — the app runs Fastify's request logging globally, so a probe polled on a short interval emits a log line per poll. No per-route logging configuration or sampling was added; the existing global behaviour is accepted. Open as an operational concern.
-  _(feature `dfc85052` · no resolution recorded anywhere)_
-- Employee column rendering: API exposes employeeId but no employee name; web employee service only getMe(). Options: render employeeId as-is, omit column, or resolve from existing list (none exists). <!-- gestalt:architecture feature=e04c2d94-ea14-4e1c-bf05-aec38b138bb0 END -->
-  _(feature `e04c2d94` · no resolution recorded anywhere)_
-- Q1: Should a controller layer be introduced, or continue with routes calling services directly? (candidates: continue routes-call-services; introduce controllers)
-  _(feature `e8c586bc` · no resolution recorded anywhere)_
-- Q2: Should LeavePolicyStatus be promoted into src/shared/types as a canonical enum? (candidates: promote to shared/types; keep module-local and import via policy index.ts) <!-- gestalt:architecture feature=e8c586bc-23c0-4c59-9111-ee280659da9a END -->
-  _(feature `e8c586bc` · no resolution recorded anywhere)_
-- Token storage mechanism (localStorage/sessionStorage/in-memory)
-  _(feature `ecef04ad` · no resolution recorded anywhere)_
-- Proactive JWT expiry detection vs server 401 only
-  _(feature `ecef04ad` · no resolution recorded anywhere)_
-- UTC date rendering implementation (Date.UTC/getUTC*, Intl timeZone UTC, raw YYYY-MM-DD substring)
-  _(feature `ecef04ad` · no resolution recorded anywhere)_
-- **OQ-1 — Confirm the strict validity predicate** (trim, `/^[0-9]+$`, 1..65535). The domain slice records this as a binding rule; the data and app slices recorded it as undecided and offered lenient `parseInt`/`Number` alternatives. Reconciliation adopts strict; confirm before implementation.
-  _(feature `ed7419c9` · no resolution recorded anywhere)_
-- **OQ-2 — Silent fallback vs warning** when PORT is present but invalid. The domain binding rule currently mandates silence; the operability concern (a typo'd PORT becomes invisible) remains.
-  _(feature `ed7419c9` · no resolution recorded anywhere)_
-- **OQ-3 — Log sink** for the startup line: keep `console.log` (current) or move to `app.log.info`.
-  _(feature `ed7419c9` · no resolution recorded anywhere)_
-- **OQ-4 — Scope of `shared-config`**: PORT only now (adopted), or migrate `DATABASE_URL` and `JWT_SECRET` into it in this feature.
-  _(feature `ed7419c9` · no resolution recorded anywhere)_
+The answers are also in the platform's clarification record, `answered_by = owner`.
+🔴 One of the twenty-two — request logging on the readiness route — matched no recorded
+clarify question: the architecture crew raised it and the clarify gate never asked it, so
+its answer lives here and in this document alone.
 
 ## Feature history
 
