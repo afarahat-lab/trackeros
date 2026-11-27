@@ -507,6 +507,21 @@ agents:
         - searchFiles       # find where references need to change
         - getFileTree       # understand project layout
         - gitDiff           # see this phase's diff before updating docs
+      # Wrapped Serena (gestalt_core.serena) — bound ONLY because this role's node `produces:`
+      # document artifacts. Each call is checked BEFORE it is forwarded: reads against
+      # read_paths, writes against the node's `produces`. Serena runs on a STAGED copy that is
+      # validated and applied all-or-nothing at the end of the run. Only these eight are
+      # wrapped; `replace_symbol_body` / `insert_after_symbol` are refused at load (measured
+      # broken on Serena 2.1.0), as are the multi-file and shell/memory tools.
+      serena:
+        - get_symbols_overview   # list a document's headings without reading it whole
+        - find_symbol            # one section, by heading (relative_path required)
+        - search_for_pattern     # find text inside a document (relative_path required)
+        - read_file              # a line range of a document
+        - list_dir
+        - find_file
+        - replace_content        # WRITE — edit text inside a section
+        - insert_before_symbol   # WRITE — add a new section before an existing heading
     prompt_extensions: []
     # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
     # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
