@@ -26,6 +26,51 @@
 name: corporate-ops-web-mobile
 version: "3.3.0"
 
+artifacts:
+  domain_spec:
+    kind: data
+    format: json
+  data_spec:
+    kind: data
+    format: json
+  app_spec:
+    kind: data
+    format: json
+  architecture_reconciled:
+    kind: contract
+    contract: architecture
+    format: json
+  phase_plan:
+    kind: contract
+    contract: plan
+    format: markdown
+  gate_verdict:
+    kind: contract
+    contract: gate_findings
+    format: json
+  feature_review_result:
+    kind: contract
+    contract: gate_findings
+    format: json
+  # 🔴 THE CONTEXT DOCUMENTS (owner, 2026-11-26/27). A `document` artifact a node `produces` is
+  # edited THROUGH WRAPPED SERENA, and the `produces:` declaration is the write authority for a
+  # judged document (DECISIONS.md#context-agent-serena-2026-11-27). docs/ARCHITECTURE.md is NOT
+  # here: the planning-time architecture node will own `architecture_doc`, and one artifact has
+  # one producer.
+  domain_doc:
+    kind: document
+    path: docs/DOMAIN.md
+    format: markdown
+  decisions_doc:
+    kind: document
+    path: docs/DECISIONS.md
+    format: markdown
+  agents_doc:
+    kind: document
+    path: AGENTS.md
+    format: markdown
+
+
 phases:
   # ── Planning: architecture crew → planner → persist (runs once) ──
   planning:
@@ -154,6 +199,7 @@ phases:
             agent: context-agent
             inputs: [spec, commit_sha, feature_branch]
             output: { name: context_files, channel: files }
+            produces: [domain_doc, decisions_doc, agents_doc]
           # Deploy + gate — open PR → poll CI → GATE (after CI, ADR-041) → merge.
           # create_pr / poll_ci / gate are VERDICT nodes: a non-ok result RAISES a
           # typed signal into the loop's self-heal envelope. The gate is a single

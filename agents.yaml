@@ -463,12 +463,22 @@ agents:
     # shipped template's, which carries the measurement behind it.
     max_iterations: 40
     role: "Technical writer"
+    # 🔴 EDITS DOCUMENTS THROUGH WRAPPED SERENA (owner, 2026-11-26; rulings 2026-11-27 —
+    # docs/claude/DECISIONS.md#context-agent-serena-2026-11-27). It produces `domain_doc`,
+    # `decisions_doc` and `agents_doc` (pipeline.yaml), and that `produces:` IS its write authority
+    # for those judged documents. It does NOT write docs/ARCHITECTURE.md: the planning-time
+    # architecture node owns `architecture_doc`. It still READS it (reference_paths).
+    #
+    # 🔴 SWITCHED TO `runtime: base-agent` 2026-11-27, MEETING THE CONDITION ITS 2026-11-24 REVERT
+    # SET: "switch this role only after the write-and-refuse mechanics move into BaseAgent,
+    # parameterised by ARTIFACT rather than by role." They now live in the document-editing
+    # dispatch, chosen because this node's `produces` names `kind: document` artifacts: Serena edits
+    # a STAGED copy, every write is checked against `produces` before it is forwarded, refusals
+    # become findings, and the staged copy is validated and applied in one commit — or not at all.
+    # The legacy `context` profile's `save_updates` (edits the PLATFORM applied) is gone from this
+    # role; the agent now edits, and the platform only checks and applies.
+    runtime: base-agent
     write_paths:
-      # Brief 1 — what THIS agent may write. GOVERNANCE files (docs/GOLDEN_PRINCIPLES.md,
-      # HARNESS.json, agents.yaml, harness/pipeline.yaml) are refused regardless of what is
-      # listed here: a per-project config must not grant an agent authority over the rules the
-      # platform judges the project by. See gestalt_core/agents/write_policy.py.
-      - docs/ARCHITECTURE.md
       - docs/DOMAIN.md
       - docs/DECISIONS.md
       - AGENTS.md
@@ -498,25 +508,25 @@ agents:
         - getFileTree       # understand project layout
         - gitDiff           # see this phase's diff before updating docs
     prompt_extensions: []
-    profile: context
     # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
     # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
     # The base-agent runtime reads ONLY config (`BaseAgent.extra_instructions` -> 
     # `cfg.user_message`), so a role switched to it without this runs with no task line —
     # which is what this project's `runtime: base-agent` chief had been doing.
     task: |-
-      Update the project context files (docs/* + AGENTS.md) to reflect what this phase ACTUALLY built — document the committed implementation, not the plan. Only propose updates for files that genuinely need to change.
+      Update the project context documents to reflect what this phase ACTUALLY built — document the committed implementation, not the plan. Only edit documents that genuinely need to change.
     user_message: |-
-      This runs AFTER code-generation, so the phase's code is committed on this branch. Inspect the REAL committed diff with gitDiff (+ readFile) to see what was actually implemented, and document THAT. Use the phase spec's invariants/constraints only as a CHECK against drift: if the code diverges from a spec invariant, document the code as built and note the divergence — do NOT document the plan's prescribed shape when the implementation chose a different valid one (the same 'satisfy the constraints, don't match a prescribed shape' framing the review agent uses).
+      This runs AFTER code-generation, so the phase's code is committed on this branch. Inspect the REAL committed diff with gitDiff (+ readFile) to see what was actually implemented, and document THAT. Use the phase spec's invariants/constraints only as a CHECK against drift: if the code diverges from a spec invariant, document the code as built and note the divergence — do NOT document the plan's prescribed shape when the implementation chose a different valid one.
 
-      HOW TO READ AND WRITE, and this is the part that decides what this costs:
+      HOW TO READ AND EDIT. The documents you maintain are docs/DOMAIN.md, docs/DECISIONS.md and AGENTS.md; you edit them with Serena's tools, and every edit is checked and validated before anything is applied.
       1. Read the PHASE DIFF first (gitDiff), so you know which documentation is affected.
-      2. For a large document, your task carries a HEADING INDEX — every heading with its size and whether it is uniquely addressable. Read ONLY the sections the phase affects, with `readFile(path=..., section="<heading>")`.
-      3. Write with a SECTION update: `save_updates` with `section` set to the heading text and `content` set to that section's NEW BODY ONLY. Every other byte is preserved for you.
+      2. Find the section to change without reading a whole document: `get_symbols_overview(relative_path=...)` lists its headings, and `find_symbol(name_path_pattern="<heading>", relative_path=..., include_body=true)` returns one section.
+      3. Edit with `replace_content(relative_path, needle, repl, mode="literal")` to change text inside a section, or `insert_before_symbol(name_path="<heading>", relative_path, body)` to add a new section before an existing heading — end the body with a blank line.
+      4. Change ONLY the sections the phase affects. End-of-run validation refuses the whole run if a section you did not address changed, and then NOTHING is applied.
 
-      🔴 THE ANTI-PATTERN, named because it is expensive and invisible: do NOT read a large document whole. ARCHITECTURE.md is ~36,000 tokens. A tool loop re-sends the entire conversation on every turn, so loading it once costs ~36,000 tokens again on EVERY remaining turn — measured at 40% of one invocation's total spend, to produce one update. Omit `section` only to create a new file or rewrite one whole, which requires having read the whole file and is refused otherwise.
+      🔴 do NOT read a large document whole: a tool loop re-sends the whole conversation on every turn, so one full read is paid again on every remaining turn.
 
-      Call `complete` when done. If nothing needs to change, `complete` with no updates.
+      When you are done, report what you changed. If nothing needs to change, say so and change nothing.
     reference_paths:
     # §3 — narrowed to the files this agent MAINTAINS. Audited on run f890ed1a: all five
     # previous references were read exactly 8 times each (once per invocation) — the turn-1
@@ -527,36 +537,21 @@ agents:
     - docs/DOMAIN.md
     - docs/DECISIONS.md
     - AGENTS.md
-    token_budget: 800000
+    # 🔴 RE-BASED FOR THE WEIGHTED COUNTER, 2026-11-27, by the same method as constraint-agent's:
+    # legacy weights fresh x1, cache x0.1, output x1; BaseAgent fresh x1, cache x0.02, output x4
+    # (output INCLUDING reasoning — disjoint keys in this store). MEASURED over every GENERATION
+    # tagged `gestalt_agent = context-agent` (3,381 calls): the weighted counter totals 0.8954x the
+    # legacy one — LOWER, because this role's traffic is cache-heavy (249M cache-read vs 25M fresh
+    # input tokens). Positive control, same query: constraint-agent 1.2486x against its recorded
+    # 1.2491x.   800,000 x 0.8954 = 716,320 -> 720,000
+    token_budget: 720000
+    token_budget_basis: weighted
     schema:
-      models:
-        _Update:
-          fields:
-            path:
-              type: str
-              optional: false
-              description: Context file path, e.g. docs/DOMAIN.md or AGENTS.md
-            section:
-              type: str
-              optional: true
-              description: >-
-                STRONGLY PREFERRED. The exact markdown heading text whose body this update
-                replaces, e.g. "Phase 3 delivered" — copy it verbatim from the heading index in
-                your task. With it, `content` is the NEW BODY OF THAT SECTION ONLY and every
-                other byte of the file is left untouched, so you need only read that section.
-                You may write the body alone — the heading line is kept for you.
-                Omit it ONLY to create a new file or to rewrite one whole, which requires having
-                read the entire file and is refused otherwise.
-            content:
-              type: str
-              optional: false
-              description: With `section`, the new body of that section alone. Without `section`, the FULL new contents of the file.
-      fields: {}
-      append:
-        updates: _Update
-      finalize: {}
-      required_non_empty: []
-
+      fields:
+        summary:
+          type: str
+          optional: false
+          description: What you changed in which document and why — or that nothing needed to change.
   code-agent:
     # 🔴 TEMPLATE WORDING TAKEN IN FULL (owner, 2026-11-10), the transaction-boundary rule
     # included. Three of the four project-only rules were TypeScript/npm specifics —
