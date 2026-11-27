@@ -53,7 +53,8 @@ agents:
       temperature: 0.1
       max_tokens: 2000
     tools:
-      builtin: [readFile, searchFiles]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - searchFiles
     prompt_extensions: []
     profile: intent
     # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
@@ -156,7 +157,9 @@ agents:
       temperature: 0.2
       max_tokens: 4000
     tools:
-      builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - listDirectory
+      - searchFiles
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
     profile: design
@@ -308,7 +311,9 @@ agents:
       # the registry ceiling, so it bounds a runaway without bounding real work.
       max_tokens: 12000
     tools:
-      builtin: [readFile, listDirectory, searchFiles]
+      - readFile
+      - listDirectory
+      - searchFiles
     prompt_extensions:
       - "When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response."
     profile: intent-design
@@ -501,27 +506,25 @@ agents:
       # the registry ceiling, so it bounds a runaway without bounding real work.
       max_tokens: 40000
     tools:
-      builtin:
-        - readFile          # read existing context files before updating
-        - listDirectory     # explore the docs/ structure
-        - searchFiles       # find where references need to change
-        - getFileTree       # understand project layout
-        - gitDiff           # see this phase's diff before updating docs
+      - readFile          # read existing context files before updating
+      - listDirectory     # explore the docs/ structure
+      - searchFiles       # find where references need to change
+      - getFileTree       # understand project layout
+      - gitDiff           # see this phase's diff before updating docs
       # Wrapped Serena (gestalt_core.serena) — bound ONLY because this role's node `produces:`
       # document artifacts. Each call is checked BEFORE it is forwarded: reads against
       # read_paths, writes against the node's `produces`. Serena runs on a STAGED copy that is
       # validated and applied all-or-nothing at the end of the run. Only these eight are
       # wrapped; `replace_symbol_body` / `insert_after_symbol` are refused at load (measured
       # broken on Serena 2.1.0), as are the multi-file and shell/memory tools.
-      serena:
-        - get_symbols_overview   # list a document's headings without reading it whole
-        - find_symbol            # one section, by heading (relative_path required)
-        - search_for_pattern     # find text inside a document (relative_path required)
-        - read_file              # a line range of a document
-        - list_dir
-        - find_file
-        - replace_content        # WRITE — edit text inside a section
-        - insert_before_symbol   # WRITE — add a new section before an existing heading
+      - get_symbols_overview   # list a document's headings without reading it whole
+      - find_symbol            # one section, by heading (relative_path required)
+      - search_for_pattern     # find text inside a document (relative_path required)
+      - read_file              # a line range of a document
+      - list_dir
+      - find_file
+      - replace_content        # WRITE — edit text inside a section
+      - insert_before_symbol   # WRITE — add a new section before an existing heading
     prompt_extensions: []
     # 🔴 THE PROMPT TEXT, FROM THE TEMPLATE (2026-11-18). It lived in the platform's Python
     # `AppendProfile` and reached the prompt only because the legacy dispatch fell back to it.
@@ -598,36 +601,15 @@ agents:
       temperature: 0.2
       max_tokens: 8000
     tools:
-      builtin:
-        - readFile          # read existing files before modifying
-        - listDirectory     # explore the project structure
-        - searchFiles       # find where things are defined
-        - getFileTree       # understand project layout
-        - executeScript     # verify generated code (compile / lint / etc.)
-                            # The agent picks the command — there are NO
-                            # hardcoded shell strings on the platform.
-                            # Hard blocklist: rm -rf, git push/commit/reset/rebase,
-                            # curl|sh, wget|sh, > /etc/, sudo (never overridable).
-      # ADR-039 — MCP (Model Context Protocol) servers extend the
-      # agent with external tools (issue trackers, dashboards, docs).
-      # Tool names are auto-namespaced as `<serverName>__<toolName>`
-      # so they cannot shadow the built-ins.
-      #
-      # token_from sources:
-      #   harness            — reads HARNESS.json mcp.servers[].token
-      #                        (token sits in the project repo —
-      #                        visible to anyone with repo access)
-      #   project_credential — reuses the project Git PAT
-      #   env:VAR_NAME       — reads process.env.VAR_NAME on the
-      #                        server process (recommended for any
-      #                        sensitive secret)
-      # mcp:
-      #   - name: github
-      #     url: https://mcp.github.com/v1
-      #     token_from: env:GITHUB_MCP_TOKEN
-      #   - name: localfs
-      #     url: stdio:npx @modelcontextprotocol/server-filesystem /tmp/project
-      #     token_from: env:NOOP   # stdio servers usually don't need a token
+      - readFile          # read existing files before modifying
+      - listDirectory     # explore the project structure
+      - searchFiles       # find where things are defined
+      - getFileTree       # understand project layout
+      - executeScript     # verify generated code (compile / lint / etc.)
+                          # The agent picks the command — there are NO
+                          # hardcoded shell strings on the platform.
+                          # Hard blocklist: rm -rf, git push/commit/reset/rebase,
+                          # curl|sh, wget|sh, > /etc/, sudo (never overridable).
     # Stack-specific coding conventions generated by the
     # `generateStackConfig` LLM call at `gestalt init` time.
     # Add more project-specific extensions below as needed.
@@ -734,7 +716,11 @@ agents:
       # the registry ceiling, so it bounds a runaway without bounding real work.
       max_tokens: 40000
     tools:
-      builtin: [executeScript, readFile, searchFiles, getFileTree, gitDiff]
+      - executeScript
+      - readFile
+      - searchFiles
+      - getFileTree
+      - gitDiff
     prompt_extensions: []
     reference_paths:
     - HARNESS.json
@@ -851,13 +837,16 @@ agents:
       model: gestalt-reasoning
       temperature: 0.0
       max_tokens: 44000
+    # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
+    # to verify import resolution before flagging "Import cannot be
+    # resolved" findings. searchFiles + readFile are the legacy
+    # spot-check toolset. Same hard blocklist as code-agent (no rm
+    # -rf / no git push / no sudo / no curl|bash / etc.) applies.
     tools:
-      # TEST_REPORT_007 — gains executeScript so it can `tsc --noEmit`
-      # to verify import resolution before flagging "Import cannot be
-      # resolved" findings. searchFiles + readFile are the legacy
-      # spot-check toolset. Same hard blocklist as code-agent (no rm
-      # -rf / no git push / no sudo / no curl|bash / etc.) applies.
-      builtin: [gitDiff, executeScript, readFile, searchFiles]
+      - gitDiff
+      - executeScript
+      - readFile
+      - searchFiles
     prompt_extensions: []
 
   # ── Maintenance layer (Amendment 2026-06: tools enabled) ──────
@@ -944,10 +933,11 @@ agents:
       model: ~   # null = platform registry default (switched centrally; see gestalt scripts/register-llm-and-prices.sh)
       temperature: 0.2
       max_tokens: 8192
+    # Pared-down set — context-fixer verifies the current file
+    # state before editing, but doesn't need to enumerate the tree.
     tools:
-      # Pared-down set — context-fixer verifies the current file
-      # state before editing, but doesn't need to enumerate the tree.
-      builtin: [readFile, listDirectory]
+      - readFile
+      - listDirectory
     prompt_extensions: []
 
   # ─── Architecture crew (TR_051 / ADR-056 Phase 1) ────────────────────
@@ -1098,7 +1088,9 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - searchFiles
+      - getFileTree
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - Focus exclusively on domain concepts — entities, attributes, lifecycle states, business rules
@@ -1265,7 +1257,9 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - searchFiles
+      - getFileTree
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - 'Describe each table CONCEPTUALLY: name, field names (no SQL types), primary key, foreign-key relationships, index rationale'
@@ -1452,7 +1446,9 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: [readFile, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - searchFiles
+      - getFileTree
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - Service methods are NAMES WITH PARAMETER NAMES ONLY — e.g. deductBalance(employeeId, leaveType, days, fiscalYear); no TypeScript types or return types (the design agent adds types)
@@ -1556,7 +1552,9 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: [readFile, listDirectory, searchFiles]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - listDirectory
+      - searchFiles
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - You receive three specialist designs. Your job is to reconcile them, not regenerate them.
@@ -1628,7 +1626,10 @@ agents:
       # spends ~210 completion tokens.
       max_tokens: 32000
     tools:
-      builtin: [readFile, listDirectory, searchFiles, getFileTree]   # §config-migration — explicit platform grant
+      - readFile   # §config-migration — explicit platform grant
+      - listDirectory
+      - searchFiles
+      - getFileTree
     prompt_extensions:
       - When your output is a collection of items, produce them one at a time — commit each item as you finish it, reason in free text between items, and signal completion when none remain. Never emit the entire collection in a single response.
       - Each phase must touch at most 5 files — prefer 2-3 files per phase
@@ -1785,7 +1786,6 @@ agents:
       temperature: 0.0
       max_tokens: 40000
     tools:
-      builtin:
       - executeScript
       - readFile
       - searchFiles
